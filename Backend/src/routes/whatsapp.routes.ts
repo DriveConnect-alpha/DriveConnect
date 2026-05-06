@@ -67,6 +67,13 @@ function isRateLimited(ip: string, windowMs: number, max: number): boolean {
   return current.count > max;
 }
 
+function cleanupRateLimit(windowMs: number): void {
+  const now = Date.now();
+  for (const [ip, state] of rateLimitState.entries()) {
+    if (now - state.startMs >= windowMs) rateLimitState.delete(ip);
+  }
+}
+
 // ──────────────────────────────────────────────
 // GET /whatsapp/webhook
 // Verificação do webhook da Meta
@@ -112,6 +119,7 @@ export async function receiveWebhook(req: IncomingMessage, res: ServerResponse) 
   const rateMax = Number.parseInt(process.env.WHATSAPP_RATE_LIMIT_MAX || '120', 10);
 
   if (Number.isFinite(rateWindowMs) && Number.isFinite(rateMax) && rateWindowMs > 0 && rateMax > 0) {
+    cleanupRateLimit(rateWindowMs);
     if (isRateLimited(ip, rateWindowMs, rateMax)) {
       res.writeHead(429, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ erro: 'Rate limit excedido.' }));
@@ -142,7 +150,7 @@ export async function receiveWebhook(req: IncomingMessage, res: ServerResponse) 
     return;
   }
 
-  if (appSecret) {
+  if (requireSignature && appSecret) {
     const signatureHeader = String(req.headers['x-hub-signature-256'] ?? '');
     const ok = verifyMetaSignature(raw, signatureHeader, appSecret);
     if (!ok) {

@@ -76,6 +76,7 @@ export async function sendMessage(to: string, text: string): Promise<void> {
         body: JSON.stringify({
           messaging_product: 'whatsapp',
           to,
+          type: 'text',
           text: { body: text },
         }),
         signal: controller.signal,

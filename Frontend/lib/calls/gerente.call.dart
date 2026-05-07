@@ -50,8 +50,8 @@ class GerenteCall {
       onSuccess(response.data!);
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao registrar gerente.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 
@@ -79,8 +79,8 @@ class GerenteCall {
       onSuccess(data);
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao listar clientes.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 
@@ -114,8 +114,8 @@ class GerenteCall {
       onSuccess(response.data!);
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao buscar detalhes do cliente.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 
@@ -158,8 +158,8 @@ class GerenteCall {
       onSuccess(response.data!);
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao atualizar dados do cliente.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 
@@ -193,8 +193,8 @@ class GerenteCall {
       onSuccess(response.data!['mensagem'] as String? ?? 'Usuário desativado com sucesso.');
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao desativar usuário.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 }

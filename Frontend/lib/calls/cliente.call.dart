@@ -57,8 +57,8 @@ class ClienteCall {
       onSuccess(response.data!);
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao registrar cliente.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 
@@ -85,8 +85,8 @@ class ClienteCall {
       onSuccess(response.data!);
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao buscar perfil do cliente.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 
@@ -122,8 +122,8 @@ class ClienteCall {
       onSuccess(response.data!);
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao atualizar perfil do cliente.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 }

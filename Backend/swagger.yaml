@@ -171,13 +171,15 @@ paths:
           description: Lista de veículos
     post:
       tags: [Veículos & Frota]
-      summary: Registra um novo veículo (Apenas Gerentes)
+      summary: Registra um novo veículo (Apenas Gerentes e Admins)
       security:
         - ApiKeyAuth: []
         - BearerAuth: []
       responses:
         '201':
           description: Veículo criado
+        '403':
+          description: Sem permissão (requer GERENTE ou ADMIN)
   /pagamento/webhook:
     post:
       tags: [Pagamentos & Financeiro]
@@ -201,6 +203,35 @@ paths:
           description: Arquivo de imagem (PNG/JPG/WEBP)
         '403':
           description: API Key inválida
+  /usuarios/gerentes:
+    post:
+      tags: [Auth & Usuários]
+      summary: Registra um novo gerente (Apenas Administradores)
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                senha:
+                  type: string
+                nome_completo:
+                  type: string
+                filial_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        '201':
+          description: Gerente criado com sucesso
+        '403':
+          description: Sem permissão (apenas ADMIN)
   /relatorios/faturamento:
     get:
       tags: [Relatórios]

@@ -45,21 +45,18 @@ ReservAqui/
 
 ---
 
-## Step 1 — Read the Swagger first
+## Step 1 — Read the Swagger AND Backend Code First
 
 **Always start here.** Open `Backend/swagger.yaml` and find every endpoint relevant to the
-developer's request. The Swagger is the authoritative contract: it has paths, HTTP methods,
-required/optional parameters, query strings, request body schemas, and response shapes.
+developer's request. However, the Swagger might be incomplete or outdated. **You MUST ALSO check the backend route definitions (e.g. `Backend/src/routes/*.ts`) and service functions to verify exactly which parameters are required.**
 
 Look for:
-- `paths` — lists every endpoint with method, auth requirement, request/response
-- `parameters` — query params and path params for GET endpoints
-- `requestBody` — JSON fields for POST/PATCH endpoints
-- `security` — `UserBearer` = authGuard (usuario token), `HotelBearer` = hotelGuard (hotel token)
-- `responses` — what the backend actually returns on 200/201
+- `paths` in Swagger AND the actual `req.on('data')` or `lerCorpo(req)` destructurings in the route handlers.
+- Required vs optional fields: Check the backend `if (!campo) { return erro; }` statements.
+- `security` headers: Check how `middlewares/auth.ts` actually extracts the identity (e.g., `x-usuario-id` instead of Bearer token).
+- `responses`: Check what `responder(res, 200, dados)` actually returns in the backend code.
 
-> If you need details about a schema (e.g., what fields `Quarto` has), it's in
-> `components/schemas`. Cross-reference freely.
+> If you need details about a schema (e.g., what fields `Quarto` has), cross-reference `components/schemas` with the actual Entity classes (`Backend/src/entities/*.ts`).
 
 ---
 

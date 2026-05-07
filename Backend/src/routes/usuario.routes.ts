@@ -135,6 +135,9 @@ export async function registrarCliente(req: IncomingMessage, res: ServerResponse
 // ──────────────────────────────────────────────
 export async function registrarGerente(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
+    const caller = requireCaller(req);
+    requireTipo(caller, 'ADMIN');
+
     const corpo = await lerCorpo(req);
     const { email, senha, nome_completo, filial_id } = corpo;
 

@@ -47,8 +47,8 @@ class RelatorioCall {
       onSuccess(response.data!);
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao buscar faturamento.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 
@@ -90,8 +90,8 @@ class RelatorioCall {
       onSuccess(response.data!);
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao buscar dados de ocupação.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 
@@ -133,8 +133,8 @@ class RelatorioCall {
       onSuccess(response.data!);
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao buscar dados operacionais.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 }

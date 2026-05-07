@@ -11,17 +11,16 @@ if (!fs.existsSync(UPLOAD_DIR)) {
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-export async function processarUpload(req: IncomingMessage): Promise<{ campos: Record<string, any>, caminhoImagem: string | null }> {
+export async function processarUpload(req: IncomingMessage): Promise<{ campos: Record<string, any>, caminhosImagens: string[] }> {
     const form = formidable({
         uploadDir: UPLOAD_DIR,
         keepExtensions: true,
-        maxFileSize: 5 * 1024 * 1024, // 5MB
+        maxFileSize: 200 * 1024 * 1024, // 200MB total para múltiplos arquivos
+        multiples: true, // Habilita múltiplos arquivos
         filename: (name: string, ext: string, part: any) => {
-            // Nome final seguro com UUID para evitar Path Traversal
             return `${uuidv4()}${ext}`;
         },
         filter: (part: any) => {
-            // Validar tipo de arquivo
             return part.mimetype?.includes('image/') ?? false;
         }
     });
@@ -38,17 +37,17 @@ export async function processarUpload(req: IncomingMessage): Promise<{ campos: R
                 campos[key] = Array.isArray(val) ? val[0] : val;
             }
 
-            let caminhoImagem: string | null = null;
+            const caminhosImagens: string[] = [];
             if (files.imagem) {
                 const fileArray = Array.isArray(files.imagem) ? files.imagem : [files.imagem];
-                const file = fileArray[0];
-                if (file) {
-                    // Agora salvamos só o nome do arquivo para usar na rota segura /storage/carros/
-                    caminhoImagem = file.newFilename;
+                for (const file of fileArray) {
+                    if (file) {
+                        caminhosImagens.push(file.newFilename);
+                    }
                 }
             }
 
-            resolve({ campos, caminhoImagem });
+            resolve({ campos, caminhosImagens });
         });
     });
 }
@@ -56,12 +55,12 @@ export async function processarUpload(req: IncomingMessage): Promise<{ campos: R
 // Ler arquivo de forma segura
 export function lerArquivoSeguro(filename: string): fs.ReadStream {
     const filepath = path.join(UPLOAD_DIR, filename);
-    
+
     // Evita path traversal: verifica se o caminho resolvido continua dentro da pasta
     if (!filepath.startsWith(UPLOAD_DIR)) {
         throw new Error('Acesso negado.');
     }
-    
+
     if (!fs.existsSync(filepath)) {
         throw new Error('Arquivo não encontrado.');
     }

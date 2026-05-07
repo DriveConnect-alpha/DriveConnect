@@ -7,6 +7,7 @@ import {
     deletarVeiculo
 } from '../services/veiculo.service.js';
 import { processarUpload } from '../services/storage.service.js';
+import { requireCaller, requireTipo } from '../middlewares/auth.js';
 
 function isMultipart(req: IncomingMessage) {
     return req.headers['content-type']?.includes('multipart/form-data');
@@ -33,7 +34,9 @@ async function tratarErro(res: ServerResponse, err: unknown): Promise<void> {
     const mensagem = err instanceof Error ? err.message : 'Erro interno.';
     const status = mensagem.includes('inválid') || mensagem.includes('obrigatório') ? 400
         : mensagem.includes('não encontrad') ? 404
-            : 500;
+        : mensagem.includes('Não autorizado') || mensagem.includes('identidade ausente') ? 401
+        : mensagem.includes('Sem permissão') ? 403
+        : 500;
     responder(res, status, { erro: mensagem });
 }
 
@@ -43,23 +46,32 @@ async function tratarErro(res: ServerResponse, err: unknown): Promise<void> {
 // ──────────────────────────────────────────────
 export async function registrarVeiculo(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN');
+
         let campos: Record<string, any> = {};
-        let caminhoImagem: string | null = null;
+        let caminhosImagens: string[] = [];
 
         if (isMultipart(req)) {
             const uploadResult = await processarUpload(req);
             campos = uploadResult.campos;
-            caminhoImagem = uploadResult.caminhoImagem;
+            caminhosImagens = uploadResult.caminhosImagens;
         } else {
             campos = await lerCorpoJson(req);
         }
 
-        const { modelo_id, filial_id, placa, ano, cor, status } = campos;
+        const { modelo_id, filial_id, placa, ano, cor, status, indice_principal } = campos;
 
         if (!modelo_id || !filial_id || !placa || !ano || !status) {
             responder(res, 400, { erro: 'Campos obrigatórios: modelo_id, filial_id, placa, ano, status.' });
             return;
         }
+
+        // Determina qual imagem será a principal (capa)
+        const idxPrincipal = Number(indice_principal || 0);
+        const imagemPrincipal = caminhosImagens.length > 0 
+            ? (caminhosImagens[idxPrincipal] || caminhosImagens[0]) 
+            : null;
 
         const novoVeiculo = await criarVeiculo({
             modelo_id: Number(modelo_id),
@@ -68,8 +80,15 @@ export async function registrarVeiculo(req: IncomingMessage, res: ServerResponse
             ano: Number(ano),
             cor,
             status,
-            imagem_url: caminhoImagem,
+            imagem_url: imagemPrincipal, // Capa oficial no registro
         });
+
+        // Salva todas as imagens na tabela de galeria
+        const { adicionarImagemVeiculo } = await import('../services/veiculo.service.js');
+        for (let i = 0; i < caminhosImagens.length; i++) {
+            const isPrincipal = i === idxPrincipal || (caminhosImagens.length === 1);
+            await adicionarImagemVeiculo(novoVeiculo.id!, caminhosImagens[i], isPrincipal);
+        }
 
         responder(res, 201, novoVeiculo);
     } catch (err) {
@@ -117,13 +136,16 @@ export async function buscar(req: IncomingMessage, res: ServerResponse, id: stri
 // ──────────────────────────────────────────────
 export async function atualizar(req: IncomingMessage, res: ServerResponse, id: string): Promise<void> {
     try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN');
+
         let campos: Record<string, any> = {};
-        let caminhoImagem: string | null = null;
+        let caminhosImagens: string[] = [];
 
         if (isMultipart(req)) {
             const uploadResult = await processarUpload(req);
             campos = uploadResult.campos;
-            caminhoImagem = uploadResult.caminhoImagem;
+            caminhosImagens = uploadResult.caminhosImagens;
         } else {
             campos = await lerCorpoJson(req);
         }
@@ -138,13 +160,24 @@ export async function atualizar(req: IncomingMessage, res: ServerResponse, id: s
         if (ano) dadosParaAtualizar.ano = Number(ano);
         if (cor) dadosParaAtualizar.cor = cor;
         if (status) dadosParaAtualizar.status = status;
-        if (caminhoImagem) dadosParaAtualizar.imagem_url = caminhoImagem;
+        
+        // Se enviou novas imagens no PUT, a primeira vira a capa por padrão nesta rota simplificada
+        if (caminhosImagens.length > 0) {
+            dadosParaAtualizar.imagem_url = caminhosImagens[0];
+        }
 
         const veiculoAtualizado = await atualizarVeiculo(id, dadosParaAtualizar);
 
         if (!veiculoAtualizado) {
             responder(res, 404, { erro: 'Veículo não encontrado ou nenhum campo válido enviado.' });
             return;
+        }
+
+        // Se houver novas imagens, adiciona na galeria (sem marcar como principal obrigatoriamente, 
+        // a menos que seja a única ou explicitado - aqui mantemos simples para o PUT)
+        const { adicionarImagemVeiculo } = await import('../services/veiculo.service.js');
+        for (const img of caminhosImagens) {
+            await adicionarImagemVeiculo(id, img, false);
         }
 
         responder(res, 200, veiculoAtualizado);
@@ -155,21 +188,27 @@ export async function atualizar(req: IncomingMessage, res: ServerResponse, id: s
 
 export async function adicionarImagem(req: IncomingMessage, res: ServerResponse, id: string): Promise<void> {
     try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN');
+
         if (!isMultipart(req)) {
             responder(res, 400, { erro: 'Requisição deve ser multipart/form-data.' });
             return;
         }
 
         const uploadResult = await processarUpload(req);
-        const { caminhoImagem, campos } = uploadResult;
+        const { caminhosImagens, campos } = uploadResult;
 
-        if (!caminhoImagem) {
+        if (caminhosImagens.length === 0) {
             responder(res, 400, { erro: 'Nenhuma imagem enviada.' });
             return;
         }
 
         const isPrincipal = campos.is_principal === 'true' || campos.is_principal === true;
         const { adicionarImagemVeiculo } = await import('../services/veiculo.service.js');
+        
+        // Nesta rota, processamos apenas a primeira imagem para manter compatibilidade com o comportamento esperado
+        const caminhoImagem = caminhosImagens[0];
         await adicionarImagemVeiculo(id, caminhoImagem, isPrincipal);
 
         responder(res, 201, { mensagem: 'Imagem adicionada com sucesso.', filename: caminhoImagem });
@@ -183,6 +222,9 @@ export async function adicionarImagem(req: IncomingMessage, res: ServerResponse,
 // ──────────────────────────────────────────────
 export async function deletar(req: IncomingMessage, res: ServerResponse, id: string): Promise<void> {
     try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN');
+
         const sucesso = await deletarVeiculo(id);
         if (!sucesso) {
             responder(res, 404, { erro: 'Veículo não encontrado.' });

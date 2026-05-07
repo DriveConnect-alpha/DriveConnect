@@ -259,7 +259,7 @@ export async function estenderReserva(
      WHERE r.id = $1 AND r.deletado_em IS NULL`,
     [reservaId]
   );
-  
+
   const reserva = reservaRes.rows[0];
   if (!reserva) throw new Error('Reserva não encontrada.');
 
@@ -311,10 +311,10 @@ export async function estenderReserva(
     novaDataFim
   );
 
-  const planoFinal = reserva.plano_seguro_id 
+  const planoFinal = reserva.plano_seguro_id
     ? await buscarPlanoPorId(reserva.plano_seguro_id)
     : await buscarPlanoBasico();
-    
+
   // Verifica se o plano existe
   if (!planoFinal) throw new Error('Plano de seguro original não encontrado.');
 

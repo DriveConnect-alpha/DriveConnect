@@ -54,8 +54,8 @@ class UserCall {
       onSuccess(userData);
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao fazer login.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 
@@ -90,8 +90,8 @@ class UserCall {
       onSuccess(response.data!['mensagem'] as String? ?? 'Instruções enviadas.');
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao solicitar recuperação.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 
@@ -128,8 +128,8 @@ class UserCall {
       onSuccess(response.data!['mensagem'] as String? ?? 'Senha redefinida com sucesso.');
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao redefinir a senha.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 
@@ -166,8 +166,8 @@ class UserCall {
       onSuccess(response.data!['mensagem'] as String? ?? 'Senha alterada com sucesso.');
     } on DioException catch (e) {
       handleApiError(e, onError);
-    } catch (_) {
-      onError('Erro inesperado ao trocar a senha.');
+    } catch (e) {
+      onError(e.toString());
     }
   }
 }

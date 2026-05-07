@@ -67,7 +67,7 @@ final Dio dioClient = () {
         if (_apiKey != null) {
           options.headers['x-api-key'] = _apiKey;
         }
-        
+
         handler.next(options);
       },
       onError: (error, handler) async {
@@ -79,46 +79,40 @@ final Dio dioClient = () {
       },
     ),
   );
-  
+
   return dio;
 }();
 
 // ── Helper centralizado para tratar erros do Dio ────────────────────────────
 void handleApiError(DioException e, void Function(String) onError) {
+  String message = 'Ocorreu um erro inesperado.';
+
   switch (e.type) {
     case DioExceptionType.connectionTimeout:
     case DioExceptionType.sendTimeout:
     case DioExceptionType.receiveTimeout:
-      onError('Tempo de conexão esgotado. Verifique sua internet.');
+      message =
+          'O servidor demorou muito para responder. Verifique sua conexão.';
       break;
     case DioExceptionType.connectionError:
-      onError('Sem conexão com o servidor. Verifique sua internet.');
+      message =
+          'Não foi possível conectar ao servidor. Verifique se você está conectado à internet.';
       break;
     case DioExceptionType.badResponse:
-      final statusCode = e.response?.statusCode;
-      final body = e.response?.data;
-      final serverMsg = body is Map
-          ? (body['erro'] ?? body['error'] ?? body['message'])?.toString()
-          : null;
-          
-      switch (statusCode) {
-        case 400:
-          onError(serverMsg ?? 'Dados inválidos. Verifique os campos e tente novamente.');
-          break;
-        case 401:
-          onError(serverMsg ?? 'Credenciais inválidas ou sessão expirada.');
-          break;
-        case 403:
-          onError(serverMsg ?? 'Sem permissão para acessar este recurso.');
-          break;
-        case 404:
-          onError(serverMsg ?? 'Recurso não encontrado.');
-          break;
-        default:
-          onError(serverMsg ?? 'Erro inesperado (código $statusCode).');
+      final data = e.response?.data;
+      if (data is Map) {
+        // Tenta pegar a mensagem específica enviada pelo backend
+        message = data['erro'] ?? data['error'] ?? data['message'] ?? message;
+      } else if (data is String && data.isNotEmpty) {
+        message = data;
       }
       break;
+    case DioExceptionType.cancel:
+      message = 'A requisição foi cancelada.';
+      break;
     default:
-      onError('Erro inesperado na requisição.');
+      message = 'Erro na comunicação com o servidor.';
   }
+
+  onError(message);
 }

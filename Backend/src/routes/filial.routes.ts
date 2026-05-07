@@ -44,7 +44,7 @@ function mapearErro(err: unknown): { status: number; mensagem: string } {
 export async function listarTodasFiliais(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     const caller = requireCaller(req);
-    requireTipo(caller, 'GERENTE', 'ADMIN');
+    requireTipo(caller, 'GERENTE', 'ADMIN', 'CLIENTE');
 
     const filiais = await listarFiliais();
     responder(res, 200, filiais);
@@ -61,7 +61,7 @@ export async function listarTodasFiliais(req: IncomingMessage, res: ServerRespon
 export async function detalharFilial(req: IncomingMessage, res: ServerResponse, filialId: string): Promise<void> {
   try {
     const caller = requireCaller(req);
-    requireTipo(caller, 'GERENTE', 'ADMIN');
+    requireTipo(caller, 'GERENTE', 'ADMIN', 'CLIENTE');
 
     const filial = await buscarFilialPorId(filialId);
     if (!filial) { responder(res, 404, { erro: 'Filial não encontrada.' }); return; }

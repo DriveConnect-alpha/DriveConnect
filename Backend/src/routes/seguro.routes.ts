@@ -6,6 +6,8 @@ import {
   desativarPlano,
 } from '../services/seguro.service.js';
 
+import { requireCaller, requireTipo } from '../middlewares/auth.js';
+
 function lerCorpo(req: IncomingMessage): Promise<Record<string, any>> {
   return new Promise((resolve, reject) => {
     let dados = '';
@@ -36,7 +38,11 @@ export async function listarSeguros(_req: IncomingMessage, res: ServerResponse) 
 // Body: { nome, descricao?, percentual, obrigatorio? }
 // ──────────────────────────────────────────────
 export async function criarSeguro(req: IncomingMessage, res: ServerResponse) {
-  const corpo = await lerCorpo(req);
+  try {
+    const caller = requireCaller(req);
+    requireTipo(caller, 'ADMIN');
+
+    const corpo = await lerCorpo(req);
   const { nome, descricao, percentual, obrigatorio } = corpo;
 
   if (!nome || percentual === undefined) {
@@ -53,8 +59,13 @@ export async function criarSeguro(req: IncomingMessage, res: ServerResponse) {
 
   const plano = await criarPlano({ nome, descricao, percentual, obrigatorio });
 
-  res.writeHead(201, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(plano));
+    res.writeHead(201, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(plano));
+  } catch (err: any) {
+    const mensagem = err.message || 'Erro interno.';
+    res.writeHead(err.message?.includes('autorizado') ? 401 : 500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ erro: mensagem }));
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -63,7 +74,11 @@ export async function criarSeguro(req: IncomingMessage, res: ServerResponse) {
 // Body: { nome?, descricao?, percentual? }
 // ──────────────────────────────────────────────
 export async function atualizarSeguro(req: IncomingMessage, res: ServerResponse, planoId: string) {
-  const corpo = await lerCorpo(req);
+  try {
+    const caller = requireCaller(req);
+    requireTipo(caller, 'ADMIN');
+
+    const corpo = await lerCorpo(req);
   const { nome, descricao, percentual } = corpo;
 
   const planoAtualizado = await atualizarPlano(planoId, { nome, descricao, percentual });
@@ -74,8 +89,13 @@ export async function atualizarSeguro(req: IncomingMessage, res: ServerResponse,
     return;
   }
 
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(planoAtualizado));
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(planoAtualizado));
+  } catch (err: any) {
+    const mensagem = err.message || 'Erro interno.';
+    res.writeHead(err.message?.includes('autorizado') ? 401 : 500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ erro: mensagem }));
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -84,7 +104,11 @@ export async function atualizarSeguro(req: IncomingMessage, res: ServerResponse,
 // Planos obrigatórios (Básico) não podem ser desativados.
 // ──────────────────────────────────────────────
 export async function desativarSeguro(req: IncomingMessage, res: ServerResponse, planoId: string) {
-  const resultado = await desativarPlano(planoId);
+  try {
+    const caller = requireCaller(req);
+    requireTipo(caller, 'ADMIN');
+
+    const resultado = await desativarPlano(planoId);
 
   if (!resultado.sucesso) {
     res.writeHead(409, { 'Content-Type': 'application/json' });
@@ -92,6 +116,11 @@ export async function desativarSeguro(req: IncomingMessage, res: ServerResponse,
     return;
   }
 
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ mensagem: 'Plano desativado com sucesso.' }));
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ mensagem: 'Plano desativado com sucesso.' }));
+  } catch (err: any) {
+    const mensagem = err.message || 'Erro interno.';
+    res.writeHead(err.message?.includes('autorizado') ? 401 : 500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ erro: mensagem }));
+  }
 }

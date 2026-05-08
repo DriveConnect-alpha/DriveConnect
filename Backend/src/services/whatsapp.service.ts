@@ -3,6 +3,13 @@
 // ──────────────────────────────────────────────
 
 import 'dotenv/config';
+import { answerWhatsAppMessage } from '../ai/rag.js';
+import {
+  ensureConversation,
+  getConversationHistory,
+  storeMessage,
+  updateMessageStatus,
+} from './whatsappStorage.service.js';
 
 type WhatsAppTextMessage = {
   from: string;
@@ -55,7 +62,7 @@ setInterval(cleanupSeen, Math.max(30_000, Math.floor(DEDUPE_TTL_MS / 2))).unref(
  * @param to Número de telefone do destinatário
  * @param text Texto da mensagem a ser enviada
  */
-export async function sendMessage(to: string, text: string): Promise<void> {
+export async function sendMessage(to: string, text: string): Promise<string | null> {
   const graphApiVersion = process.env.WHATSAPP_GRAPH_API_VERSION ?? process.env.GRAPH_API_VERSION ?? 'v19.0';
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN ?? process.env.ACCESS_TOKEN ?? mustGetEnv('WHATSAPP_ACCESS_TOKEN');
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID ?? process.env.PHONE_NUMBER_ID ?? mustGetEnv('WHATSAPP_PHONE_NUMBER_ID');
@@ -87,6 +94,10 @@ export async function sendMessage(to: string, text: string): Promise<void> {
       const body = await response.text().catch(() => '');
       throw new Error(`Graph API error: HTTP ${response.status} ${body}`);
     }
+
+    const json = await response.json().catch(() => ({}));
+    const messageId = Array.isArray(json?.messages) ? json.messages[0]?.id : null;
+    return messageId ?? null;
   } finally {
     clearTimeout(timeout);
   }
@@ -103,6 +114,19 @@ export async function processIncomingMessage(payload: any): Promise<void> {
   const changes = entry?.changes?.[0];
   const value = changes?.value;
   const message = value?.messages?.[0];
+  const statuses = Array.isArray(value?.statuses)
+    ? (value?.statuses as Array<{ id?: string; status?: string }> )
+    : [];
+
+  if (statuses.length > 0) {
+    for (const status of statuses) {
+      const statusId = status?.id;
+      const statusValue = status?.status;
+      if (statusId && statusValue) {
+        await updateMessageStatus(statusId, statusValue);
+      }
+    }
+  }
 
   if (!message) return;
   if (hasSeenMessage(message.id)) return;
@@ -115,7 +139,75 @@ export async function processIncomingMessage(payload: any): Promise<void> {
   if (logBody) logPayload.body = text;
   console.log('[WhatsApp Service] Mensagem recebida:', JSON.stringify(logPayload));
 
-  // Resposta padrão (pode ser trocada por regras do seu domínio depois)
-  const reply = `Recebi sua mensagem: "${text}". BOT em modo de testes.`;
-  await sendMessage(from, reply);
+  const conversation = await ensureConversation(from);
+  if (!conversation?.id) {
+    console.error('[WhatsApp Service] Não foi possível abrir conversa para', from);
+    return;
+  }
+
+  await storeMessage({
+    conversationId: conversation.id,
+    direction: 'IN',
+    waMessageId: message.id,
+    text,
+    rawPayload: message,
+    status: 'received',
+  });
+
+  if (!text) {
+    const fallback = 'Mensagem de mídia recebida, consigo processar apenas texto no momento.';
+    const fallbackMessageId = await sendMessage(from, fallback);
+    await storeMessage({
+      conversationId: conversation.id,
+      direction: 'OUT',
+      waMessageId: fallbackMessageId,
+      text: fallback,
+      status: 'sent',
+    });
+    return;
+  }
+
+  const history = await getConversationHistory(conversation.id, Number.parseInt(process.env.WHATSAPP_HISTORY_LIMIT || '12', 10));
+
+  const quickReplyMsRaw = process.env.WHATSAPP_QUICK_REPLY_MS ?? '0';
+  const quickReplyMs = Number.parseInt(quickReplyMsRaw, 10);
+  const quickReplyText = (process.env.WHATSAPP_QUICK_REPLY_TEXT || '').trim();
+
+  let placeholderTimer: NodeJS.Timeout | null = null;
+  if (Number.isFinite(quickReplyMs) && quickReplyMs > 0 && quickReplyText) {
+    const safeQuickReplyMs = quickReplyMs >= 200 ? quickReplyMs : 1500;
+    placeholderTimer = setTimeout(() => {
+      void sendMessage(from, quickReplyText).catch((err) => {
+        console.error('[WhatsApp Service] Erro enviando quick reply:', err);
+      });
+    }, safeQuickReplyMs);
+    placeholderTimer.unref();
+  }
+
+  try {
+    const reply = await answerWhatsAppMessage(text, { history });
+    if (placeholderTimer) clearTimeout(placeholderTimer);
+
+    const replyMessageId = await sendMessage(from, reply);
+    await storeMessage({
+      conversationId: conversation.id,
+      direction: 'OUT',
+      waMessageId: replyMessageId,
+      text: reply,
+      status: 'sent',
+    });
+  } catch (error) {
+    if (placeholderTimer) clearTimeout(placeholderTimer);
+    console.error('[WhatsApp Service] Erro gerando resposta da IA:', error);
+    const fallback = 'Desculpe, não consegui acessar a base de conhecimento agora. Pode tentar novamente em instantes?';
+    const fallbackMessageId = await sendMessage(from, fallback);
+    await storeMessage({
+      conversationId: conversation.id,
+      direction: 'OUT',
+      waMessageId: fallbackMessageId,
+      text: fallback,
+      status: 'sent',
+      error: String((error as Error)?.message || error),
+    });
+  }
 }

@@ -53,7 +53,8 @@ describe('Storage Service', () => {
 
       expect(resultado).toEqual({
         campos: { nome: 'Fusca', portas: '2' },
-        caminhoImagem: 'uuid-123.jpg'
+        caminhoImagem: 'uuid-123.jpg',
+        caminhosImagens: ['uuid-123.jpg']
       });
     });
 
@@ -66,7 +67,8 @@ describe('Storage Service', () => {
 
       expect(resultado).toEqual({
         campos: { modelo: 'Civic' },
-        caminhoImagem: null
+        caminhoImagem: null,
+        caminhosImagens: []
       });
     });
 

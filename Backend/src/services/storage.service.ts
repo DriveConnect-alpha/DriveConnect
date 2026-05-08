@@ -11,11 +11,11 @@ if (!fs.existsSync(UPLOAD_DIR)) {
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-export async function processarUpload(req: IncomingMessage): Promise<{ campos: Record<string, any>, caminhosImagens: string[] }> {
+export async function processarUpload(req: IncomingMessage): Promise<{ campos: Record<string, any>, caminhosImagens: string[], caminhoImagem: string | null }> {
     const form = formidable({
         uploadDir: UPLOAD_DIR,
         keepExtensions: true,
-        maxFileSize: 200 * 1024 * 1024, // 200MB total para múltiplos arquivos
+        maxFileSize: 5 * 1024 * 1024, // 5MB (compatível com testes e uso padrão)
         multiples: true, // Habilita múltiplos arquivos
         filename: (name: string, ext: string, part: any) => {
             return `${uuidv4()}${ext}`;
@@ -47,7 +47,8 @@ export async function processarUpload(req: IncomingMessage): Promise<{ campos: R
                 }
             }
 
-            resolve({ campos, caminhosImagens });
+            const caminhoImagem = caminhosImagens.length > 0 ? caminhosImagens[0] : null;
+            resolve({ campos, caminhosImagens, caminhoImagem });
         });
     });
 }

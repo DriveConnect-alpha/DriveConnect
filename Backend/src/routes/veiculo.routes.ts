@@ -69,8 +69,8 @@ export async function registrarVeiculo(req: IncomingMessage, res: ServerResponse
 
         // Determina qual imagem será a principal (capa)
         const idxPrincipal = Number(indice_principal || 0);
-        const imagemPrincipal = caminhosImagens.length > 0 
-            ? (caminhosImagens[idxPrincipal] || caminhosImagens[0]) 
+        const imagemPrincipal: string | null = caminhosImagens.length > 0
+            ? (caminhosImagens[idxPrincipal] || caminhosImagens[0] || null)
             : null;
 
         const novoVeiculo = await criarVeiculo({
@@ -86,8 +86,10 @@ export async function registrarVeiculo(req: IncomingMessage, res: ServerResponse
         // Salva todas as imagens na tabela de galeria
         const { adicionarImagemVeiculo } = await import('../services/veiculo.service.js');
         for (let i = 0; i < caminhosImagens.length; i++) {
+            const caminho = caminhosImagens[i];
+            if (!caminho) continue;
             const isPrincipal = i === idxPrincipal || (caminhosImagens.length === 1);
-            await adicionarImagemVeiculo(novoVeiculo.id!, caminhosImagens[i], isPrincipal);
+            await adicionarImagemVeiculo(novoVeiculo.id!, caminho, isPrincipal);
         }
 
         responder(res, 201, novoVeiculo);
@@ -209,6 +211,10 @@ export async function adicionarImagem(req: IncomingMessage, res: ServerResponse,
         
         // Nesta rota, processamos apenas a primeira imagem para manter compatibilidade com o comportamento esperado
         const caminhoImagem = caminhosImagens[0];
+        if (!caminhoImagem) {
+            responder(res, 400, { erro: 'Imagem inválida.' });
+            return;
+        }
         await adicionarImagemVeiculo(id, caminhoImagem, isPrincipal);
 
         responder(res, 201, { mensagem: 'Imagem adicionada com sucesso.', filename: caminhoImagem });

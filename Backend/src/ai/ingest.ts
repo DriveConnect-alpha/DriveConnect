@@ -150,7 +150,11 @@ async function populateVectorStore(): Promise<void> {
 
   const docs: Document[] = await textSplitter.splitDocuments(baseDocs);
   docs.forEach((doc: Document, i: number) => {
-    doc.metadata = { ...(doc.metadata || {}), chunk: i };
+    doc.metadata = {
+      ...(doc.metadata || {}),
+      chunk: i,
+      stable_id: stableIdForDoc(doc),
+    };
   });
 
   const embeddings = new OpenAIEmbeddings({
@@ -173,8 +177,7 @@ async function populateVectorStore(): Promise<void> {
     },
   });
 
-  const ids = docs.map((doc: Document) => stableIdForDoc(doc));
-  await store.addDocuments(docs, { ids });
+  await store.addDocuments(docs);
 
   console.log(`Ingestão concluída. ${docs.length} chunks enviados para ${collectionName}.`);
 }

@@ -165,6 +165,12 @@ async function populateVectorStore(): Promise<void> {
     tableName: process.env.RAG_PG_TABLE || 'langchain_pg_embedding',
     collectionTableName: process.env.RAG_COLLECTION_TABLE || 'langchain_pg_collection',
     collectionName,
+    columns: {
+      contentColumnName: process.env.RAG_CONTENT_COLUMN || 'document',
+      metadataColumnName: process.env.RAG_METADATA_COLUMN || 'metadata',
+      vectorColumnName: process.env.RAG_VECTOR_COLUMN || 'embedding',
+      idColumnName: process.env.RAG_ID_COLUMN || 'id',
+    },
   });
 
   const ids = docs.map((doc: Document) => stableIdForDoc(doc));

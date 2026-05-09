@@ -88,6 +88,12 @@ async function getVectorStore(): Promise<PGVectorStore> {
     tableName: process.env.RAG_PG_TABLE || 'langchain_pg_embedding',
     collectionTableName: process.env.RAG_COLLECTION_TABLE || 'langchain_pg_collection',
     collectionName: process.env.RAG_COLLECTION || 'driveconnect',
+    columns: {
+      contentColumnName: process.env.RAG_CONTENT_COLUMN || 'document',
+      metadataColumnName: process.env.RAG_METADATA_COLUMN || 'metadata',
+      vectorColumnName: process.env.RAG_VECTOR_COLUMN || 'embedding',
+      idColumnName: process.env.RAG_ID_COLUMN || 'id',
+    },
   });
 
   return vectorStore;

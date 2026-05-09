@@ -74,9 +74,15 @@ async function run() {
         }
 
         try {
+            await pool.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
+        } catch (e) {
+            console.error('Erro ao habilitar extensão pgcrypto', e);
+        }
+
+        try {
             await pool.query(`
                 CREATE TABLE IF NOT EXISTS langchain_pg_collection (
-                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     name TEXT NOT NULL,
                     cmetadata JSONB
                 );
@@ -85,7 +91,7 @@ async function run() {
 
                 CREATE TABLE IF NOT EXISTS langchain_pg_embedding (
                     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                    collection_id UUID REFERENCES langchain_pg_collection(id) ON DELETE CASCADE,
+                    collection_id UUID REFERENCES langchain_pg_collection(uuid) ON DELETE CASCADE,
                     embedding vector(1536),
                     document TEXT,
                     metadata JSONB
@@ -97,6 +103,31 @@ async function run() {
             console.log('✅ Tabelas LangChain/PGVector verificadas/criadas.');
         } catch (e) {
             console.error('Erro ao criar tabelas de RAG', e);
+        }
+
+        try {
+            await pool.query(`
+                ALTER TABLE langchain_pg_collection
+                ADD COLUMN IF NOT EXISTS uuid UUID;
+
+                UPDATE langchain_pg_collection
+                SET uuid = id
+                WHERE uuid IS NULL AND id IS NOT NULL;
+
+                ALTER TABLE langchain_pg_collection
+                ALTER COLUMN uuid SET NOT NULL;
+
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_langchain_pg_collection_uuid ON langchain_pg_collection(uuid);
+
+                ALTER TABLE langchain_pg_embedding
+                DROP CONSTRAINT IF EXISTS langchain_pg_embedding_collection_id_fkey;
+
+                ALTER TABLE langchain_pg_embedding
+                ADD CONSTRAINT langchain_pg_embedding_collection_id_fkey
+                FOREIGN KEY (collection_id) REFERENCES langchain_pg_collection(uuid) ON DELETE CASCADE;
+            `);
+        } catch (e) {
+            console.error('Erro ao alinhar esquema PGVector', e);
         }
 
         await pool.end();

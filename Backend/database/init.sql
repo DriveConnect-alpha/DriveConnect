@@ -1,6 +1,7 @@
 -- Extensões úteis
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ──────────────────────────────────────────────
 -- USUÁRIO (autenticação central)
@@ -236,7 +237,7 @@ CREATE INDEX idx_whatsapp_message_wa_id ON whatsapp_message(wa_message_id);
 -- RAG / PGVector (LangChain)
 -- ──────────────────────────────────────────────
 CREATE TABLE langchain_pg_collection (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     cmetadata JSONB
 );
@@ -245,7 +246,7 @@ CREATE UNIQUE INDEX idx_langchain_pg_collection_name ON langchain_pg_collection(
 
 CREATE TABLE langchain_pg_embedding (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    collection_id UUID REFERENCES langchain_pg_collection(id) ON DELETE CASCADE,
+    collection_id UUID REFERENCES langchain_pg_collection(uuid) ON DELETE CASCADE,
     embedding vector(1536),
     document TEXT,
     metadata JSONB

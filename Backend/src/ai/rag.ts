@@ -86,6 +86,7 @@ async function getVectorStore(): Promise<PGVectorStore> {
       connectionString: process.env.DATABASE_URL,
     },
     tableName: process.env.RAG_PG_TABLE || 'langchain_pg_embedding',
+    collectionTableName: process.env.RAG_COLLECTION_TABLE || 'langchain_pg_collection',
     collectionName: process.env.RAG_COLLECTION || 'driveconnect',
   });
 

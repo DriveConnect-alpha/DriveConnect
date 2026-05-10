@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/widgets/dc_card.dart';
+import '../widgets/edit_profile_dialog.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  void _showEditProfile(BuildContext context, dynamic user) {
+    if (user == null) return;
+    showDialog(
+      context: context,
+      builder: (context) => EditProfileDialog(user: user),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,9 +43,9 @@ class ProfileScreen extends StatelessWidget {
             Text(user?.email ?? 'email@exemplo.com', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey)),
             const SizedBox(height: 32),
             
-            _buildProfileItem(Symbols.person, 'Dados Pessoais', () {}),
+            _buildProfileItem(Symbols.person, 'Dados Pessoais', () => _showEditProfile(context, user)),
             _buildProfileItem(Symbols.credit_card, 'Métodos de Pagamento', () {}),
-            _buildProfileItem(Symbols.history, 'Histórico de Aluguéis', () {}),
+            _buildProfileItem(Symbols.history, 'Histórico de Aluguéis', () => context.push('/my-reservations')),
             _buildProfileItem(Symbols.help, 'Ajuda e Suporte', () {}),
             _buildProfileItem(Symbols.settings, 'Configurações', () {}),
             
@@ -43,7 +53,16 @@ class ProfileScreen extends StatelessWidget {
             _buildProfileItem(
               Symbols.logout, 
               'Sair da Conta', 
-              () => authProvider.logout(),
+              () async {
+                await authProvider.logout();
+                if (context.mounted) context.go('/login');
+              },
+              color: Colors.orange, // Changed to orange to distinguish from Delete
+            ),
+            _buildProfileItem(
+              Symbols.delete_forever, 
+              'Excluir Conta', 
+              () => _confirmDeleteAccount(context, authProvider),
               color: theme.colorScheme.error,
             ),
           ],
@@ -52,9 +71,47 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  void _confirmDeleteAccount(BuildContext context, AuthProvider authProvider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir Conta'),
+        content: const Text(
+          'Tem certeza que deseja excluir permanentemente sua conta? '
+          'Esta ação não pode ser desfeita e você perderá acesso a todo o seu histórico.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            onPressed: () async {
+              try {
+                await authProvider.deleteAccount();
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  context.go('/login');
+                }
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Erro ao excluir conta: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProfileItem(IconData icon, String title, VoidCallback onTap, {Color? color}) {
     return Padding(
-      padding: const EdgeInsets.bottom(12),
+      padding: const EdgeInsets.only(bottom: 12),
       child: DCCard(
         onTap: onTap,
         child: Row(

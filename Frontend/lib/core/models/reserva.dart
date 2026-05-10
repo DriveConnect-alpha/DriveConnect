@@ -1,3 +1,6 @@
+import 'veiculo.dart';
+import 'cliente.dart';
+
 class Reserva {
   final String id;
   final String? clienteId;
@@ -26,6 +29,10 @@ class Reserva {
   final String? planoSeguroId;
   final double? valorSeguro;
 
+  // Campos de JOIN
+  final Veiculo? veiculo;
+  final Cliente? cliente;
+
   Reserva({
     required this.id,
     this.clienteId,
@@ -48,6 +55,8 @@ class Reserva {
     this.expiraEm,
     this.planoSeguroId,
     this.valorSeguro,
+    this.veiculo,
+    this.cliente,
   });
 
   factory Reserva.fromJson(Map<String, dynamic> json) {
@@ -85,6 +94,8 @@ class Reserva {
       valorSeguro: json['valor_seguro'] != null
           ? (json['valor_seguro'] as num).toDouble()
           : null,
+      veiculo: json['veiculo'] != null ? Veiculo.fromJson(json['veiculo']) : null,
+      cliente: json['cliente'] != null ? Cliente.fromJson(json['cliente']) : null,
     );
   }
 

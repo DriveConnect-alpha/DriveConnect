@@ -8,4 +8,10 @@ abstract class IAuthService {
     required String nomeCompleto,
     required String cpf,
   });
+  Future<Usuario> updateProfile({
+    required String id,
+    required String nomeCompleto,
+    required String email,
+  });
+  Future<void> deleteAccount(String id);
 }

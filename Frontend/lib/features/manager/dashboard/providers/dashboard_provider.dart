@@ -1,32 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_exceptions.dart';
-
-class DashboardStats {
-  final int activeReservations;
-  final int availableVehicles;
-  final double monthlyRevenue;
-  final int newClients;
-
-  DashboardStats({
-    required this.activeReservations,
-    required this.availableVehicles,
-    required this.monthlyRevenue,
-    required this.newClients,
-  });
-
-  factory DashboardStats.fromJson(Map<String, dynamic> json) {
-    return DashboardStats(
-      activeReservations: json['active_reservations'] ?? 0,
-      availableVehicles: json['available_vehicles'] ?? 0,
-      monthlyRevenue: (json['monthly_revenue'] ?? 0).toDouble(),
-      newClients: json['new_clients'] ?? 0,
-    );
-  }
-}
+import '../models/dashboard_stats.dart';
+import '../services/idashboard_service.dart';
 
 class DashboardProvider with ChangeNotifier {
-  final ApiClient _apiClient = ApiClient();
+  final IDashboardService _service;
+  
+  DashboardProvider(this._service);
   
   DashboardStats? _stats;
   bool _isLoading = false;
@@ -42,8 +22,7 @@ class DashboardProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiClient.get('/dashboard/stats');
-      _stats = DashboardStats.fromJson(response.data);
+      _stats = await _service.getStats();
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {

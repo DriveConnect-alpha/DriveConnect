@@ -44,7 +44,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
             itemBuilder: (context, index) {
               final reserva = provider.reservas[index];
               return Card(
-                margin: const EdgeInsets.bottom(12),
+                margin: const EdgeInsets.only(bottom: 12),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -61,7 +61,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                         ],
                       ),
                       const Divider(),
-                      Text('Cliente: ${reserva.cliente?.usuario?.nome ?? "N/A"}'),
+                      Text('Cliente: ${reserva.cliente?.nomeCompleto ?? "N/A"}'),
                       Text('Veículo: ${reserva.veiculo?.modelo?.marca} ${reserva.veiculo?.modelo?.nome} (${reserva.veiculo?.placa})'),
                       const SizedBox(height: 8),
                       Row(
@@ -104,11 +104,11 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
   }
 
   void _updateStatus(BuildContext context, String id, String status) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final success = await context.read<ReservationsProvider>().updateStatus(id, status);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(success ? 'Status atualizado' : 'Erro ao atualizar')),
-      );
-    }
+    
+    scaffoldMessenger.showSnackBar(
+      SnackBar(content: Text(success ? 'Status atualizado' : 'Erro ao atualizar')),
+    );
   }
 }

@@ -7,14 +7,45 @@ import '../../../../core/widgets/dc_button.dart';
 import '../../../../core/widgets/dc_card.dart';
 import '../../booking/providers/booking_provider.dart';
 
-class VehicleDetailScreen extends StatelessWidget {
+class VehicleDetailScreen extends StatefulWidget {
   final Veiculo veiculo;
 
   const VehicleDetailScreen({super.key, required this.veiculo});
 
   @override
+  State<VehicleDetailScreen> createState() => _VehicleDetailScreenState();
+}
+
+class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
+  bool _isFavorite = false;
+
+  void _toggleFavorite() {
+    setState(() {
+      _isFavorite = !_isFavorite;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_isFavorite ? 'Veículo adicionado aos favoritos!' : 'Veículo removido dos favoritos.'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _shareVehicle() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Compartilhando link do veículo...'),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final veiculo = widget.veiculo;
 
     return Scaffold(
       body: CustomScrollView(
@@ -30,14 +61,17 @@ class VehicleDetailScreen extends StatelessWidget {
             ),
             actions: [
               IconButton(
-                onPressed: () {},
-                icon: const Icon(Symbols.favorite),
+                onPressed: _toggleFavorite,
+                icon: Icon(
+                  _isFavorite ? Symbols.favorite : Symbols.favorite_border,
+                  color: _isFavorite ? Colors.red : Colors.black87,
+                ),
                 style: IconButton.styleFrom(backgroundColor: Colors.white),
               ),
               const SizedBox(width: 8),
               IconButton(
-                onPressed: () {},
-                icon: const Icon(Symbols.share),
+                onPressed: _shareVehicle,
+                icon: const Icon(Symbols.share, color: Colors.black87),
                 style: IconButton.styleFrom(backgroundColor: Colors.white),
               ),
               const SizedBox(width: 16),
@@ -50,7 +84,7 @@ class VehicleDetailScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.between,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

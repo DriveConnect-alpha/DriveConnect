@@ -5,6 +5,9 @@ import '../../../core/widgets/dc_button.dart';
 import '../../../core/widgets/dc_text_field.dart';
 import '../../../core/providers/auth_provider.dart';
 
+import '../../../features/auth/services/auth_service.dart';
+import '../../../core/network/api_client.dart';
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -32,17 +35,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _handleRegister() async {
     if (_formKey.currentState!.validate()) {
-      // TODO: Chamar registro no AuthProvider/Service
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Conta criada com sucesso! Faça login.')),
-      );
-      context.pop();
+      final authProvider = context.read<AuthProvider>();
+      try {
+        await authProvider.register(
+          email: _emailController.text,
+          password: _passwordController.text,
+          nomeCompleto: _nomeController.text,
+          cpf: _cpfController.text,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Conta criada com sucesso! Faça login.')),
+          );
+          context.pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(authProvider.error ?? e.toString())),
+          );
+        }
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authProvider = context.watch<AuthProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -111,6 +131,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 DCButton(
                   label: 'Criar Conta',
                   onPressed: _handleRegister,
+                  isLoading: authProvider.isLoading,
                 ),
                 const SizedBox(height: 16),
                 Center(

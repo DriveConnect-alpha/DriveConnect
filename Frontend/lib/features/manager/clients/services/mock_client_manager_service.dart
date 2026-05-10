@@ -6,8 +6,20 @@ class MockClientManagerService implements IClientManagerService {
   Future<List<Cliente>> getClients() async {
     await Future.delayed(const Duration(seconds: 1));
     return [
-      Cliente(id: 'c1', nomeCompleto: 'João Silva', cpf: '123.456.789-00', telefone: '(11) 99999-9999', email: 'joao@example.com'),
-      Cliente(id: 'c2', nomeCompleto: 'Maria Souza', cpf: '987.654.321-11', telefone: '(11) 88888-8888', email: 'maria@example.com'),
+      Cliente(
+        id: 'c1',
+        nomeCompleto: 'João Silva',
+        cpf: '123.456.789-00',
+        usuarioId: 'u1',
+        criadoEm: DateTime.now(),
+      ),
+      Cliente(
+        id: 'c2',
+        nomeCompleto: 'Maria Souza',
+        cpf: '987.654.321-11',
+        usuarioId: 'u2',
+        criadoEm: DateTime.now(),
+      ),
     ];
   }
 }

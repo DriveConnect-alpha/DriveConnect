@@ -83,6 +83,8 @@ typings/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.example
+!.env.example
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -97,8 +99,6 @@ out
 
 # Gatsby files
 .cache/
-# Comment in the public line in if your project uses Gatsby and not Next.js
-# public
 
 # vuepress build output
 .vuepress/dist
@@ -120,21 +120,85 @@ out
 
 # Windows
 Thumbs.db
+Desktop.ini
 
 # Editor directories and files
-.vscode/*
+.vscode/
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 .idea/
+*.iml
+*.ipr
+*.iws
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# Build / dist folder (para frontend e backend)
-dist/
-build/
-driveconnectfirebase.json
+# Build / dist folder
+**/dist/
+**/build/
+**/node_modules/
+**/jspm_packages/
+
+
+# Project Specific
+**/src/generated/prisma/
+**/database/temp/
+
+
+# Flutter/Dart/Pub related
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+/Frontend/build/
+/Frontend/.dart_tool/
+/Frontend/.flutter-plugins
+/Frontend/.flutter-plugins-dependencies
+/Frontend/.packages
+/Frontend/.pub-cache/
+/Frontend/.pub/
+
+# Android related
+**/android/**/generated/
+**/android/key.properties
+**/android/local.properties
+**/android/app/google-services.json
+**/android/.gradle/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+*.keystore
+*.jks
+
+# iOS related
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Runner/GeneratedPluginRegistrant.[hm]
+**/ios/Runner/GoogleService-Info.plist
+**/ios/.generated/
+**/ios/Pods/
+**/ios/ServiceDefinitions.json
+**/ios/DerivedData/
+*.moved-aside
+*.xcuserstate
+
+# Mobile Symbols/Maps
+app.*.symbols
+app.*.map.json
+
+# Local Testing/Scrap
+artifacts/
+scratch/
+.gemini/
+
+# Firebase
+Backend/driveconnectfirebase.json

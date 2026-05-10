@@ -1,5 +1,6 @@
 import '../../../../core/models/reserva.dart';
 import '../../../../core/models/veiculo.dart';
+import '../../../../core/models/modelo.dart';
 import 'ibooking_service.dart';
 
 class MockBookingService implements IBookingService {
@@ -26,7 +27,7 @@ class MockBookingService implements IBookingService {
   }) async {
     await Future.delayed(const Duration(seconds: 1));
     return {
-      'reserva_id': 'mock-reserva-456',
+      'id': 'mock-reserva-456',
       'payment_url': 'https://mock.payment.link',
       'order_nsu': 'MOCK123'
     };
@@ -43,22 +44,31 @@ class MockBookingService implements IBookingService {
     await Future.delayed(const Duration(seconds: 1));
     return [
       Reserva(
-        id: '1',
+        id: '12345678-90ab-cdef-1234-567890abcdef',
         dataInicio: DateTime.now().add(const Duration(days: 1)),
         dataFim: DateTime.now().add(const Duration(days: 5)),
-        status: 'ATIVA',
+        status: 'RESERVADA',
         valorTotal: 850.00,
         veiculo: Veiculo(
           id: 'v1',
           placa: 'MOCK-001',
           cor: 'Prata',
           ano: 2023,
-          quilometragem: 1000,
           status: 'DISPONIVEL',
           filialId: 'f1',
           modeloId: 1,
+          modelo: Modelo(
+            id: 1,
+            nome: 'Corolla',
+            marca: 'Toyota',
+          ),
         ),
       ),
     ];
+  }
+
+  @override
+  Future<void> cancelarReserva(String reservaId) async {
+    await Future.delayed(const Duration(seconds: 1));
   }
 }

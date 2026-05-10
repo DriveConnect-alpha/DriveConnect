@@ -31,9 +31,9 @@ function mapearErro(err: unknown): { status: number; mensagem: string } {
   const mensagem = err instanceof Error ? err.message : 'Erro interno.';
   const status = mensagem.includes('inválid') || mensagem.includes('obrigatório') ? 400
     : mensagem.includes('não encontrad') ? 404
-    : mensagem.includes('Não autorizado') ? 401
-    : mensagem.includes('Sem permissão') ? 403
-    : 500;
+      : mensagem.includes('Não autorizado') ? 401
+        : mensagem.includes('Sem permissão') ? 403
+          : 500;
   return { status, mensagem };
 }
 
@@ -92,12 +92,12 @@ export async function registrarFilial(req: IncomingMessage, res: ServerResponse)
     }
 
     const params: { nome: string; cep?: string; uf?: string; cidade?: string; bairro?: string; rua?: string; numero?: string; complemento?: string } = { nome };
-    if (cep)         params.cep = cep;
-    if (uf)          params.uf = uf;
-    if (cidade)      params.cidade = cidade;
-    if (bairro)      params.bairro = bairro;
-    if (rua)         params.rua = rua;
-    if (numero)      params.numero = numero;
+    if (cep) params.cep = cep;
+    if (uf) params.uf = uf;
+    if (cidade) params.cidade = cidade;
+    if (bairro) params.bairro = bairro;
+    if (rua) params.rua = rua;
+    if (numero) params.numero = numero;
     if (complemento) params.complemento = complemento;
 
     const filial = await criarFilial(params);

@@ -6,14 +6,16 @@ class MockAuthService implements IAuthService {
   Future<Map<String, dynamic>> login(String email, String password) async {
     await Future.delayed(const Duration(seconds: 1));
 
-    // Lógica simples de mock para aceitar qualquer login que pareça válido
     if (email.contains('admin') || email.contains('gerente')) {
+      final isActuallyAdmin = email.contains('admin');
       return {
-        'token': 'mock-token-manager',
+        'token': isActuallyAdmin ? 'mock-token-admin' : 'mock-token-manager',
         'user': Usuario(
-          id: 'm1',
+          id: isActuallyAdmin ? 'a1' : 'm1',
+          nome: isActuallyAdmin ? 'Administrador do Sistema' : 'Gerente da Filial',
           email: email,
-          tipo: 'GERENTE',
+          tipo: isActuallyAdmin ? 'ADMIN' : 'GERENTE',
+          criadoEm: DateTime.now(),
         ),
       };
     } else {
@@ -21,8 +23,10 @@ class MockAuthService implements IAuthService {
         'token': 'mock-token-client',
         'user': Usuario(
           id: 'c1',
+          nome: 'Nome do Cliente',
           email: email,
           tipo: 'CLIENTE',
+          criadoEm: DateTime.now(),
         ),
       };
     }
@@ -35,6 +39,27 @@ class MockAuthService implements IAuthService {
     required String nomeCompleto,
     required String cpf,
   }) async {
+    await Future.delayed(const Duration(seconds: 1));
+  }
+
+  @override
+  Future<Usuario> updateProfile({
+    required String id,
+    required String nomeCompleto,
+    required String email,
+  }) async {
+    await Future.delayed(const Duration(seconds: 1));
+    return Usuario(
+      id: id,
+      nome: nomeCompleto,
+      email: email,
+      tipo: 'CLIENTE',
+      criadoEm: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<void> deleteAccount(String id) async {
     await Future.delayed(const Duration(seconds: 1));
   }
 }

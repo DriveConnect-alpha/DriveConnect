@@ -1,4 +1,4 @@
-import '../providers/dashboard_provider.dart';
+import '../models/dashboard_stats.dart';
 
 abstract class IDashboardService {
   Future<DashboardStats> getStats();

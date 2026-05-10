@@ -1,12 +1,15 @@
 import '../../../../core/network/api_client.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/api_exceptions.dart';
+import '../../../../core/models/reserva.dart';
+import 'ibooking_service.dart';
 
-class BookingService {
+class BookingService implements IBookingService {
   final ApiClient _apiClient;
 
   BookingService(this._apiClient);
 
+  @override
   Future<Map<String, dynamic>> verificarDisponibilidade({
     required int modeloId,
     required String filialId,
@@ -29,6 +32,7 @@ class BookingService {
     }
   }
 
+  @override
   Future<Map<String, dynamic>> iniciarPagamento({
     required int modeloId,
     required String filialRetiradaId,
@@ -57,12 +61,32 @@ class BookingService {
     }
   }
 
+  @override
   Future<Map<String, dynamic>> consultarStatusPagamento(String reservaId) async {
     try {
       final response = await _apiClient.dio.get(
         ApiConstants.statusPagamento.replaceFirst('{reservaId}', reservaId),
       );
       return response.data;
+    } catch (e) {
+      throw ApiErrorHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<List<Reserva>> getMyReservations() async {
+     try {
+      final response = await _apiClient.get('/reservas/minhas');
+      return (response.data as List).map((r) => Reserva.fromJson(r)).toList();
+    } catch (e) {
+       throw ApiErrorHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> cancelarReserva(String reservaId) async {
+    try {
+      await _apiClient.post('/reservas/$reservaId/cancelar');
     } catch (e) {
       throw ApiErrorHandler.handle(e);
     }

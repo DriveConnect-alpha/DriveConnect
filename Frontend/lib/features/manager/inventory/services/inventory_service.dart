@@ -17,4 +17,9 @@ class InventoryService implements IInventoryService {
   Future<void> updateVehicleStatus(String id, String status) async {
     await _apiClient.patch('/veiculos/$id/status', data: {'status': status});
   }
+
+  @override
+  Future<void> addVehicle(Veiculo veiculo) async {
+    await _apiClient.post('/veiculos', data: veiculo.toJson());
+  }
 }

@@ -3,8 +3,12 @@ import '../../../../core/models/plano_seguro.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_exceptions.dart';
 
+import '../services/iinsurance_service.dart';
+
 class InsuranceProvider with ChangeNotifier {
-  final ApiClient _apiClient = ApiClient();
+  final IInsuranceService _service;
+  
+  InsuranceProvider(this._service);
   
   List<PlanoSeguro> _planos = [];
   bool _isLoading = false;
@@ -20,8 +24,7 @@ class InsuranceProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiClient.get('/planos-seguro');
-      _planos = (response.data as List).map((p) => PlanoSeguro.fromJson(p)).toList();
+      _planos = await _service.getPlanos();
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {
@@ -34,7 +37,7 @@ class InsuranceProvider with ChangeNotifier {
 
   Future<bool> updatePlano(String id, Map<String, dynamic> data) async {
     try {
-      await _apiClient.put('/planos-seguro/$id', data: data);
+      await _service.updatePlano(id, data);
       await fetchPlanos();
       return true;
     } catch (e) {

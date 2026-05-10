@@ -32,11 +32,20 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text,
       );
       
-      if (mounted && authProvider.isAuthenticated) {
-        if (authProvider.isManager) {
-          context.go('/manager');
-        } else {
-          context.go('/home');
+      if (mounted) {
+        if (authProvider.error != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(authProvider.error!),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        } else if (authProvider.isAuthenticated) {
+          if (authProvider.isManager) {
+            context.go('/manager');
+          } else {
+            context.go('/home');
+          }
         }
       }
     }

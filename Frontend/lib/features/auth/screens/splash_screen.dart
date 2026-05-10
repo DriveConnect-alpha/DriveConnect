@@ -24,6 +24,12 @@ class _SplashScreenState extends State<SplashScreen> {
 
     final authProvider = context.read<AuthProvider>();
     
+    // Wait until loading finishes if it's still loading
+    while (authProvider.isLoading) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    if (!mounted) return;
+
     if (authProvider.isAuthenticated) {
       if (authProvider.isManager) {
         context.go('/manager');

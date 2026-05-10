@@ -7,11 +7,15 @@ import '../../../core/providers/auth_provider.dart';
 class ManagerScaffold extends StatelessWidget {
   final Widget child;
   final String title;
+  final Widget? floatingActionButton;
+  final List<Widget>? actions;
 
   const ManagerScaffold({
     super.key,
     required this.child,
     required this.title,
+    this.floatingActionButton,
+    this.actions,
   });
 
   @override
@@ -24,6 +28,8 @@ class ManagerScaffold extends StatelessWidget {
 
     final List<Map<String, dynamic>> menuItems = [
       {'icon': Symbols.dashboard, 'label': 'Dashboard', 'path': '/manager'},
+      if (authProvider.isAdmin)
+        {'icon': Symbols.admin_panel_settings, 'label': 'Usuários', 'path': '/manager/admin/users'},
       {'icon': Symbols.book_online, 'label': 'Reservas', 'path': '/manager/reservations'},
       {'icon': Symbols.inventory_2, 'label': 'Inventário', 'path': '/manager/inventory'},
       {'icon': Symbols.group, 'label': 'Clientes', 'path': '/manager/clients'},
@@ -37,10 +43,14 @@ class ManagerScaffold extends StatelessWidget {
       appBar: AppBar(
         title: Text(title),
         actions: [
+          if (actions != null) ...actions!,
           if (!useSideRail)
             IconButton(
               icon: const Icon(Symbols.logout),
-              onPressed: () => authProvider.logout(),
+              onPressed: () async {
+                await authProvider.logout();
+                if (context.mounted) context.go('/login');
+              },
             ),
           const SizedBox(width: 8),
         ],
@@ -69,12 +79,16 @@ class ManagerScaffold extends StatelessWidget {
                   ListTile(
                     leading: const Icon(Symbols.logout, color: Colors.red),
                     title: const Text('Sair', style: TextStyle(color: Colors.red)),
-                    onTap: () => authProvider.logout(),
+                    onTap: () async {
+                      await authProvider.logout();
+                      if (context.mounted) context.go('/login');
+                    },
                   ),
                 ],
               ),
             )
           : null,
+      floatingActionButton: floatingActionButton,
       body: Row(
         children: [
           if (useSideRail)
@@ -101,7 +115,10 @@ class ManagerScaffold extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 16.0),
                     child: IconButton(
                       icon: const Icon(Symbols.logout),
-                      onPressed: () => authProvider.logout(),
+                      onPressed: () async {
+                        await authProvider.logout();
+                        if (context.mounted) context.go('/login');
+                      },
                     ),
                   ),
                 ),

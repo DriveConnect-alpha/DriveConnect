@@ -3,8 +3,12 @@ import '../../../../core/models/cliente.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_exceptions.dart';
 
+import '../services/iclient_manager_service.dart';
+
 class ClientsProvider with ChangeNotifier {
-  final ApiClient _apiClient = ApiClient();
+  final IClientManagerService _service;
+  
+  ClientsProvider(this._service);
   
   List<Cliente> _clientes = [];
   bool _isLoading = false;
@@ -20,8 +24,7 @@ class ClientsProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiClient.get('/clientes');
-      _clientes = (response.data as List).map((c) => Cliente.fromJson(c)).toList();
+      _clientes = await _service.getClients();
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {

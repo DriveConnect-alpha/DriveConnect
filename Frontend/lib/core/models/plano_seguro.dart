@@ -6,6 +6,8 @@ class PlanoSeguro {
   final bool obrigatorio; // true = plano básico (sempre incluso)
   final bool ativo;
 
+  double get precoDiaria => percentual; // Alias ou lógica específica se necessário
+
   PlanoSeguro({
     required this.id,
     required this.nome,

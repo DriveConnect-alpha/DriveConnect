@@ -3,37 +3,38 @@ import '../theme/app_theme.dart';
 
 class DCStatusBadge extends StatelessWidget {
   final String status;
+  final String? label;
 
-  const DCStatusBadge({super.key, required this.status});
+  const DCStatusBadge({super.key, required this.status, this.label});
 
   @override
   Widget build(BuildContext context) {
     Color color;
-    String label = status;
+    String displayLabel = label ?? status;
 
     switch (status.toUpperCase()) {
       case 'DISPONIVEL':
         color = AppTheme.statusDisponivel;
-        label = 'Disponível';
+        if (label == null) displayLabel = 'Disponível';
         break;
       case 'ALUGADO':
       case 'ATIVA':
         color = AppTheme.statusAlugado;
-        label = status == 'ATIVA' ? 'Ativa' : 'Alugado';
+        if (label == null) displayLabel = status == 'ATIVA' ? 'Ativa' : 'Alugado';
         break;
       case 'MANUTENCAO':
         color = AppTheme.statusManutencao;
-        label = 'Manutenção';
+        if (label == null) displayLabel = 'Manutenção';
         break;
       case 'PENDENTE':
       case 'PENDENTE_PAGAMENTO':
         color = AppTheme.statusPendente;
-        label = 'Pendente';
+        if (label == null) displayLabel = 'Pendente';
         break;
       case 'FINALIZADA':
       case 'RESERVADA':
         color = status == 'RESERVADA' ? AppTheme.statusDisponivel : AppTheme.statusFinalizada;
-        label = status == 'RESERVADA' ? 'Reservada' : 'Finalizada';
+        if (label == null) displayLabel = status == 'RESERVADA' ? 'Reservada' : 'Finalizada';
         break;
       default:
         color = Colors.grey;
@@ -47,7 +48,7 @@ class DCStatusBadge extends StatelessWidget {
         border: Border.all(color: color),
       ),
       child: Text(
-        label,
+        displayLabel,
         style: TextStyle(
           color: color,
           fontSize: 12,

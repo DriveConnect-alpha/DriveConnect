@@ -14,7 +14,13 @@ class MockReservationManagerService implements IReservationManagerService {
         status: 'PENDENTE',
         dataInicio: DateTime.now().add(const Duration(days: 2)),
         dataFim: DateTime.now().add(const Duration(days: 5)),
-        cliente: Cliente(id: 'c1', nomeCompleto: 'João Silva', cpf: '123', telefone: '123', email: 'joao@example.com'),
+        cliente: Cliente(
+          id: 'c1',
+          nomeCompleto: 'João Silva',
+          cpf: '123.456.789-00',
+          usuarioId: 'u1',
+          criadoEm: DateTime.now(),
+        ),
         veiculo: Veiculo(
           id: 'v1', 
           placa: 'ABC-1234', 

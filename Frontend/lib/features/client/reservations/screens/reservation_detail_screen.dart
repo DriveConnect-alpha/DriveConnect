@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/models/reserva.dart';
 import '../../../../core/widgets/dc_card.dart';
 import '../../../../core/widgets/dc_status_badge.dart';
 import '../../../../core/widgets/dc_button.dart';
+import '../providers/my_reservations_provider.dart';
 
 class ReservationDetailScreen extends StatelessWidget {
   final Reserva reserva;
@@ -15,6 +18,7 @@ class ReservationDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+    final provider = context.watch<MyReservationsProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -33,7 +37,8 @@ class ReservationDetailScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Código da Reserva', style: theme.textTheme.labelSmall),
-                    Text(reserva.id, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(reserva.id.length > 8 ? reserva.id.substring(0, 8) : reserva.id, 
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                   ],
                 ),
                 DCStatusBadge(status: reserva.status, label: reserva.status),
@@ -134,26 +139,62 @@ class ReservationDetailScreen extends StatelessWidget {
             ),
             
             const SizedBox(height: 32),
-            
+
             if (reserva.status == 'PENDENTE_PAGAMENTO' && reserva.linkPagamento != null)
               DCButton(
                 label: 'Pagar Agora',
+                isLoading: provider.isLoading,
                 onPressed: () {
                   // Abrir link de pagamento
                 },
               ),
-              
-            if (reserva.status == 'RESERVADA')
+
+            if (reserva.status == 'RESERVADA' || reserva.status == 'PENDENTE_PAGAMENTO')
               DCButton(
                 label: 'Cancelar Reserva',
-                onPressed: () {},
-                backgroundColor: Colors.red.shade50,
-                textColor: Colors.red,
+                isLoading: provider.isLoading,
+                onPressed: () => _handleCancel(context),
+                isPrimary: false, // Define como estilo Outlined
+                color: Colors.red, // Agora o texto e a borda ficarão vermelhos
               ),
           ],
         ),
       ),
     );
+  }
+
+  void _handleCancel(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancelar Reserva?'),
+        content: const Text('Tem certeza que deseja cancelar esta reserva? Esta ação não pode ser desfeita.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Não')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Sim, Cancelar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final success = await context.read<MyReservationsProvider>().cancelarReserva(reserva.id);
+      if (context.mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Reserva cancelada com sucesso.')),
+          );
+          context.pop();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.read<MyReservationsProvider>().error ?? 'Erro ao cancelar reserva.')),
+          );
+        }
+      }
+    }
   }
 
   Widget _buildInfoRow(BuildContext context, IconData icon, String label, String value) {

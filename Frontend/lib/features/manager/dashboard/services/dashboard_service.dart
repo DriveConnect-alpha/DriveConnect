@@ -1,5 +1,5 @@
 import '../../../../core/network/api_client.dart';
-import '../providers/dashboard_provider.dart';
+import '../models/dashboard_stats.dart';
 import 'idashboard_service.dart';
 
 class DashboardService implements IDashboardService {

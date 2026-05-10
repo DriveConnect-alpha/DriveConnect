@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../services/booking_service.dart';
+import '../services/ibooking_service.dart';
 import '../../../../core/models/veiculo.dart';
 import '../../../../core/models/plano_seguro.dart';
 
 class BookingProvider extends ChangeNotifier {
-  final BookingService _service;
+  final IBookingService _service;
 
   BookingProvider(this._service);
 
@@ -18,6 +18,8 @@ class BookingProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   Map<String, dynamic>? _availabilityResult;
+  String? _currentReservaId;
+  String? _paymentStatus;
 
   // Getters
   Veiculo? get selectedVehicle => _selectedVehicle;
@@ -27,6 +29,7 @@ class BookingProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   Map<String, dynamic>? get availabilityResult => _availabilityResult;
+  String? get paymentStatus => _paymentStatus;
 
   void selectVehicle(Veiculo vehicle) {
     _selectedVehicle = vehicle;
@@ -76,7 +79,7 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> startPayment(String clienteId) async {
+  Future<bool> initiatePayment(String clienteId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -85,19 +88,32 @@ class BookingProvider extends ChangeNotifier {
       final result = await _service.iniciarPagamento(
         modeloId: _selectedVehicle!.modeloId!,
         filialRetiradaId: _pickupBranchId!,
-        filialDevolucaoId: _returnBranchId!,
+        filialDevolucaoId: _returnBranchId ?? _pickupBranchId!,
         dataInicio: _startDate!,
         dataFim: _endDate!,
         clienteId: clienteId,
-        planoSeguroId: _selectedInsurance?.id ?? '', // Backend should handle if empty but we should have a default
+        planoSeguroId: _selectedInsurance?.id ?? 'BASICO',
       );
-      return result['link_pagamento'];
+      _currentReservaId = result['id'];
+      return true;
     } catch (e) {
       _error = e.toString();
-      return null;
+      return false;
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> pollPaymentStatus() async {
+    if (_currentReservaId == null) return;
+
+    try {
+      final result = await _service.consultarStatusPagamento(_currentReservaId!);
+      _paymentStatus = result['status'];
+      notifyListeners();
+    } catch (e) {
+      // Falha silenciosa no polling ou logar
     }
   }
 }

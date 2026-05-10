@@ -6,6 +6,7 @@ class DCButton extends StatelessWidget {
   final bool isLoading;
   final IconData? icon;
   final bool isPrimary;
+  final Color? color;
 
   const DCButton({
     super.key,
@@ -14,12 +15,18 @@ class DCButton extends StatelessWidget {
     this.isLoading = false,
     this.icon,
     this.isPrimary = true,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+    final customStyle = color != null
+        ? ElevatedButton.styleFrom(
+      backgroundColor: color,
+      foregroundColor: Colors.white,
+    )
+        : null;
     if (!isPrimary) {
       return OutlinedButton(
         onPressed: isLoading ? null : onPressed,
@@ -33,6 +40,7 @@ class DCButton extends StatelessWidget {
 
     return ElevatedButton(
       onPressed: isLoading ? null : onPressed,
+      style: customStyle,
       child: _buildChild(),
     );
   }

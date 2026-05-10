@@ -11,13 +11,13 @@ import { requireCaller, requireTipo } from '../middlewares/auth.js';
 
 function lerCorpo(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-      let dados = '';
-      req.on('data', (chunk) => (dados += chunk));
-      req.on('end', () => {
-          try { resolve(JSON.parse(dados || '{}')); }
-          catch { reject(new Error('JSON inválido.')); }
-      });
-      req.on('error', reject);
+    let dados = '';
+    req.on('data', (chunk) => (dados += chunk));
+    req.on('end', () => {
+      try { resolve(JSON.parse(dados || '{}')); }
+      catch { reject(new Error('JSON inválido.')); }
+    });
+    req.on('error', reject);
   });
 }
 
@@ -29,10 +29,10 @@ function responder(res: ServerResponse, status: number, corpo: unknown): void {
 function mapearErro(err: unknown): { status: number; mensagem: string } {
   const mensagem = err instanceof Error ? err.message : 'Erro interno.';
   const status = mensagem.includes('inválid') || mensagem.includes('obrigatório') || mensagem.includes('ausente') ? 400
-      : mensagem.includes('não encontrad') ? 404
+    : mensagem.includes('não encontrad') ? 404
       : mensagem.includes('Não autorizado') ? 401
-      : mensagem.includes('Sem permissão') ? 403
-      : 500;
+        : mensagem.includes('Sem permissão') ? 403
+          : 500;
   return { status, mensagem };
 }
 
@@ -169,28 +169,34 @@ export async function estenderReservaHandler(req: IncomingMessage, res: ServerRe
 // está pronto para ser entregue ao cliente.
 // ──────────────────────────────────────────────
 export async function confirmarRetirada(req: IncomingMessage, res: ServerResponse, reservaId: string) {
-  const { liberado, motivo } = await verificarDisponibilidadeRetirada(reservaId);
+  try {
+    const caller = requireCaller(req);
+    requireTipo(caller, 'GERENTE', 'ADMIN');
 
-  if (!liberado) {
-    res.writeHead(409, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ liberado: false, motivo }));
-    return;
+    const { liberado, motivo } = await verificarDisponibilidadeRetirada(reservaId);
+
+    if (!liberado) {
+      responder(res, 409, { liberado: false, motivo });
+      return;
+    }
+
+    // Atualiza veículo para ALUGADO e reserva para ATIVA
+    await query(
+      `UPDATE veiculo SET status = 'ALUGADO'
+       WHERE id = (SELECT veiculo_id FROM reserva WHERE id = $1)`,
+      [reservaId],
+    );
+
+    await query(
+      `UPDATE reserva SET status = 'ATIVA', data_retirada_real = NOW() WHERE id = $1`,
+      [reservaId],
+    );
+
+    responder(res, 200, { liberado: true, mensagem: 'Retirada confirmada. Veículo marcado como ALUGADO.' });
+  } catch (err) {
+    const { status, mensagem } = mapearErro(err);
+    responder(res, status, { erro: mensagem });
   }
-
-  // Atualiza veículo para ALUGADO e reserva para ATIVA
-  await query(
-    `UPDATE veiculo SET status = 'ALUGADO'
-     WHERE id = (SELECT veiculo_id FROM reserva WHERE id = $1)`,
-    [reservaId],
-  );
-
-  await query(
-    `UPDATE reserva SET status = 'ATIVA', data_retirada_real = NOW() WHERE id = $1`,
-    [reservaId],
-  );
-
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ liberado: true, mensagem: 'Retirada confirmada. Veículo marcado como ALUGADO.' }));
 }
 
 // ──────────────────────────────────────────────
@@ -198,30 +204,35 @@ export async function confirmarRetirada(req: IncomingMessage, res: ServerRespons
 // Registra a devolução do veículo, finalizando a reserva
 // ──────────────────────────────────────────────
 export async function confirmarDevolucao(req: IncomingMessage, res: ServerResponse, reservaId: string) {
-  const reserva = await query('SELECT veiculo_id, status FROM reserva WHERE id = $1', [reservaId]);
+  try {
+    const caller = requireCaller(req);
+    requireTipo(caller, 'GERENTE', 'ADMIN');
 
-  if (!reserva.rows[0]) {
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ erro: 'Reserva não encontrada.' }));
-    return;
+    const reserva = await query('SELECT veiculo_id, status FROM reserva WHERE id = $1', [reservaId]);
+
+    if (!reserva.rows[0]) {
+      responder(res, 404, { erro: 'Reserva não encontrada.' });
+      return;
+    }
+
+    if (reserva.rows[0].status !== 'ATIVA') {
+      responder(res, 409, { erro: 'Só é possível registrar devolução de reservas ATIVAS.' });
+      return;
+    }
+
+    await query(
+      `UPDATE veiculo SET status = 'DISPONIVEL' WHERE id = $1`,
+      [reserva.rows[0].veiculo_id],
+    );
+
+    await query(
+      `UPDATE reserva SET status = 'FINALIZADA', data_devolucao_real = NOW() WHERE id = $1`,
+      [reservaId],
+    );
+
+    responder(res, 200, { mensagem: 'Devolução registrada. Veículo marcado como DISPONIVEL.' });
+  } catch (err) {
+    const { status, mensagem } = mapearErro(err);
+    responder(res, status, { erro: mensagem });
   }
-
-  if (reserva.rows[0].status !== 'ATIVA') {
-    res.writeHead(409, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ erro: 'Só é possível registrar devolução de reservas ATIVAS.' }));
-    return;
-  }
-
-  await query(
-    `UPDATE veiculo SET status = 'DISPONIVEL' WHERE id = $1`,
-    [reserva.rows[0].veiculo_id],
-  );
-
-  await query(
-    `UPDATE reserva SET status = 'FINALIZADA', data_devolucao_real = NOW() WHERE id = $1`,
-    [reservaId],
-  );
-
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ mensagem: 'Devolução registrada. Veículo marcado como DISPONIVEL.' }));
 }

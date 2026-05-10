@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/booking_provider.dart';
+import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/widgets/dc_button.dart';
 import '../../../../core/widgets/dc_card.dart';
 import '../../../../core/widgets/dc_loading.dart';
@@ -13,11 +14,13 @@ class CheckoutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bookingProvider = context.watch<BookingProvider>();
+    final authProvider = context.read<AuthProvider>();
+    final bookingProvider = context.read<BookingProvider>();
     final veiculo = bookingProvider.selectedVehicle;
+    final clienteId = authProvider.user?.id ?? 'guest';
 
-    if (veiculo == null) {
-      return const Scaffold(body: Center(child: Text('Erro: Nenhum veículo selecionado')));
+    if (veiculo == null || bookingProvider.startDate == null || bookingProvider.endDate == null) {
+      return const Scaffold(body: Center(child: Text('Erro: Dados da reserva incompletos')));
     }
 
     final dias = bookingProvider.endDate!.difference(bookingProvider.startDate!).inDays;
@@ -79,7 +82,7 @@ class CheckoutScreen extends StatelessWidget {
                     child: Divider(),
                   ),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.between,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Total Geral', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                       Text(
@@ -136,7 +139,7 @@ class CheckoutScreen extends StatelessWidget {
             label: 'Confirmar e Pagar',
             isLoading: bookingProvider.isLoading,
             onPressed: () async {
-              final success = await bookingProvider.initiatePayment();
+              final success = await bookingProvider.initiatePayment(clienteId);
               if (success && context.mounted) {
                 _showPaymentModal(context);
               }
@@ -151,7 +154,7 @@ class CheckoutScreen extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.between,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: Colors.grey)),
           Text('R\$ ${value.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w500)),

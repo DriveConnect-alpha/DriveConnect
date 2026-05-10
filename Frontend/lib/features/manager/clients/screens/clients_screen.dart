@@ -1,28 +1,59 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import '../providers/clients_provider.dart';
 import '../../widgets/manager_scaffold.dart';
 
-class ClientsScreen extends StatelessWidget {
+class ClientsScreen extends StatefulWidget {
   const ClientsScreen({super.key});
+
+  @override
+  State<ClientsScreen> createState() => _ClientsScreenState();
+}
+
+class _ClientsScreenState extends State<ClientsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ClientsProvider>().fetchClients();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return ManagerScaffold(
-      title: 'Clientes',
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Symbols.group, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            const Text('Lista de Clientes em desenvolvimento'),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: () {},
-              child: const Text('Adicionar Novo Cliente'),
-            ),
-          ],
-        ),
+      title: 'Gestão de Clientes',
+      child: Consumer<ClientsProvider>(
+        builder: (context, provider, child) {
+          if (provider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (provider.error != null) {
+            return Center(child: Text(provider.error!));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: provider.clientes.length,
+            itemBuilder: (context, index) {
+              final cliente = provider.clientes[index];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: const CircleAvatar(child: Icon(Symbols.person)),
+                  title: Text(cliente.usuario?.email ?? 'Sem e-mail'),
+                  subtitle: Text('CPF: ${cliente.cpf}'),
+                  trailing: const Icon(Symbols.chevron_right),
+                  onTap: () {
+                    // Detalhes do cliente
+                  },
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }

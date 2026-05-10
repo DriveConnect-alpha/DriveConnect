@@ -6,8 +6,22 @@ class MockInsuranceService implements IInsuranceService {
   Future<List<PlanoSeguro>> getPlanos() async {
     await Future.delayed(const Duration(seconds: 1));
     return [
-      PlanoSeguro(id: 'BASICO', nome: 'Plano Básico', descricao: 'Cobertura básica', precoDiaria: 50.0),
-      PlanoSeguro(id: 'PREMIUM', nome: 'Plano Premium', descricao: 'Cobertura total', precoDiaria: 120.0),
+      PlanoSeguro(
+        id: 'BASICO',
+        nome: 'Plano Básico',
+        descricao: 'Cobertura básica',
+        percentual: 5.0,
+        obrigatorio: true,
+        ativo: true,
+      ),
+      PlanoSeguro(
+        id: 'PREMIUM',
+        nome: 'Plano Premium',
+        descricao: 'Cobertura total',
+        percentual: 15.0,
+        obrigatorio: false,
+        ativo: true,
+      ),
     ];
   }
 

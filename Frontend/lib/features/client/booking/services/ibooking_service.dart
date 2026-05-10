@@ -21,4 +21,6 @@ abstract class IBookingService {
   Future<Map<String, dynamic>> consultarStatusPagamento(String reservaId);
   
   Future<List<Reserva>> getMyReservations();
+
+  Future<void> cancelarReserva(String reservaId);
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -18,6 +19,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   final TextEditingController _searchController = TextEditingController();
   String selectedType = 'Todos';
 
+  Timer? _debounce;
+
   @override
   void initState() {
     super.initState();
@@ -28,6 +31,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -59,7 +63,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ),
                   ),
                   onChanged: (value) {
-                    // Implementar debounce para busca
+                    if (_debounce?.isActive ?? false) _debounce!.cancel();
+                    _debounce = Timer(const Duration(milliseconds: 500), () {
+                      context.read<ExploreProvider>().setSearchQuery(value);
+                    });
                   },
                 ),
                 const SizedBox(height: 12),
@@ -74,7 +81,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           isSelected: selectedType == type,
                           onSelected: () {
                             setState(() => selectedType = type);
-                            // Filtrar no provider
+                            context.read<ExploreProvider>().setCategory(type);
                           },
                         ),
                       );
@@ -96,7 +103,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   itemBuilder: (context, index) {
                     final veiculo = exploreProvider.veiculos[index];
                     return Padding(
-                      padding: const EdgeInsets.bottom(12),
+                      padding: const EdgeInsets.only(bottom: 12),
                       child: DCCard(
                         padding: EdgeInsets.zero,
                         onTap: () => context.push('/vehicle-detail', extra: veiculo),
@@ -140,7 +147,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.between,
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,

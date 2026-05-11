@@ -75,7 +75,6 @@ export async function gerarLinkPagamento(params: GerarLinkParams): Promise<Respo
 
   return {
     link_pagamento: dados.url,
-    slug: undefined,
   };
 }
 

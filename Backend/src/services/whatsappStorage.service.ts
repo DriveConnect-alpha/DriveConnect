@@ -94,6 +94,51 @@ export async function updateMessageStatus(waMessageId: string, status: string): 
   );
 }
 
+export async function linkReservaToConversation(params: {
+  reservaId: string;
+  phone: string;
+  conversationId?: string | null;
+}): Promise<void> {
+  const { reservaId, phone, conversationId } = params;
+  if (!reservaId || !phone) return;
+
+  await query(
+    `INSERT INTO whatsapp_reserva (reserva_id, phone, conversation_id)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (reserva_id)
+     DO UPDATE SET phone = EXCLUDED.phone, conversation_id = EXCLUDED.conversation_id`,
+    [reservaId, phone, conversationId ?? null],
+  );
+}
+
+export async function getWhatsappReserva(reservaId: string): Promise<{
+  phone: string;
+  conversationId: string | null;
+  notifiedAt: Date | null;
+} | null> {
+  const result = await query(
+    `SELECT phone, conversation_id, notified_at
+     FROM whatsapp_reserva
+     WHERE reserva_id = $1`,
+    [reservaId],
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    phone: row.phone,
+    conversationId: row.conversation_id ?? null,
+    notifiedAt: row.notified_at ?? null,
+  };
+}
+
+export async function markWhatsappReservaNotified(reservaId: string): Promise<void> {
+  await query(
+    `UPDATE whatsapp_reserva SET notified_at = NOW() WHERE reserva_id = $1`,
+    [reservaId],
+  );
+}
+
 export async function getConversationHistory(conversationId: string, limit = 12): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
   if (!conversationId) return [];
 

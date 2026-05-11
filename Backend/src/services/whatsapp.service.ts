@@ -4,9 +4,18 @@
 
 import 'dotenv/config';
 import { answerWhatsAppMessage } from '../ai/rag.js';
+import { query } from '../db/index.js';
+import {
+  buscarVeiculoDisponivelPorFilial,
+  calcularValorTotal,
+  criarReservaPendente,
+} from './reserva.service.js';
 import {
   ensureConversation,
   getConversationHistory,
+  getWhatsappReserva,
+  linkReservaToConversation,
+  markWhatsappReservaNotified,
   storeMessage,
   updateMessageStatus,
 } from './whatsappStorage.service.js';
@@ -56,6 +65,23 @@ function cleanupSeen(): void {
 }
 
 setInterval(cleanupSeen, Math.max(30_000, Math.floor(DEDUPE_TTL_MS / 2))).unref();
+
+type Cached<T> = { value: T; expiresAt: number };
+const cache = new Map<string, Cached<any>>();
+
+function setCache<T>(key: string, value: T, ttlMs: number): void {
+  cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+}
+
+function getCache<T>(key: string): T | null {
+  const item = cache.get(key);
+  if (!item) return null;
+  if (Date.now() > item.expiresAt) {
+    cache.delete(key);
+    return null;
+  }
+  return item.value as T;
+}
 
 /**
  * Função para enviar uma mensagem via WhatsApp
@@ -167,6 +193,24 @@ export async function processIncomingMessage(payload: any): Promise<void> {
     return;
   }
 
+  const paymentResult = await tryHandlePaymentIntent({
+    messageText: text,
+    phone: from,
+    conversationId: conversation.id,
+  });
+
+  if (paymentResult?.handled) {
+    const replyMessageId = await sendMessage(from, paymentResult.replyText);
+    await storeMessage({
+      conversationId: conversation.id,
+      direction: 'OUT',
+      waMessageId: replyMessageId,
+      text: paymentResult.replyText,
+      status: 'sent',
+    });
+    return;
+  }
+
   const history = await getConversationHistory(conversation.id, Number.parseInt(process.env.WHATSAPP_HISTORY_LIMIT || '12', 10));
 
   const quickReplyMsRaw = process.env.WHATSAPP_QUICK_REPLY_MS ?? '0';
@@ -210,4 +254,244 @@ export async function processIncomingMessage(payload: any): Promise<void> {
       error: String((error as Error)?.message || error),
     });
   }
+}
+
+function extractDateRange(messageText: string): { startDate: string | null; endDate: string | null } {
+  const matches = (messageText || '').match(/\b(\d{1,2}\/\d{1,2}\/20\d{2}|20\d{2}-\d{2}-\d{2})\b/g);
+  if (!matches || matches.length === 0) return { startDate: null, endDate: null };
+  const startDate = parseDateToIso(matches[0]);
+  const endDate = parseDateToIso(matches[1] || matches[0]);
+  return { startDate, endDate };
+}
+
+function parseDateToIso(text: string | null): string | null {
+  if (!text) return null;
+  const t = text.trim();
+
+  const iso = t.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  const br = t.match(/\b(\d{1,2})\/(\d{1,2})\/(20\d{2})\b/);
+  if (br) {
+    const [, ddRaw, mmRaw, yyyy] = br;
+    if (!ddRaw || !mmRaw || !yyyy) return null;
+    const dd = ddRaw.padStart(2, '0');
+    const mm = mmRaw.padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return null;
+}
+
+function normalizePhone(phone: string): string {
+  return (phone || '').replace(/\D/g, '');
+}
+
+function isPaymentIntent(text: string): boolean {
+  const t = (text || '').toLowerCase();
+  const intentWords = ['pagar', 'pagamento', 'link', 'checkout', 'finalizar', 'fechar'];
+  return intentWords.some((w) => t.includes(w));
+}
+
+async function detectModelo(messageText: string): Promise<{ id: number; descricao: string } | null> {
+  const t = (messageText || '').toLowerCase();
+  const cached = getCache<Array<{ id: number; nome: string; marca: string }>>('modelos');
+  const rows = cached ?? (await query('SELECT id, nome, marca FROM modelo ORDER BY nome')).rows;
+  if (!cached) setCache('modelos', rows, 5 * 60_000);
+  for (const row of rows) {
+    const nome = String(row.nome || '').trim();
+    const marca = String(row.marca || '').trim();
+    if (!nome) continue;
+    const nomeLower = nome.toLowerCase();
+    const marcaLower = marca.toLowerCase();
+    const combos = [
+      nomeLower,
+      marcaLower ? `${marcaLower} ${nomeLower}` : '',
+      marcaLower ? `${nomeLower} ${marcaLower}` : '',
+    ].filter(Boolean);
+    if (combos.some((c) => t.includes(c))) {
+      return { id: Number(row.id), descricao: `${marca} ${nome}`.trim() };
+    }
+  }
+  return null;
+}
+
+async function detectFilialId(messageText: string): Promise<string | null> {
+  const t = (messageText || '').toLowerCase();
+  const cached = getCache<Array<{ id: string; nome: string; cidade: string; uf: string }>>('filiais');
+  const rows = cached ?? (await query(
+    `SELECT id, nome, cidade, uf FROM filial WHERE deletado_em IS NULL AND ativo = TRUE ORDER BY nome`,
+  )).rows;
+  if (!cached) setCache('filiais', rows, 5 * 60_000);
+
+  if (rows.length === 1) return String(rows[0].id);
+
+  for (const row of rows) {
+    const nome = String(row.nome || '').toLowerCase();
+    const cidade = String(row.cidade || '').toLowerCase();
+    const uf = String(row.uf || '').toLowerCase();
+    if ((nome && t.includes(nome)) || (cidade && t.includes(cidade)) || (uf && t.includes(uf))) {
+      return String(row.id);
+    }
+  }
+  return null;
+}
+
+async function findClienteByPhone(phone: string): Promise<{ id: string; nome: string; email: string; telefone?: string | null } | null> {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return null;
+  try {
+    const result = await query(
+      `SELECT c.id, c.nome_completo, u.email, c.telefone
+       FROM cliente c
+       JOIN usuario u ON u.id = c.usuario_id
+       WHERE regexp_replace(c.telefone, '\\D', '', 'g') = $1
+       LIMIT 1`,
+      [normalized],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      id: row.id,
+      nome: row.nome_completo,
+      email: row.email,
+      telefone: row.telefone ?? null,
+    };
+  } catch (err) {
+    console.error('[WhatsApp] Erro buscando cliente por telefone:', err);
+    return null;
+  }
+}
+
+async function tryHandlePaymentIntent(params: {
+  messageText: string;
+  phone: string;
+  conversationId: string;
+}): Promise<{ handled: boolean; replyText: string }> {
+  const { messageText, phone, conversationId } = params;
+
+  if (!isPaymentIntent(messageText)) {
+    return { handled: false, replyText: '' };
+  }
+
+  const { startDate, endDate } = extractDateRange(messageText);
+  const modelo = await detectModelo(messageText);
+  const filialId = await detectFilialId(messageText);
+
+  if (startDate && endDate) {
+    const inicio = new Date(startDate);
+    const fim = new Date(endDate);
+    if (!(inicio instanceof Date) || !(fim instanceof Date) || Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) {
+      return {
+        handled: true,
+        replyText: 'As datas informadas estão inválidas. Pode enviar no formato DD/MM/AAAA?',
+      };
+    }
+    if (fim.getTime() <= inicio.getTime()) {
+      return {
+        handled: true,
+        replyText: 'A data de devolução precisa ser depois da retirada. Pode corrigir, por favor?',
+      };
+    }
+  }
+
+  if (!startDate || !endDate || !modelo || !filialId) {
+    return {
+      handled: true,
+      replyText: 'Consigo gerar seu link de pagamento. Me envie: modelo do carro, unidade de retirada e datas (retirada e devolução).',
+    };
+  }
+
+  const cliente = await findClienteByPhone(phone);
+  if (!cliente) {
+    const frontendUrl = (process.env.FRONTEND_URL || '').trim();
+    const cadastro = frontendUrl ? ` Você pode se cadastrar em ${frontendUrl}/cadastro.` : '';
+    return {
+      handled: true,
+      replyText: `Para gerar o link, preciso do seu cadastro.${cadastro} Se preferir, me informe seu CPF e e‑mail para localizar sua conta.`,
+    };
+  }
+
+  const inicio = new Date(startDate);
+  const fim = new Date(endDate);
+  const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, inicio, fim);
+
+  if (!veiculoId) {
+    return {
+      handled: true,
+      replyText: 'Não encontrei disponibilidade para esse modelo e período. Quer que eu verifique outra categoria ou datas próximas?',
+    };
+  }
+
+  const valorAluguel = await calcularValorTotal(modelo.id, filialId, inicio, fim);
+  const reserva = await criarReservaPendente({
+    clienteId: cliente.id,
+    veiculoId,
+    filialRetiradaId: filialId,
+    filialDevolucaoId: filialId,
+    dataInicio: inicio,
+    dataFim: fim,
+    valorAluguel,
+    nomeCliente: cliente.nome,
+    emailCliente: cliente.email,
+    telefoneCliente: cliente.telefone ?? phone,
+    descricaoModelo: modelo.descricao,
+  });
+
+  await linkReservaToConversation({
+    reservaId: reserva.reservaId,
+    phone,
+    conversationId,
+  });
+
+  return {
+    handled: true,
+    replyText: `Perfeito! Aqui está seu link de pagamento: ${reserva.linkPagamento}\nAssim que o pagamento for confirmado, eu te aviso por aqui.`,
+  };
+}
+
+export async function notifyPaymentConfirmed(reservaId: string): Promise<void> {
+  if (!reservaId) return;
+
+  const vinculo = await getWhatsappReserva(reservaId);
+  if (!vinculo || vinculo.notifiedAt) return;
+
+  const dados = await query(
+    `SELECT r.id, r.data_inicio, r.data_fim, f.nome AS filial_nome, f.cidade, f.uf,
+            m.nome AS modelo, m.marca
+     FROM reserva r
+     JOIN veiculo v ON v.id = r.veiculo_id
+     JOIN modelo m ON m.id = v.modelo_id
+     JOIN filial f ON f.id = r.filial_retirada_id
+     WHERE r.id = $1`,
+    [reservaId],
+  );
+
+  const row = dados.rows[0];
+  const inicio = row?.data_inicio ? new Date(row.data_inicio).toLocaleDateString('pt-BR') : null;
+  const fim = row?.data_fim ? new Date(row.data_fim).toLocaleDateString('pt-BR') : null;
+  const modelo = row?.modelo ? `${row.modelo}${row.marca ? ` ${row.marca}` : ''}` : 'seu veículo';
+  const local = [row?.filial_nome, row?.cidade, row?.uf].filter(Boolean).join(' / ');
+
+  const texto = `Pagamento confirmado! Sua reserva está confirmada para ${inicio} até ${fim}.` +
+    `${modelo ? ` Modelo: ${modelo}.` : ''}` +
+    `${local ? ` Unidade: ${local}.` : ''}` +
+    ' Obrigado! Se precisar ajustar algo, me avise.';
+
+  const conversation = vinculo.conversationId
+    ? { id: vinculo.conversationId }
+    : await ensureConversation(vinculo.phone);
+
+  if (!conversation?.id) return;
+
+  const messageId = await sendMessage(vinculo.phone, texto);
+  await storeMessage({
+    conversationId: conversation.id,
+    direction: 'OUT',
+    waMessageId: messageId,
+    text: texto,
+    status: 'sent',
+  });
+
+  await markWhatsappReservaNotified(reservaId);
 }

@@ -87,136 +87,71 @@ Use termos padronizados no atendimento:
 - Indisponível (oferecer equivalente)
 - Sob consulta (aguardar retorno do pátio/unidade)
 
-## 7) Quilometragem e pacotes
-Padrão por diária:
-- 150 km/dia incluídos (podendo variar por categoria/contrato)
-Excedente (referência):
-- Econômico e SUV: R$ 1,50/km excedente
-- Premium: R$ 3,50/km excedente
+# DRIVE CONNECT — BASE DE CONHECIMENTO (LOCADORA)
 
-Pacotes (opcionais, se aplicável):
-- Km livre (sob cotação; recomendado para viagens longas)
-- Pacote 300 km/dia (sob cotação; recomendado para rota intermunicipal)
+## 1) Papel do atendimento
+- Atender rápido via WhatsApp, entender necessidade e orientar a reserva.
+- Sempre confirmar unidade, datas e categoria antes de prometer disponibilidade.
+- Opções de carros, disponibilidade e preços reais devem vir do sistema (banco).
 
-## 8) Caução, pagamento e reembolso
-### 8.1 Caução (bloqueio no cartão)
-Referência por categoria:
-- Econômico: R$ 800,00
-- SUV: R$ 1.500,00
-- Premium: R$ 5.000,00
-
-Regras:
-- Caução via cartão de crédito físico, em nome do locatário (motorista principal).
-- O desbloqueio depende da administradora do cartão e pode levar alguns dias úteis.
-
-### 8.2 Formas de pagamento
-- Cartão de crédito (até 3x sem juros, quando disponível)
-- Pix
-- Débito (quando disponível para diárias; caução continua no crédito)
-Não aceitamos:
-- Dinheiro em espécie, cheques.
-
-## 9) Requisitos do motorista e documentação
-Obrigatório:
-- CNH definitiva e válida (categoria B ou superior, conforme veículo)
-- Documento com foto (RG ou CNH)
-- Cartão de crédito físico em nome do locatário (para caução)
-
-Políticas comuns:
-- Idade mínima: 21 anos (pode variar por categoria; Premium pode exigir idade maior)
-- Motorista adicional: permitido mediante cadastro (pode ter taxa)
-- Condutor fora do contrato: não permitido; pode gerar multas/recusa de cobertura.
-
-## 10) Retirada, devolução, combustível e limpeza
-### 10.1 Retirada e devolução
-- Veículo é entregue vistoriado e com checklist (fotos e registro).
-- Atraso na devolução pode gerar cobrança proporcional e/ou diária extra (conforme tolerância contratual).
-
-### 10.2 Combustível (política “cheio/cheio”)
-- Entrega com tanque cheio; devolução deve ser com tanque cheio.
-Se devolvido abaixo:
-- Reabastecimento: R$ 8,50 por litro faltante + R$ 50,00 taxa de serviço (referência).
-
-### 10.3 Limpeza
-- Entregamos limpo.
-- Sujeira excessiva (areia, lama, pelos em excesso, odor forte) pode gerar taxa:
-  - Lavagem especial: R$ 100,00 (referência; pode variar pelo nível).
-
-## 11) Planos de proteção/seguro (explicação simples para o cliente)
-Todo veículo tem regras de responsabilidade (franquia) em caso de sinistro.
-Referência de franquia por categoria (sem plano adicional):
-- Econômico: R$ 2.000,00
-- SUV: R$ 4.000,00
-- Premium: R$ 15.000,00
-
-Opções comuns (modelo de oferta):
-- Proteção Básica: reduz burocracia, mantém franquia padrão
-- Proteção Plus: reduz franquia (valor sob cotação)
-- Proteção Total: maior redução de franquia + cobertura ampliada (sob análise e regras)
-
-Importante:
-- Condução sob álcool/drogas, infrações graves e uso indevido podem invalidar cobertura.
-
-## 12) Adicionais e serviços
-Adicionais típicos (sob disponibilidade):
-- Cadeira de bebê/assento de elevação
-- GPS/Tag de pedágio (quando aplicável)
-- Wi‑Fi veicular (quando aplicável)
-- Motorista adicional
-
-Entrega/retirada no endereço:
-- Sujeito a raio e agenda; taxa informada na cotação.
-
-## 13) Cancelamento, no-show e alterações
-Regras de referência (ajustar ao contrato vigente):
-- Cancelamento com antecedência maior pode ter reembolso integral/ parcial.
-- Alteração de datas pode alterar tarifa e disponibilidade.
-- No-show (não comparecimento) pode gerar multa/diária (conforme política do período).
-
-## 14) Regras de uso (proibições e cuidados)
-Proibido:
-- Uso em competições, rachas, trilhas severas, transporte ilegal, sublocação.
-Cuidados:
-- Não fumar no veículo (pode gerar taxa de higienização).
-- Manter documentos do veículo e seguir normas de trânsito.
-
-## 15) Suporte 24h e emergências
-Em caso de:
-- Pane mecânica: acionar suporte e aguardar instruções (carro reserva sujeito a disponibilidade)
-- Acidente/sinistro: priorizar segurança, registrar ocorrência quando aplicável e acionar suporte
-- Guincho: disponível via assistência 24h (conforme regras do plano e local)
-
-## 16) FAQ rápido (respostas prontas)
-1) “Posso reservar sem pagar?”  
-Podemos segurar como pré‑reserva por curto período, mas a confirmação depende de pagamento/garantia e validação.
-
-2) “Posso usar cartão de outra pessoa para o caução?”  
-Não. O caução precisa ser no cartão de crédito físico em nome do locatário/motorista principal.
-
-3) “Qual a diferença entre SUV e Econômico?”  
-SUV tem mais espaço, posição mais alta e geralmente mais conforto em viagens; Econômico é mais barato e eficiente para cidade.
-
-4) “Tem km livre?”  
-Quando disponível, oferecemos pacotes (inclusive km livre) sob cotação, conforme categoria e período.
-
-5) “Quais carros estão disponíveis nas datas X a Y?”  
-Para eu checar certinho, me diga a data/horário de retirada e devolução e a categoria desejada. Se não tiver na categoria, posso sugerir equivalentes.
-
-## 17) Dados que o atendente deve coletar (checklist)
-- Cidade/unidade desejada
-- Data/hora retirada e devolução
+Checklist rápido:
+- Unidade/cidade retirada e devolução
+- Datas e horários
 - Categoria preferida e alternativas aceitas
-- Nome completo do motorista + CPF
-- Idade do motorista
-- CNH (válida e definitiva)
 - Forma de pagamento (Pix/cartão)
-- Endereço (se entrega/retirada no local)
-- Necessidade de adicionais (cadeirinha, motorista extra, etc.)
+- CNH válida e idade do motorista
+- Adicionais (cadeirinha, motorista extra, entrega/retirada no local)
 
-## 18) Perguntas prontas (para agilizar)
-1) “Pra qual unidade/cidade você quer retirar? E a devolução é no mesmo local?”
+## 2) Categorias (sem modelos específicos)
+Observação: modelos variam por unidade e período.
+
+- Econômico — melhor custo/uso urbano
+- Compacto Automático — conforto urbano
+- Sedan — porta‑malas e estrada
+- SUV — família e bagagem
+- Premium — mais tecnologia e conforto
+- Utilitário — carga leve
+
+## 3) Preços e disponibilidade
+- Valores variam por período, unidade, duração e disponibilidade.
+- Disponibilidade é por período (data/hora de retirada e devolução).
+- Reserva só é confirmada após pagamento/garantia.
+
+## 4) Quilometragem
+- Padrão: 150 km/dia (pode variar por contrato/categoria).
+- Excedente: valores sob cotação.
+- Pacotes km (incluindo km livre) sob cotação.
+
+## 5) Pagamento e caução
+- Pagamento: Pix ou cartão (até 3x quando disponível).
+- Caução via cartão de crédito físico do locatário.
+- Não aceitamos dinheiro/cheque.
+
+## 6) Requisitos do motorista
+- CNH definitiva e válida.
+- Documento com foto.
+- Idade mínima: 21 anos (premium pode exigir idade maior).
+
+## 7) Retirada, devolução e limpeza
+- Política combustível: cheio/cheio.
+- Atraso pode gerar diária extra.
+- Sujeira excessiva pode gerar taxa.
+
+## 8) Proteção/seguro
+- Franquia varia por categoria.
+- Planos adicionais podem reduzir franquia (sob cotação).
+- Uso indevido ou infrações graves podem invalidar cobertura.
+
+## 9) Adicionais e serviços
+- Cadeirinha, motorista extra, entrega/retirada no endereço (sob disponibilidade).
+
+## 10) Cancelamento e no‑show
+- Alterações podem mudar preço e disponibilidade.
+- No‑show pode gerar multa conforme política do período.
+
+## 11) Perguntas prontas
+1) “Qual unidade/cidade de retirada? A devolução é no mesmo local?”
 2) “Quais datas e horários de retirada e devolução?”
-3) “Prefere qual categoria (Econômico, Automático, Sedan, SUV, Premium ou Utilitário)? Aceita alternativa?”
-4) “Vai rodar muito? Tem uma estimativa de km por dia ou no total?”
-5) “Vai pagar no Pix ou cartão? (Caução é no cartão de crédito físico do motorista principal)”
-6) “Quantas pessoas e bagagens vão no carro? Precisa de cadeirinha?”
+3) “Qual categoria você prefere? Aceita alternativa?”
+4) “Vai pagar no Pix ou cartão?”
+Importante:

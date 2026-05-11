@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { query } from '../db/index.js';
 import {
-  buscarVeiculoDisponivel,
+  buscarVeiculoDisponivelPorFilial,
   calcularValorTotal,
   verificarDisponibilidadeRetirada,
   criarReservaPendente,
@@ -57,7 +57,7 @@ export async function checarDisponibilidade(req: IncomingMessage, res: ServerRes
   const inicio = new Date(dataInicio);
   const fim = new Date(dataFim);
 
-  const veiculoId = await buscarVeiculoDisponivel(modeloId, inicio, fim);
+  const veiculoId = await buscarVeiculoDisponivelPorFilial(modeloId, filialId, inicio, fim);
   const disponivel = veiculoId !== null;
 
   let precoTotal: number | null = null;

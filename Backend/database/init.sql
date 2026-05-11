@@ -29,6 +29,7 @@ CREATE TABLE cliente (
     cpf VARCHAR(14) UNIQUE NOT NULL,
     rg VARCHAR(20),
     cnh VARCHAR(20),
+    telefone VARCHAR(20),
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deletado_em TIMESTAMP
 );
@@ -232,6 +233,17 @@ CREATE TABLE whatsapp_message (
 
 CREATE INDEX idx_whatsapp_message_conversation ON whatsapp_message(conversation_id, created_at DESC);
 CREATE INDEX idx_whatsapp_message_wa_id ON whatsapp_message(wa_message_id);
+
+CREATE TABLE whatsapp_reserva (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    reserva_id UUID UNIQUE REFERENCES reserva(id) ON DELETE CASCADE,
+    phone VARCHAR(32) NOT NULL,
+    conversation_id UUID REFERENCES whatsapp_conversation(id) ON DELETE SET NULL,
+    notified_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_whatsapp_reserva_phone ON whatsapp_reserva(phone);
 
 -- ──────────────────────────────────────────────
 -- RAG / PGVector (LangChain)

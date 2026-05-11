@@ -8,8 +8,8 @@
     "start": "node dist/server.js",
     "dev": "tsc && node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "rag:ingest": "ts-node src/ai/ingest.ts",
-    "rag:reindex": "ts-node src/ai/ingest.ts --wipe",
+    "rag:ingest": "node --loader ts-node/esm src/ai/ingest.ts",
+    "rag:reindex": "node --loader ts-node/esm src/ai/ingest.ts --wipe",
     "test": "NODE_OPTIONS=--experimental-vm-modules npx jest",
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules npx jest --watch"
   },

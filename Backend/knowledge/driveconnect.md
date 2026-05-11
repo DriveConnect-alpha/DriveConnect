@@ -27,42 +27,33 @@ Unidades e cobertura (modelo de cadastro):
 
 Observação: domingos/feriados sem atendimento presencial; suporte 24h apenas para emergência, guincho e sinistro.
 
-## 4) Catálogo de categorias, veículos e itens de série
+## 4) Catálogo de categorias e itens de série
+Observação importante:
+- As opções de modelos específicos variam por unidade, período e disponibilidade e devem ser consultadas no sistema (banco).
+
 ### 4.1 Econômico (1.0–1.6) — “melhor custo”
-Modelos referência (podem variar conforme disponibilidade):
-- Chevrolet Onix, Hyundai HB20, VW Polo, Fiat Argo
 Características comuns:
 - Ar-condicionado, direção elétrica, 4 portas, multimídia (varia), porta-malas médio
 Perfil ideal:
 - Viagens curtas, cidade, casal, pequenos grupos (até 5 ocupantes)
 
 ### 4.2 Compacto Automático — “conforto urbano”
-Modelos referência:
-- Onix AT, HB20 AT, Polo AT, Yaris AT (varia)
 Características comuns:
 - Câmbio automático, central multimídia, consumo otimizado
 
 ### 4.3 Sedan — “porta-malas e rodovia”
-Modelos referência:
-- Chevrolet Onix Plus, VW Virtus, Toyota Corolla (faixas diferentes)
 Características:
 - Mais porta-malas, mais conforto em estrada (especialmente médio/alto)
 
 ### 4.4 SUV — “família e bagagem”
-Modelos referência:
-- Jeep Compass, Hyundai Creta, VW T-Cross, Nissan Kicks
 Características:
 - Posição alta, porta-malas maior, conforto em viagens
 
 ### 4.5 Premium — “performance e status”
-Modelos referência:
-- BMW 320i, Audi A4, Mercedes-Benz C200 (podem variar)
 Características:
 - Acabamento superior, potência, mais tecnologia
 
 ### 4.6 Utilitário leve (carga) — “trabalho”
-Modelos referência:
-- Fiat Fiorino, Renault Kangoo, similares (conforme frota)
 Características:
 - Volume de carga, ideal para pequenas mudanças e entregas
 Regras especiais:

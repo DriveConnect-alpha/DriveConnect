@@ -47,7 +47,9 @@ export async function processarUpload(req: IncomingMessage): Promise<{ campos: R
                 }
             }
 
-            const caminhoImagem = caminhosImagens.length > 0 ? caminhosImagens[0] : null;
+            const caminhoImagem: string | null = caminhosImagens.length > 0
+                ? (caminhosImagens[0] ?? null)
+                : null;
             resolve({ campos, caminhosImagens, caminhoImagem });
         });
     });

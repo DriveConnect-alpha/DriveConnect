@@ -42,6 +42,37 @@ export async function buscarVeiculoDisponivel(
 }
 
 /**
+ * Busca a primeira unidade física disponível de um modelo em uma filial específica.
+ */
+export async function buscarVeiculoDisponivelPorFilial(
+  modeloId: number,
+  filialId: string,
+  dataInicio: Date,
+  dataFim: Date,
+): Promise<string | null> {
+  const sql = `
+    SELECT v.id
+    FROM veiculo v
+    WHERE v.modelo_id = $1
+      AND v.filial_id = $2
+      AND v.status IN ('DISPONIVEL', 'ALUGADO')
+      AND v.deletado_em IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM reserva r
+        WHERE r.veiculo_id = v.id
+          AND r.status IN ('PENDENTE_PAGAMENTO', 'RESERVADA', 'ATIVA')
+          AND r.data_inicio < $4
+          AND r.data_fim > $3
+          AND r.deletado_em IS NULL
+      )
+    LIMIT 1;
+  `;
+
+  const resultado = await query(sql, [modeloId, filialId, dataInicio, dataFim]);
+  return resultado.rows[0]?.id ?? null;
+}
+
+/**
  * Calcula o valor total da reserva com base na tabela de preço dinâmico.
  * Fallback para preco_base_diaria do tipo_carro quando não há registro específico.
  */
@@ -199,7 +230,7 @@ export async function criarReservaPendente(
 
   await query(
     `UPDATE reserva SET link_pagamento = $1, infinitepay_order_nsu = $2, infinitepay_slug = $3 WHERE id = $4`,
-    [link_pagamento, reservaId, slug, reservaId],
+    [link_pagamento, reservaId, slug ?? null, reservaId],
   );
 
   return { reservaId, linkPagamento: link_pagamento, valorTotal, valorSeguro, planoSeguro: planoFinal.nome };
@@ -208,7 +239,7 @@ export async function criarReservaPendente(
 interface DadosWebhook {
   order_nsu: string;
   transaction_nsu: string;
-  invoice_slug: string;
+  invoice_slug?: string;
   capture_method: string;
   receipt_url: string;
 }
@@ -217,7 +248,16 @@ interface DadosWebhook {
  * Confirma uma reserva após receber o webhook de pagamento aprovado.
  * Muda o status de PENDENTE_PAGAMENTO para RESERVADA.
  */
-export async function confirmarReserva(dados: DadosWebhook): Promise<void> {
+export async function confirmarReserva(dados: DadosWebhook): Promise<'confirmed' | 'already_confirmed' | 'not_found'> {
+  const existente = await query(
+    `SELECT status FROM reserva WHERE id = $1 AND deletado_em IS NULL`,
+    [dados.order_nsu],
+  );
+
+  const current = existente.rows[0]?.status as string | undefined;
+  if (!current) return 'not_found';
+  if (current !== 'PENDENTE_PAGAMENTO') return 'already_confirmed';
+
   const sql = `
     UPDATE reserva
     SET
@@ -225,6 +265,7 @@ export async function confirmarReserva(dados: DadosWebhook): Promise<void> {
       infinitepay_nsu = $1,
       metodo_pagamento = $2,
       comprovante_url = $3,
+      infinitepay_slug = COALESCE($5, infinitepay_slug),
       pagamento_em = NOW()
     WHERE id = $4
       AND status = 'PENDENTE_PAGAMENTO'
@@ -236,7 +277,10 @@ export async function confirmarReserva(dados: DadosWebhook): Promise<void> {
     dados.capture_method,
     dados.receipt_url,
     dados.order_nsu, // order_nsu = reserva.id
+    dados.invoice_slug ?? null,
   ]);
+
+  return 'confirmed';
 }
 
 // ──────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-const INFINITEPAY_API = 'https://api.infinitepay.io/invoices/public/checkout';
+const INFINITEPAY_API = 'https://api.checkout.infinitepay.io';
 
 interface ItemPagamento {
   quantity: number;
@@ -24,7 +24,7 @@ interface GerarLinkParams {
 
 interface RespostaLink {
   link_pagamento: string;
-  slug: string;
+  slug?: string;
 }
 
 /**
@@ -33,17 +33,27 @@ interface RespostaLink {
  */
 export async function gerarLinkPagamento(params: GerarLinkParams): Promise<RespostaLink> {
   const handle = process.env.INFINITEPAY_HANDLE;
-  const appUrl = process.env.APP_URL ?? '';
-  const frontendUrl = process.env.FRONTEND_URL ?? '';
+  const appUrl = (process.env.APP_URL ?? '').trim();
+  const frontendUrl = (process.env.FRONTEND_URL ?? '').trim();
 
   if (!handle) throw new Error('INFINITEPAY_HANDLE não configurado no .env');
+
+  const defaultRedirectBase = frontendUrl || appUrl;
+  if (!defaultRedirectBase && !params.redirectUrl) {
+    throw new Error('FRONTEND_URL ou APP_URL não configurado para redirect_url.');
+  }
+
+  const webhookUrl = params.webhookUrl ?? (appUrl ? `${appUrl}/pagamento/webhook` : '');
+  if (!webhookUrl) {
+    throw new Error('APP_URL não configurado para webhook_url.');
+  }
 
   const payload: Record<string, unknown> = {
     handle,
     order_nsu: params.orderNsu,
-    itens: params.itens,
-    redirect_url: params.redirectUrl ?? `${frontendUrl}/reserva/${params.orderNsu}/sucesso`,
-    webhook_url: params.webhookUrl ?? `${appUrl}/pagamento/webhook`,
+    items: params.itens,
+    redirect_url: params.redirectUrl ?? `${defaultRedirectBase}/reserva/${params.orderNsu}/sucesso`,
+    webhook_url: webhookUrl,
   };
 
   if (params.cliente) {
@@ -61,11 +71,10 @@ export async function gerarLinkPagamento(params: GerarLinkParams): Promise<Respo
     throw new Error(`InfinitePay: erro ao gerar link de pagamento. Status ${resposta.status}: ${erro}`);
   }
 
-  const dados = await resposta.json() as { url: string; slug: string };
+  const dados = await resposta.json() as { url: string };
 
   return {
     link_pagamento: dados.url,
-    slug: dados.slug,
   };
 }
 

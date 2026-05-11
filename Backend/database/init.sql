@@ -1,5 +1,7 @@
 -- Extensões úteis
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ──────────────────────────────────────────────
 -- USUÁRIO (autenticação central)
@@ -27,6 +29,7 @@ CREATE TABLE cliente (
     cpf VARCHAR(14) UNIQUE NOT NULL,
     rg VARCHAR(20),
     cnh VARCHAR(20),
+    telefone VARCHAR(20),
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deletado_em TIMESTAMP
 );
@@ -204,3 +207,62 @@ CREATE TABLE veiculo_imagem (
 CREATE INDEX idx_veiculo_imagem_veiculo ON veiculo_imagem(veiculo_id);
 
 CREATE INDEX idx_gerente_filial ON gerente(filial_id);
+
+-- ──────────────────────────────────────────────
+-- WHATSAPP (conversas e mensagens)
+-- ──────────────────────────────────────────────
+CREATE TABLE whatsapp_conversation (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    phone VARCHAR(32) UNIQUE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+    last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE whatsapp_message (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conversation_id UUID REFERENCES whatsapp_conversation(id) ON DELETE CASCADE,
+    direction VARCHAR(3) NOT NULL CHECK (direction IN ('IN', 'OUT')),
+    wa_message_id VARCHAR(128),
+    text TEXT,
+    raw_payload JSONB,
+    status VARCHAR(20) NOT NULL DEFAULT 'received',
+    error TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_whatsapp_message_conversation ON whatsapp_message(conversation_id, created_at DESC);
+CREATE INDEX idx_whatsapp_message_wa_id ON whatsapp_message(wa_message_id);
+
+CREATE TABLE whatsapp_reserva (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    reserva_id UUID UNIQUE REFERENCES reserva(id) ON DELETE CASCADE,
+    phone VARCHAR(32) NOT NULL,
+    conversation_id UUID REFERENCES whatsapp_conversation(id) ON DELETE SET NULL,
+    notified_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_whatsapp_reserva_phone ON whatsapp_reserva(phone);
+
+-- ──────────────────────────────────────────────
+-- RAG / PGVector (LangChain)
+-- ──────────────────────────────────────────────
+CREATE TABLE langchain_pg_collection (
+    uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    cmetadata JSONB
+);
+
+CREATE UNIQUE INDEX idx_langchain_pg_collection_name ON langchain_pg_collection(name);
+
+CREATE TABLE langchain_pg_embedding (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    collection_id UUID REFERENCES langchain_pg_collection(uuid) ON DELETE CASCADE,
+    embedding vector(1536),
+    document TEXT,
+    metadata JSONB
+);
+
+CREATE INDEX idx_langchain_pg_embedding_collection ON langchain_pg_embedding(collection_id);
+CREATE INDEX idx_langchain_pg_embedding_vector ON langchain_pg_embedding USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);

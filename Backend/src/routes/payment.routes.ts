@@ -1,11 +1,12 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { query } from '../db/index.js';
 import {
-  buscarVeiculoDisponivel,
+  buscarVeiculoDisponivelPorFilial,
   calcularValorTotal,
   criarReservaPendente,
   confirmarReserva,
 } from '../services/reserva.service.js';
+import { notifyPaymentConfirmed } from '../services/whatsapp.service.js';
 
 // ──────────────────────────────────────────────
 // POST /pagamento/iniciar
@@ -35,7 +36,7 @@ export async function iniciarPagamento(req: IncomingMessage, res: ServerResponse
   const fim = new Date(data_fim);
 
   // Busca unidade física disponível (Garantia A)
-  const veiculoId = await buscarVeiculoDisponivel(modelo_id, inicio, fim);
+  const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo_id, filial_retirada_id, inicio, fim);
 
   if (!veiculoId) {
     res.writeHead(409, { 'Content-Type': 'application/json' });
@@ -98,11 +99,23 @@ export async function receberWebhook(req: IncomingMessage, res: ServerResponse) 
     return;
   }
 
-  await confirmarReserva({ order_nsu, transaction_nsu, invoice_slug, capture_method, receipt_url });
+  const resultado = await confirmarReserva({ order_nsu, transaction_nsu, invoice_slug, capture_method, receipt_url });
+
+  if (resultado !== 'not_found') {
+    void notifyPaymentConfirmed(order_nsu).catch((err) => {
+      console.error('[Pagamento] Falha ao notificar WhatsApp:', err);
+    });
+  }
 
   // InfinitePay exige resposta rápida (< 1 segundo)
-  res.writeHead(200);
-  res.end();
+  if (resultado === 'not_found') {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, message: 'Pedido não encontrado' }));
+    return;
+  }
+
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ success: true, message: null }));
 }
 
 // ──────────────────────────────────────────────

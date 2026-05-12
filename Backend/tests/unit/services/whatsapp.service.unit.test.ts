@@ -1,17 +1,41 @@
 /// <reference types="node" />
-import { jest, describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
-import { sendMessage, processIncomingMessage } from '../../../src/services/whatsapp.service';
+import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+
+// Define mocks before any imports
+const mockFetch = jest.fn();
+global.fetch = mockFetch as any;
+
+// Mock dependencies
+jest.unstable_mockModule('../../../src/db/index.js', () => ({
+  query: jest.fn(),
+}));
+
+jest.unstable_mockModule('../../../src/ai/rag.js', () => ({
+  answerWhatsAppMessage: jest.fn().mockResolvedValue('Mocked AI response'),
+}));
+
+jest.unstable_mockModule('../../../src/services/whatsappStorage.service.js', () => ({
+  ensureConversation: jest.fn().mockResolvedValue({ id: 'conv-123' }),
+  storeMessage: jest.fn().mockResolvedValue({ id: 'msg-stored-123' }),
+  updateMessageStatus: jest.fn().mockResolvedValue(undefined),
+  getConversationHistory: jest.fn().mockResolvedValue([]),
+  getWhatsappReserva: jest.fn().mockResolvedValue(null),
+  linkReservaToConversation: jest.fn().mockResolvedValue(undefined),
+  markWhatsappReservaNotified: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.unstable_mockModule('../../../src/services/reserva.service.js', () => ({
+  buscarVeiculoDisponivelPorFilial: jest.fn(),
+  calcularValorTotal: jest.fn(),
+  criarReservaPendente: jest.fn(),
+}));
+
+// Import the service after mocking
+const { sendMessage, processIncomingMessage } = await import('../../../src/services/whatsapp.service.js');
+const { ensureConversation, storeMessage } = await import('../../../src/services/whatsappStorage.service.js');
 
 describe('WhatsApp Service Unit Tests', () => {
   const originalEnv = process.env;
-  const originalFetch = global.fetch;
-  let mockFetch: jest.Mock<any>;
-
-  beforeAll(() => {
-    // Avoid real network requests and suppress console logs
-    jest.spyOn(console, 'log').mockImplementation(() => { });
-    jest.spyOn(console, 'error').mockImplementation(() => { });
-  });
 
   beforeEach(() => {
     jest.resetModules();
@@ -23,26 +47,19 @@ describe('WhatsApp Service Unit Tests', () => {
       WHATSAPP_LOG_MESSAGE_BODY: '0',
       DEDUPE_TTL_MS: '60000',
     };
-
-    mockFetch = jest.fn();
-    global.fetch = mockFetch as any;
+    mockFetch.mockClear();
+    jest.clearAllMocks();
   });
 
   afterEach(() => {
     process.env = originalEnv;
-    global.fetch = originalFetch;
-    jest.clearAllMocks();
-  });
-
-  afterAll(() => {
-    jest.restoreAllMocks();
   });
 
   const mockTextPayload = {
     ok: true,
     status: 200,
-    json: async () => ({ message_id: '123' }),
-  }
+    json: async () => ({ messages: [{ id: '123' }] }),
+  };
 
   describe('sendMessage', () => {
     it('should send a text message successfully', async () => {
@@ -104,34 +121,26 @@ describe('WhatsApp Service Unit Tests', () => {
     });
 
     it('should process a valid incoming message and send a reply', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ message_id: 'reply-123' }),
-      });
+      // Mock successful reply send
+      mockFetch.mockResolvedValueOnce(mockTextPayload);
 
       const payload = createMockPayload('msg-1', '5511999999999', 'Oi BOT');
 
       await processIncomingMessage(payload);
 
-      expect(console.log).toHaveBeenCalledWith(
-        '[WhatsApp Service] Mensagem recebida:',
-        expect.stringContaining('"id":"msg-1"')
-      );
+      expect(ensureConversation).toHaveBeenCalledWith('5511999999999');
+      expect(storeMessage).toHaveBeenCalled();
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
       const [, options] = mockFetch.mock.calls[0] as [string, any];
       const sentBody = JSON.parse(options.body);
 
       expect(sentBody.to).toBe('5511999999999');
-      expect(sentBody.text.body).toContain('Recebi sua mensagem: "Oi BOT"');
+      expect(sentBody.text.body).toBe('Mocked AI response');
     });
 
     it('should deduplicate messages with the same ID', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 200,
-      });
+      mockFetch.mockResolvedValue(mockTextPayload);
 
       const payload = createMockPayload('msg-dedupe-1', '5511999999999', 'Duplicate msg');
 

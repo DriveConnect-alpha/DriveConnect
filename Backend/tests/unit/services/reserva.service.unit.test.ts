@@ -143,20 +143,49 @@ describe('Reserva Service', () => {
   });
 
   describe('confirmarReserva', () => {
-    it('deve atualizar o banco para status RESERVADA', async () => {
-      (query as jest.Mock<any>).mockResolvedValueOnce({ rowCount: 1 });
+    const mockWebhook = {
+      transaction_nsu: 'txn1',
+      capture_method: 'PIX',
+      receipt_url: 'url',
+      order_nsu: 'reserva-1',
+      invoice_slug: 'slug-123'
+    };
 
-      await confirmarReserva({
-        transaction_nsu: 'txn1', capture_method: 'PIX', receipt_url: 'url', order_nsu: 'reserva-1', invoice_slug: 'slug'
-      });
+    it('deve atualizar o banco para status RESERVADA se estiver PENDENTE_PAGAMENTO', async () => {
+      (query as jest.Mock<any>)
+        .mockResolvedValueOnce({ rows: [{ status: 'PENDENTE_PAGAMENTO' }] }) // check status
+        .mockResolvedValueOnce({ rowCount: 1 }); // update
 
-      expect(query).toHaveBeenCalledTimes(1);
-      expect(query).toHaveBeenCalledWith(
+      const result = await confirmarReserva(mockWebhook);
+
+      expect(result).toBe('confirmed');
+      expect(query).toHaveBeenCalledTimes(2);
+      expect(query).toHaveBeenLastCalledWith(
         expect.stringContaining('status = \'RESERVADA\''),
-        ['txn1', 'PIX', 'url', 'reserva-1']
+        ['txn1', 'PIX', 'url', 'reserva-1', 'slug-123']
       );
+
+    });
+
+    it('deve retornar already_confirmed se a reserva já não estiver mais pendente', async () => {
+      (query as jest.Mock<any>).mockResolvedValueOnce({ rows: [{ status: 'RESERVADA' }] });
+
+      const result = await confirmarReserva(mockWebhook);
+
+      expect(result).toBe('already_confirmed');
+      expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve retornar not_found se a reserva não existir', async () => {
+      (query as jest.Mock<any>).mockResolvedValueOnce({ rows: [] });
+
+      const result = await confirmarReserva(mockWebhook);
+
+      expect(result).toBe('not_found');
+      expect(query).toHaveBeenCalledTimes(1);
     });
   });
+
 
   describe('estenderReserva', () => {
     const dataFim = new Date('2023-01-10');

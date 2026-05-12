@@ -4,10 +4,9 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/providers/auth_provider.dart';
 import 'package:go_router/go_router.dart';
-import 'core/network/api_client.dart';
+import 'calls/api_core.dart';
 import 'features/client/explore/providers/explore_provider.dart';
 import 'features/client/booking/providers/booking_provider.dart';
-import 'features/client/booking/services/booking_service.dart';
 import 'features/manager/inventory/providers/inventory_provider.dart';
 import 'features/manager/reservations/providers/reservations_provider.dart';
 import 'features/manager/clients/providers/clients_provider.dart';
@@ -23,6 +22,7 @@ import 'features/auth/services/auth_service.dart';
 import 'features/auth/services/mock_auth_service.dart';
 
 import 'features/client/booking/services/ibooking_service.dart';
+import 'features/client/booking/services/booking_service.dart';
 import 'features/client/booking/services/mock_booking_service.dart';
 
 import 'features/manager/reservations/services/ireservation_manager_service.dart';
@@ -60,56 +60,57 @@ class DriveConnectApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const bool useMock = false; // Toggle centralizado
-    final apiClient = ApiClient(
-      onUnauthorized: () {
-        final context = AppRouter.rootNavigatorKey.currentContext;
-        if (context != null) {
-          context.read<AuthProvider>().logout().then((_) {
-            if (context.mounted) context.go('/login');
-          });
-        }
-      },
-    );
+
+    // Configure session expiry handler (JWT 401 → logout)
+    onSessionExpired = () {
+      final ctx = AppRouter.rootNavigatorKey.currentContext;
+      if (ctx != null) {
+        ctx.read<AuthProvider>().logout().then((_) {
+          if (ctx.mounted) ctx.go('/login');
+        });
+      }
+    };
     
+    // Services: no longer require ApiClient, they use the calls layer internally
     final IAuthService authService = useMock
         ? MockAuthService()
-        : AuthService(apiClient);
+        : AuthService();
 
     final IExploreService exploreService = useMock
         ? MockExploreService()
-        : ExploreService(apiClient);
+        : ExploreService();
 
     final IBookingService bookingService = useMock 
         ? MockBookingService() 
-        : BookingService(apiClient);
+        : BookingService();
 
     final IReservationManagerService reservationManagerService = useMock
         ? MockReservationManagerService()
-        : ReservationManagerService(apiClient);
+        : ReservationManagerService();
 
     final IInventoryService inventoryService = useMock
         ? MockInventoryService()
-        : InventoryService(apiClient);
+        : InventoryService();
 
     final IClientManagerService clientManagerService = useMock
         ? MockClientManagerService()
-        : ClientManagerService(apiClient);
+        : ClientManagerService();
 
     final IDashboardService dashboardService = useMock
         ? MockDashboardService()
-        : DashboardService(apiClient);
+        : DashboardService();
 
     final IInsuranceService insuranceService = useMock
         ? MockInsuranceService()
-        : InsuranceService(apiClient);
+        : InsuranceService();
         
     final IAdminService adminService = useMock
         ? MockAdminService()
-        : AdminService(apiClient);
+        : AdminService();
 
     final IFilialService filialService = useMock
         ? MockFilialService()
-        : FilialService(apiClient);
+        : FilialService();
 
     return MultiProvider(
       providers: [

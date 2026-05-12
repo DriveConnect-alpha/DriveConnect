@@ -9,6 +9,8 @@ class Veiculo {
   final int ano;
   final String? cor;
   final String status; // 'DISPONIVEL' | 'ALUGADO' | 'MANUTENCAO'
+  final String? imagemUrl;
+  final String? capaUrl;
 
   // Campos JOIN
   final Modelo? modelo;
@@ -22,6 +24,8 @@ class Veiculo {
     required this.ano,
     this.cor,
     required this.status,
+    this.imagemUrl,
+    this.capaUrl,
     this.modelo,
     this.filial,
   });
@@ -35,6 +39,8 @@ class Veiculo {
       ano: json['ano'],
       cor: json['cor'],
       status: json['status'],
+      imagemUrl: json['imagem_url'],
+      capaUrl: json['capa_url'],
       modelo: json['modelo'] != null ? Modelo.fromJson(json['modelo']) : null,
       filial: json['filial'] != null ? Filial.fromJson(json['filial']) : null,
     );
@@ -49,6 +55,7 @@ class Veiculo {
       'ano': ano,
       'cor': cor,
       'status': status,
+      'imagem_url': imagemUrl,
     };
   }
 }

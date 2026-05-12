@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../providers/booking_provider.dart';
 import '../../../../core/widgets/dc_button.dart';
 import '../../../../core/widgets/dc_card.dart';
+import '../../../../calls/filial.call.dart';
 import '../../../../core/models/filial.dart';
 
 class PeriodSelectionScreen extends StatefulWidget {
@@ -21,11 +22,32 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
   String? _pickupBranchId;
   String? _returnBranchId;
 
-  // Mock de filiais (em um app real viria de um BranchProvider)
-  final List<Filial> _filiais = [
-    Filial(id: '1', nome: 'São Paulo - Matriz', ativo: true, cidade: 'São Paulo', uf: 'SP'),
-    Filial(id: '2', nome: 'Rio de Janeiro - Galeão', ativo: true, cidade: 'Rio de Janeiro', uf: 'RJ'),
-  ];
+  List<Filial> _filiais = [];
+  bool _isLoadingFiliais = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFiliais();
+  }
+
+  Future<void> _loadFiliais() async {
+    await FilialCall.listar(
+      onSuccess: (data) {
+        if (mounted) {
+          setState(() {
+            _filiais = data.map((f) => Filial.fromJson(f)).toList();
+            _isLoadingFiliais = false;
+          });
+        }
+      },
+      onError: (msg) {
+        if (mounted) {
+          setState(() => _isLoadingFiliais = false);
+        }
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,20 +135,25 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
   }) {
     return DCCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          hint: Text('Selecione a filial de $label'),
-          isExpanded: true,
-          items: _filiais.map((f) {
-            return DropdownMenuItem(
-              value: f.id,
-              child: Text(f.nome ?? ''),
-            );
-          }).toList(),
-          onChanged: onChanged,
-        ),
-      ),
+      child: _isLoadingFiliais 
+        ? const Center(child: Padding(
+            padding: EdgeInsets.all(8.0),
+            child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+          ))
+        : DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              hint: Text('Selecione a filial de $label'),
+              isExpanded: true,
+              items: _filiais.map<DropdownMenuItem<String>>((f) {
+                return DropdownMenuItem<String>(
+                  value: f.id ?? '',
+                  child: Text(f.nome ?? ''),
+                );
+              }).toList(),
+              onChanged: onChanged,
+            ),
+          ),
     );
   }
 

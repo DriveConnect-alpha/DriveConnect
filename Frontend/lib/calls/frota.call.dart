@@ -147,6 +147,8 @@ class FrotaCall {
     required String status,
     List<dynamic>? imagens,
     int indicePrincipal = 0,
+    double? precoDiaria,
+    List<String>? itensIds,
     required void Function(Map<String, dynamic> data) onSuccess,
     required void Function(String message) onError,
   }) async {
@@ -159,6 +161,8 @@ class FrotaCall {
         'cor': cor,
         'status': status,
         'indice_principal': indicePrincipal,
+        if (precoDiaria != null) 'preco_diaria': precoDiaria,
+        if (itensIds != null) 'itens_ids': itensIds,
       };
 
       if (imagens != null && imagens.isNotEmpty) {
@@ -266,6 +270,23 @@ class FrotaCall {
     try {
       final response = await dioClient.delete<Map<String, dynamic>>('/veiculos/$id');
       onSuccess(response.data!['mensagem'] as String? ?? 'Veículo removido.');
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
+
+  /// Lista itens/opcionais disponíveis para veículos.
+  /// ROUTE: GET /opcionais
+  static Future<void> listarOpcionais({
+    required void Function(List<Map<String, dynamic>> itens) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.get<List<dynamic>>('/opcionais');
+      final data = (response.data ?? []).cast<Map<String, dynamic>>();
+      onSuccess(data);
     } on DioException catch (e) {
       handleApiError(e, onError);
     } catch (e) {

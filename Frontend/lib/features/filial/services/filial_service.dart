@@ -1,20 +1,21 @@
-import '../../../core/network/api_client.dart';
+import 'dart:async';
 import '../models/filial.dart';
+import '../../../calls/filial.call.dart';
 import 'ifilial_service.dart';
 
 class FilialService implements IFilialService {
-  final ApiClient _apiClient;
-
-  FilialService(this._apiClient);
-
   @override
   Future<List<Filial>> listFiliais() async {
-    final response = await _apiClient.get('/filiais');
-    if (response.statusCode == 200) {
-      final List<dynamic> data = response.data;
-      return data.map((json) => Filial.fromJson(json)).toList();
-    } else {
-      throw Exception('Falha ao carregar filiais');
-    }
+    final completer = Completer<List<Filial>>();
+
+    await FilialCall.listar(
+      onSuccess: (data) {
+        final filiais = data.map((json) => Filial.fromJson(json)).toList();
+        completer.complete(filiais);
+      },
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
   }
 }

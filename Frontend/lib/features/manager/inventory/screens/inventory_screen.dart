@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../providers/inventory_provider.dart';
 import '../../widgets/manager_scaffold.dart';
 import '../../../../core/widgets/dc_status_badge.dart';
+import '../../../../calls/api_core.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -48,7 +49,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
-                  leading: const Icon(Symbols.directions_car, size: 40),
+                  leading: veiculo.capaUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: Image.network(
+                            '$apiBaseUrl/storage/carros/${veiculo.capaUrl}',
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Symbols.directions_car, size: 40),
+                          ),
+                        )
+                      : const Icon(Symbols.directions_car, size: 40),
                   title: Text('${veiculo.modelo?.marca} ${veiculo.modelo?.nome}'),
                   subtitle: Text('Placa: ${veiculo.placa} | Ano: ${veiculo.ano}'),
                   trailing: DCStatusBadge(

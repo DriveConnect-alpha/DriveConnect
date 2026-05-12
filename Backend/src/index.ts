@@ -5,7 +5,7 @@ import { checarDisponibilidade, confirmarRetirada, confirmarDevolucao } from './
 import { iniciarPagamento, receberWebhook, statusPagamento } from './routes/payment.routes.js';
 import { listarSeguros, criarSeguro, atualizarSeguro, desativarSeguro } from './routes/seguro.routes.js';
 import { listarUsuarios, editarUsuario, desativarUsuario } from './routes/user.routes.js';
-import { listarFiliais } from './routes/filial.routes.js';
+import { listarTodasFiliais as listarFiliais } from './routes/filial.routes.js';
 
 const PORT = process.env.PORT || 3000;
 

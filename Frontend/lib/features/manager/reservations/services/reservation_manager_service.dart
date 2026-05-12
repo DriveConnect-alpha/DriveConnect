@@ -1,20 +1,56 @@
-import '../../../../core/network/api_client.dart';
+import 'dart:async';
 import '../../../../core/models/reserva.dart';
+import '../../../../calls/reserva.call.dart';
 import 'ireservation_manager_service.dart';
 
 class ReservationManagerService implements IReservationManagerService {
-  final ApiClient _apiClient;
-
-  ReservationManagerService(this._apiClient);
-
   @override
   Future<List<Reserva>> getManagerReservations() async {
-    final response = await _apiClient.get('/reservas/gerente');
-    return (response.data as List).map((r) => Reserva.fromJson(r)).toList();
+    final completer = Completer<List<Reserva>>();
+
+    await ReservaCall.listarReservas(
+      onSuccess: (data) {
+        final reservas = data.map((r) => Reserva.fromJson(r)).toList();
+        completer.complete(reservas);
+      },
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
   }
 
   @override
   Future<void> updateReservationStatus(String id, String status) async {
-    await _apiClient.patch('/reservas/$id/status', data: {'status': status});
+    // The backend handles status changes via specific endpoints (retirada, devolucao, cancelar)
+    // rather than a generic status update. Map the status to the correct call.
+    final completer = Completer<void>();
+
+    switch (status) {
+      case 'ATIVA':
+        await ReservaCall.confirmarRetirada(
+          reservaId: id,
+          onSuccess: (_) => completer.complete(),
+          onError: (msg) => completer.completeError(Exception(msg)),
+        );
+        break;
+      case 'FINALIZADA':
+        await ReservaCall.confirmarDevolucao(
+          reservaId: id,
+          onSuccess: (_) => completer.complete(),
+          onError: (msg) => completer.completeError(Exception(msg)),
+        );
+        break;
+      case 'CANCELADA':
+        await ReservaCall.cancelar(
+          reservaId: id,
+          onSuccess: (_) => completer.complete(),
+          onError: (msg) => completer.completeError(Exception(msg)),
+        );
+        break;
+      default:
+        completer.completeError(Exception('Status inválido: $status'));
+    }
+
+    return completer.future;
   }
 }

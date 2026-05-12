@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/usuario.dart';
 import '../constants/app_constants.dart';
 import '../../features/auth/services/iauth_service.dart';
+import '../../calls/api_core.dart';
 
 class AuthProvider extends ChangeNotifier {
   final IAuthService _authService;
@@ -27,7 +29,23 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _loadAuthData() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString(AppConstants.tokenKey);
-    // TODO: Carregar usuário do storage ou buscar na API se tiver token
+    final userJson = prefs.getString(AppConstants.userKey);
+    
+    if (_token != null && userJson != null) {
+      try {
+        _user = Usuario.fromJson(jsonDecode(userJson));
+        // Restore identity in api_core so calls layer is authenticated
+        setIdentity(
+          token: _token!,
+          usuarioId: _user!.id,
+          tipo: _user!.tipo,
+        );
+      } catch (_) {
+        _token = null;
+        _user = null;
+      }
+    }
+    
     _isLoading = false;
     notifyListeners();
   }
@@ -42,9 +60,12 @@ class AuthProvider extends ChangeNotifier {
       _token = result['token'];
       _user = result['user'];
       
+      // Persist auth data for session restore
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(AppConstants.tokenKey, _token!);
-      // Idealmente salvar o user serializado ou buscar no perfil
+      await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
+      
+      // Note: setIdentity is already called inside UserCall.login
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -82,8 +103,10 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _token = null;
     _user = null;
+    clearIdentity(); // Clear JWT from api_core
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.tokenKey);
+    await prefs.remove(AppConstants.userKey);
     notifyListeners();
   }
 
@@ -103,6 +126,10 @@ class AuthProvider extends ChangeNotifier {
         nomeCompleto: nomeCompleto,
         email: email,
       );
+      
+      // Update persisted user data
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
     } catch (e) {
       _error = e.toString();
       rethrow;

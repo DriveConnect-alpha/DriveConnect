@@ -173,29 +173,44 @@ export async function buscarUsuarioPorId(id: string): Promise<Usuario | null> {
   });
 }
 
-/** Lista todos os clientes ativos com seus dados de perfil. */
-export async function listarClientes(): Promise<Cliente[]> {
+/** Lista todos os clientes ativos com seus dados de perfil e email. */
+export async function listarClientes(): Promise<any[]> {
   const r = await query(
-    `SELECT c.id, c.usuario_id, c.nome_completo, c.cpf, c.rg, c.cnh, c.criado_em, c.deletado_em
+    `SELECT 
+        c.id, 
+        c.usuario_id, 
+        c.nome_completo as nome, 
+        u.email, 
+        u.tipo,
+        c.cpf, 
+        c.rg, 
+        c.cnh, 
+        c.criado_em as criado_em
      FROM cliente c
      JOIN usuario u ON u.id = c.usuario_id
      WHERE c.deletado_em IS NULL AND u.deletado_em IS NULL
      ORDER BY c.nome_completo`,
   );
 
-  return r.rows.map(
-    (row) =>
-      new Cliente({
-        id: row.id,
-        usuarioId: row.usuario_id,
-        nomeCompleto: row.nome_completo,
-        cpf: row.cpf,
-        rg: row.rg,
-        cnh: row.cnh,
-        criadoEm: row.criado_em,
-        deletadoEm: row.deletado_em,
-      }),
+  return r.rows;
+}
+
+/** Lista absolutamente todos os usuários do sistema (Admin, Gerente, Cliente). */
+export async function listarUsuariosSistema(): Promise<any[]> {
+  const r = await query(
+    `SELECT 
+        u.id, 
+        u.email, 
+        u.tipo, 
+        u.criado_em,
+        COALESCE(c.nome_completo, g.nome_completo, 'Administrador') as nome
+     FROM usuario u
+     LEFT JOIN cliente c ON c.usuario_id = u.id
+     LEFT JOIN gerente g ON g.usuario_id = u.id
+     WHERE u.deletado_em IS NULL
+     ORDER BY u.tipo, nome`,
   );
+  return r.rows;
 }
 
 /** Busca um cliente ativo por ID com seus dados de perfil. */

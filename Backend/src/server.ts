@@ -63,6 +63,7 @@ import {
   login,
   registrarCliente,
   registrarGerente,
+  listarTodosUsuariosSistema,
   listarTodosClientes,
   buscarCliente,
   buscarMeuPerfil,
@@ -109,6 +110,7 @@ import {
   buscar,
   atualizar,
   deletar,
+  listarOpcionais
 } from './routes/veiculo.routes.js';
 
 // Rotas de WhatsApp
@@ -211,6 +213,7 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   if (method === 'POST' && path === '/usuarios/login') return login(req, res);
   if (method === 'POST' && path === '/usuarios/clientes') return registrarCliente(req, res);
   if (method === 'POST' && path === '/usuarios/gerentes') return registrarGerente(req, res);
+  if (method === 'GET' && path === '/usuarios') return listarTodosUsuariosSistema(req, res);
   if (method === 'GET' && path === '/usuarios/clientes') return listarTodosClientes(req, res);
 
   // ── Notificações (FCM) ───────────────────────
@@ -389,6 +392,7 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   // ── Veículos ──────────────────────────────────
   if (method === 'POST' && path === '/veiculos') return registrarVeiculo(req, res);
   if (method === 'GET' && path === '/veiculos') return listar(req, res);
+  if (method === 'GET' && path === '/opcionais') return listarOpcionais(req, res);
 
   const matchImagem = path.match(/^\/veiculos\/([^/]+)\/imagens$/);
   if (matchImagem && matchImagem[1] && method === 'POST') {

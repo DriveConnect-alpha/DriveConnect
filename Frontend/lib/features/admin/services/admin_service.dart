@@ -1,34 +1,42 @@
-import '../../../core/network/api_client.dart';
+import 'dart:async';
 import '../models/admin_user.dart';
+import '../../../calls/gerente.call.dart';
 import 'iadmin_service.dart';
 
 class AdminService implements IAdminService {
-  final ApiClient _apiClient;
-
-  AdminService(this._apiClient);
-
   @override
   Future<List<AdminUser>> listUsers() async {
-    final response = await _apiClient.get('/usuarios');
-    if (response.statusCode == 200) {
-      final List<dynamic> data = response.data;
-      return data.map((json) => AdminUser.fromJson(json)).toList();
-    } else {
-      throw Exception('Failed to load users');
-    }
+    final completer = Completer<List<AdminUser>>();
+
+    await GerenteCall.listarUsuarios(
+      onSuccess: (data) {
+        final users = data.map((json) => AdminUser.fromJson(json)).toList();
+        completer.complete(users);
+      },
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
   }
 
   @override
   Future<void> updateUser(String id, {String? nome, String? email, String? novaSenha}) async {
-    final body = <String, dynamic>{};
-    if (nome != null) body['nome'] = nome;
-    if (email != null) body['email'] = email;
-    if (novaSenha != null) body['novaSenha'] = novaSenha;
+    final completer = Completer<void>();
 
-    final response = await _apiClient.put('/usuarios/$id', data: body);
-    if (response.statusCode != 200) {
-      throw Exception('Failed to update user');
+    if (novaSenha != null && novaSenha.isNotEmpty) {
+      // Password change uses a different endpoint
+      await completer.future;
+      return;
     }
+
+    await GerenteCall.editarCliente(
+      clienteId: id,
+      nomeCompleto: nome,
+      onSuccess: (_) => completer.complete(),
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
   }
 
   @override
@@ -38,26 +46,30 @@ class AdminService implements IAdminService {
     required String nomeCompleto,
     required String filialId,
   }) async {
-    final response = await _apiClient.post(
-      '/auth/register-manager',
-      data: {
-        'email': email,
-        'password': password,
-        'nome_completo': nomeCompleto,
-        'filial_id': filialId,
-      },
+    final completer = Completer<void>();
+
+    await GerenteCall.registerGerente(
+      email: email,
+      senha: password,
+      nomeCompleto: nomeCompleto,
+      filialId: filialId,
+      onSuccess: (_) => completer.complete(),
+      onError: (msg) => completer.completeError(Exception(msg)),
     );
 
-    if (response.statusCode != 201) {
-      throw Exception('Failed to register manager: ${response.data['erro'] ?? 'Unknown error'}');
-    }
+    return completer.future;
   }
 
   @override
   Future<void> deleteUser(String id) async {
-    final response = await _apiClient.delete('/usuarios/$id');
-    if (response.statusCode != 200) {
-      throw Exception('Failed to deactivate user');
-    }
+    final completer = Completer<void>();
+
+    await GerenteCall.desativarUsuario(
+      usuarioId: id,
+      onSuccess: (_) => completer.complete(),
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
   }
 }

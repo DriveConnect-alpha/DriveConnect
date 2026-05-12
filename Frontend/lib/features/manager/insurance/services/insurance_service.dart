@@ -1,20 +1,37 @@
-import '../../../../core/network/api_client.dart';
+import 'dart:async';
 import '../../../../core/models/plano_seguro.dart';
+import '../../../../calls/seguro.call.dart';
 import 'iinsurance_service.dart';
 
 class InsuranceService implements IInsuranceService {
-  final ApiClient _apiClient;
-
-  InsuranceService(this._apiClient);
-
   @override
   Future<List<PlanoSeguro>> getPlanos() async {
-    final response = await _apiClient.get('/planos-seguro');
-    return (response.data as List).map((p) => PlanoSeguro.fromJson(p)).toList();
+    final completer = Completer<List<PlanoSeguro>>();
+
+    await SeguroCall.listar(
+      onSuccess: (data) {
+        final planos = data.map((p) => PlanoSeguro.fromJson(p)).toList();
+        completer.complete(planos);
+      },
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
   }
 
   @override
   Future<void> updatePlano(String id, Map<String, dynamic> data) async {
-    await _apiClient.put('/planos-seguro/$id', data: data);
+    final completer = Completer<void>();
+
+    await SeguroCall.atualizar(
+      planoId: id,
+      nome: data['nome'] as String?,
+      descricao: data['descricao'] as String?,
+      percentual: data['percentual'] as double?,
+      onSuccess: (_) => completer.complete(),
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
   }
 }

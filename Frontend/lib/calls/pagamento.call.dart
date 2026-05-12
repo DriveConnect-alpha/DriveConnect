@@ -10,36 +10,29 @@ import 'api_core.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class PagamentoCall {
-  /// Inicia o processo de pagamento para uma reserva.
-  /// O backend gerará um link de checkout ou um PIX via InfinitePay.
-  /// ROUTE: POST /pagamento/iniciar
-  /// AUTH: required (Cliente, Gerente, Admin)
-  ///
-  /// USAGE EXAMPLE:
-  /// ```dart
-  /// await PagamentoCall.iniciarPagamento(
-  ///   reservaId: 'uuid-reserva',
-  ///   onSuccess: (data) {
-  ///     final checkoutUrl = data['url']; // URL para redirecionar o cliente
-  ///     print('Link de pagamento: $checkoutUrl');
-  ///   },
-  ///   onError: (msg) => print(msg),
-  /// );
-  /// ```
   static Future<void> iniciarPagamento({
-    required String reservaId,
+    required int modeloId,
+    required String filialRetiradaId,
+    required String filialDevolucaoId,
+    required String dataInicio,
+    required String dataFim,
+    required String clienteId,
+    required String planoSeguroId,
     required void Function(Map<String, dynamic> data) onSuccess,
     required void Function(String message) onError,
   }) async {
-    if (reservaId.isEmpty) {
-      onError('O ID da reserva é obrigatório para iniciar o pagamento.');
-      return;
-    }
-
     try {
       final response = await dioClient.post<Map<String, dynamic>>(
         '/pagamento/iniciar',
-        data: {'reservaId': reservaId},
+        data: {
+          'modelo_id': modeloId,
+          'filial_retirada_id': filialRetiradaId,
+          'filial_devolucao_id': filialDevolucaoId,
+          'data_inicio': dataInicio,
+          'data_fim': dataFim,
+          'cliente_id': clienteId,
+          'plano_seguro_id': planoSeguroId,
+        },
       );
       
       onSuccess(response.data!);

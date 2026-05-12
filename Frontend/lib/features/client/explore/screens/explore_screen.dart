@@ -7,6 +7,8 @@ import '../providers/explore_provider.dart';
 import '../../../../core/widgets/dc_card.dart';
 import '../../../../core/widgets/dc_chip.dart';
 import '../../../../core/widgets/dc_loading.dart';
+import '../../../../calls/api_core.dart';
+import 'package:intl/intl.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -117,8 +119,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                   decoration: BoxDecoration(
                                     color: theme.colorScheme.surfaceVariant,
                                     borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                                    image: const DecorationImage(
-                                      image: NetworkImage('https://placehold.co/600x400/png?text=Veiculo'),
+                                    image: DecorationImage(
+                                      image: veiculo.capaUrl != null
+                                        ? NetworkImage('$apiBaseUrl/storage/carros/${veiculo.capaUrl}')
+                                        : const NetworkImage('https://placehold.co/600x400/png?text=Sem+Imagem'),
                                       fit: BoxFit.cover,
                                     ),
                                   ),
@@ -153,21 +157,35 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            veiculo.modelo?.marca ?? 'Marca',
+                                            '${veiculo.modelo?.marca ?? 'Marca'} • ${veiculo.modelo?.tipoCarro?.nome ?? 'Categoria'}',
                                             style: theme.textTheme.labelSmall,
                                           ),
                                           Text(
                                             veiculo.modelo?.nome ?? 'Modelo',
                                             style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                                           ),
+                                          if (veiculo.filial != null)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 4),
+                                              child: Row(
+                                                children: [
+                                                  const Icon(Symbols.location_on, size: 12, color: Colors.grey),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    veiculo.filial?.nome ?? '',
+                                                    style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
                                         ],
                                       ),
                                       Text.rich(
                                         TextSpan(
                                           children: [
                                             TextSpan(
-                                              text: 'R\$ ${veiculo.modelo?.tipoCarro?.precoBaseDiaria ?? 0}',
-                                              style: theme.textTheme.headlineSmall?.copyWith(
+                                              text: NumberFormat.currency(symbol: 'R\$', decimalDigits: 2).format(veiculo.modelo?.tipoCarro?.precoBaseDiaria ?? 0),
+                                              style: theme.textTheme.titleLarge?.copyWith(
                                                 color: theme.colorScheme.primary,
                                                 fontWeight: FontWeight.bold,
                                               ),

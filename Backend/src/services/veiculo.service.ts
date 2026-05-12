@@ -1,10 +1,10 @@
 import { query } from '../db/index.js';
 import type { Veiculo } from '../entities/Veiculo.js';
 
-export async function criarVeiculo(dados: Veiculo): Promise<Veiculo> {
+export async function criarVeiculo(dados: Veiculo & { itens_ids?: string[] }): Promise<Veiculo> {
     const q = `
-    INSERT INTO veiculo (modelo_id, filial_id, placa, ano, cor, status, imagem_url)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO veiculo (modelo_id, filial_id, placa, ano, cor, status, imagem_url, preco_diaria)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *;
   `;
     const values = [
@@ -14,16 +14,30 @@ export async function criarVeiculo(dados: Veiculo): Promise<Veiculo> {
         dados.ano,
         dados.cor,
         dados.status,
-        dados.imagem_url
+        dados.imagem_url,
+        dados.preco_diaria
     ];
     const result = await query(q, values);
-    return result.rows[0];
+    const veiculo = result.rows[0];
+
+    // Associar itens se fornecidos
+    if (dados.itens_ids && dados.itens_ids.length > 0) {
+        for (const itemId of dados.itens_ids) {
+            await query(
+                'INSERT INTO veiculo_item (veiculo_id, item_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                [veiculo.id, itemId]
+            );
+        }
+    }
+
+    return veiculo;
 }
 
 export async function listarVeiculos(filialId?: string): Promise<any[]> {
     let q = `
     SELECT v.*, m.nome as modelo_nome, m.marca as modelo_marca,
-           (SELECT filename FROM veiculo_imagem WHERE veiculo_id = v.id ORDER BY is_principal DESC, ordem ASC LIMIT 1) as capa_url
+           (SELECT filename FROM veiculo_imagem WHERE veiculo_id = v.id ORDER BY is_principal DESC, ordem ASC LIMIT 1) as capa_url,
+           ARRAY(SELECT i.nome FROM item i JOIN veiculo_item vi ON i.id = vi.item_id WHERE vi.veiculo_id = v.id) as itens
     FROM veiculo v
     LEFT JOIN modelo m ON v.modelo_id = m.id
     WHERE v.deletado_em IS NULL
@@ -91,4 +105,10 @@ export async function deletarVeiculo(id: string): Promise<boolean> {
     const q = `UPDATE veiculo SET deletado_em = CURRENT_TIMESTAMP WHERE id = $1 RETURNING id`;
     const result = await query(q, [id]);
     return (result.rowCount ?? 0) > 0;
+}
+
+export async function listarItens(): Promise<any[]> {
+    const q = `SELECT * FROM item ORDER BY nome ASC`;
+    const result = await query(q);
+    return result.rows;
 }

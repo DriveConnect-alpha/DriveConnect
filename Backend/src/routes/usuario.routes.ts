@@ -4,6 +4,7 @@ import {
   criarCliente,
   criarGerente,
   listarClientes,
+  listarUsuariosSistema,
   buscarClientePorId,
   atualizarCliente,
   alterarSenha,
@@ -13,7 +14,7 @@ import {
   esqueciSenha,
   redefinirSenhaComToken,
 } from '../services/usuario.service.js';
-import { requireCaller, requireTipo, requireOwnership } from '../middlewares/auth.js';
+import { requireCaller, requireTipo, requireOwnership, gerarToken } from '../middlewares/auth.js';
 
 
 function lerCorpo(req: IncomingMessage): Promise<Record<string, any>> {
@@ -57,8 +58,6 @@ export async function solicitarRecuperacaoSenha(req: IncomingMessage, res: Serve
     }
 
     const token = await esqueciSenha(email);
-    // IMPORTANTE: Em produção, enviaríamos e-mail aqui e não retornaríamos o token na response.
-    // Retornando para facilitar testes locais.
     if (token) {
       responder(res, 200, { mensagem: 'Instruções enviadas para o e-mail.', token_debug: token });
     } else {
@@ -102,7 +101,9 @@ export async function login(req: IncomingMessage, res: ServerResponse): Promise<
     }
 
     const usuario = await autenticarUsuario({ email, senha });
-    responder(res, 200, usuario);
+    const token = gerarToken({ id: usuario.id, email: usuario.email, tipo: usuario.tipo });
+
+    responder(res, 200, { token, ...usuario });
   } catch (err) {
     await tratarErro(res, err);
   }
@@ -148,6 +149,22 @@ export async function registrarGerente(req: IncomingMessage, res: ServerResponse
 
     const resultado = await criarGerente({ email, senha, nomeCompleto: nome_completo, filialId: filial_id });
     responder(res, 201, resultado);
+  } catch (err) {
+    await tratarErro(res, err);
+  }
+}
+
+// ──────────────────────────────────────────────
+// GET /usuarios
+// Acesso: ADMIN
+// ──────────────────────────────────────────────
+export async function listarTodosUsuariosSistema(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  try {
+    const caller = requireCaller(req);
+    requireTipo(caller, 'ADMIN');
+
+    const usuarios = await listarUsuariosSistema();
+    responder(res, 200, usuarios);
   } catch (err) {
     await tratarErro(res, err);
   }

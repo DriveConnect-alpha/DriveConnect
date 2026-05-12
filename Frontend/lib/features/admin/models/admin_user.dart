@@ -17,12 +17,12 @@ class AdminUser {
 
   factory AdminUser.fromJson(Map<String, dynamic> json) {
     return AdminUser(
-      id: json['id'] as String,
-      email: json['email'] as String,
-      tipo: json['tipo'] as String,
-      criadoEm: json['criado_em'] as String,
-      nome: json['nome'] as String,
-      detalhes: json['detalhes'] as Map<String, dynamic>? ?? {},
+      id: (json['id'] ?? json['usuario_id'] ?? '').toString(),
+      email: (json['email'] ?? '').toString(),
+      tipo: (json['tipo'] ?? 'CLIENTE').toString(),
+      criadoEm: (json['criado_em'] ?? json['criadoEm'] ?? '').toString(),
+      nome: (json['nome'] ?? json['nome_completo'] ?? json['nomeCompleto'] ?? 'Usuário sem nome').toString(),
+      detalhes: json, // Pass the whole map as details for flexibility
     );
   }
 }

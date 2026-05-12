@@ -1,15 +1,23 @@
-import '../../../../core/network/api_client.dart';
+import 'dart:async';
 import '../../../../core/models/veiculo.dart';
+import '../../../../calls/frota.call.dart';
 import 'iexplore_service.dart';
 
 class ExploreService implements IExploreService {
-  final ApiClient _apiClient;
-
-  ExploreService(this._apiClient);
-
   @override
   Future<List<Veiculo>> getAvailableVehicles() async {
-    final response = await _apiClient.dio.get('/veiculos');
-    return (response.data as List).map((item) => Veiculo.fromJson(item)).toList();
+    final completer = Completer<List<Veiculo>>();
+
+    await FrotaCall.listarVeiculos(
+      onSuccess: (data) {
+        final veiculos = data.map((item) => Veiculo.fromJson(item)).toList();
+        completer.complete(veiculos);
+      },
+      onError: (msg) {
+        completer.completeError(Exception(msg));
+      },
+    );
+
+    return completer.future;
   }
 }

@@ -1,25 +1,56 @@
-import '../../../../core/network/api_client.dart';
+import 'dart:async';
 import '../../../../core/models/veiculo.dart';
+import '../../../../calls/frota.call.dart';
 import 'iinventory_service.dart';
 
 class InventoryService implements IInventoryService {
-  final ApiClient _apiClient;
-
-  InventoryService(this._apiClient);
-
   @override
   Future<List<Veiculo>> getInventory() async {
-    final response = await _apiClient.get('/veiculos');
-    return (response.data as List).map((v) => Veiculo.fromJson(v)).toList();
+    final completer = Completer<List<Veiculo>>();
+
+    await FrotaCall.listarVeiculos(
+      onSuccess: (data) {
+        final veiculos = data.map((v) => Veiculo.fromJson(v)).toList();
+        completer.complete(veiculos);
+      },
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
   }
 
   @override
   Future<void> updateVehicleStatus(String id, String status) async {
-    await _apiClient.patch('/veiculos/$id/status', data: {'status': status});
+    final completer = Completer<void>();
+
+    await FrotaCall.atualizarVeiculo(
+      id: id,
+      status: status,
+      onSuccess: (_) => completer.complete(),
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
   }
 
   @override
-  Future<void> addVehicle(Veiculo veiculo) async {
-    await _apiClient.post('/veiculos', data: veiculo.toJson());
+  Future<void> addVehicle(Veiculo veiculo, {List<dynamic>? images, double? precoDiaria, List<String>? itensIds}) async {
+    final completer = Completer<void>();
+
+    await FrotaCall.registrarVeiculo(
+      modeloId: veiculo.modeloId ?? 0,
+      filialId: veiculo.filialId ?? '',
+      placa: veiculo.placa,
+      ano: veiculo.ano,
+      cor: veiculo.cor ?? 'Não especificada',
+      status: veiculo.status,
+      imagens: images,
+      precoDiaria: precoDiaria,
+      itensIds: itensIds,
+      onSuccess: (_) => completer.complete(),
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
   }
 }

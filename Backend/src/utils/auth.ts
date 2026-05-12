@@ -18,8 +18,12 @@ export function getUserFromToken(req: IncomingMessage): DecodedToken | null {
   }
 
   const token = authHeader.split(' ')[1];
+  if (!token) {
+    return null;
+  }
+
   try {
-    return jwt.verify(token, JWT_SECRET) as DecodedToken;
+    return jwt.verify(token, JWT_SECRET) as unknown as DecodedToken;
   } catch {
     return null;
   }

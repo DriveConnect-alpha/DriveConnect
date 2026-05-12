@@ -1,15 +1,21 @@
-import '../../../../core/network/api_client.dart';
+import 'dart:async';
 import '../../../../core/models/cliente.dart';
+import '../../../../calls/gerente.call.dart';
 import 'iclient_manager_service.dart';
 
 class ClientManagerService implements IClientManagerService {
-  final ApiClient _apiClient;
-
-  ClientManagerService(this._apiClient);
-
   @override
   Future<List<Cliente>> getClients() async {
-    final response = await _apiClient.get('/clientes');
-    return (response.data as List).map((c) => Cliente.fromJson(c)).toList();
+    final completer = Completer<List<Cliente>>();
+
+    await GerenteCall.listarClientes(
+      onSuccess: (data) {
+        final clientes = data.map((c) => Cliente.fromJson(c)).toList();
+        completer.complete(clientes);
+      },
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
   }
 }

@@ -32,9 +32,29 @@ describe('Payment Service', () => {
         .rejects.toThrow('INFINITEPAY_HANDLE não configurado no .env');
     });
 
+    it('deve lançar erro se FRONTEND_URL ou APP_URL não estiverem configurados para o redirect_url', async () => {
+      process.env.INFINITEPAY_HANDLE = 'meu-handle';
+      delete process.env.APP_URL;
+      delete process.env.FRONTEND_URL;
+
+      await expect(gerarLinkPagamento(validParams))
+        .rejects.toThrow('FRONTEND_URL ou APP_URL não configurado para redirect_url.');
+    });
+
+    it('deve lançar erro se APP_URL não estiver configurado para o webhook_url', async () => {
+      process.env.INFINITEPAY_HANDLE = 'meu-handle';
+      process.env.FRONTEND_URL = 'http://frontend.com';
+      delete process.env.APP_URL;
+
+      await expect(gerarLinkPagamento(validParams))
+        .rejects.toThrow('APP_URL não configurado para webhook_url.');
+    });
+
     it('deve lançar erro se a requisição para a InfinitePay falhar', async () => {
       process.env.INFINITEPAY_HANDLE = 'meu-handle';
-      
+      process.env.APP_URL = 'http://backend.com';
+      process.env.FRONTEND_URL = 'http://frontend.com';
+
       (global.fetch as jest.Mock<any>).mockResolvedValueOnce({
         ok: false,
         status: 400,
@@ -50,8 +70,8 @@ describe('Payment Service', () => {
       process.env.APP_URL = 'http://backend.com';
       process.env.FRONTEND_URL = 'http://frontend.com';
 
-      const mockResponse = { url: 'https://link.pagamento.io/abc', slug: 'abc' };
-      
+      const mockResponse = { url: 'https://link.pagamento.io/abc' };
+
       (global.fetch as jest.Mock<any>).mockResolvedValueOnce({
         ok: true,
         json: jest.fn().mockResolvedValueOnce(mockResponse)
@@ -65,13 +85,13 @@ describe('Payment Service', () => {
       const result = await gerarLinkPagamento(params);
 
       expect(global.fetch).toHaveBeenCalledTimes(1);
-      expect(global.fetch).toHaveBeenCalledWith('https://api.infinitepay.io/invoices/public/checkout/links', {
+      expect(global.fetch).toHaveBeenCalledWith('https://api.checkout.infinitepay.io/links', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           handle: 'meu-handle',
           order_nsu: 'reserva-123',
-          itens: params.itens,
+          items: params.itens,
           redirect_url: 'http://frontend.com/reserva/reserva-123/sucesso',
           webhook_url: 'http://backend.com/pagamento/webhook',
           customer: params.cliente
@@ -79,8 +99,7 @@ describe('Payment Service', () => {
       });
 
       expect(result).toEqual({
-        link_pagamento: mockResponse.url,
-        slug: mockResponse.slug
+        link_pagamento: mockResponse.url
       });
     });
   });
@@ -95,7 +114,7 @@ describe('Payment Service', () => {
 
     it('deve lançar erro se a requisição para a InfinitePay falhar', async () => {
       process.env.INFINITEPAY_HANDLE = 'meu-handle';
-      
+
       (global.fetch as jest.Mock<any>).mockResolvedValueOnce({
         ok: false,
         status: 404
@@ -124,7 +143,7 @@ describe('Payment Service', () => {
       const result = await verificarPagamento('order-123', 'txn-123', 'slug-123');
 
       expect(global.fetch).toHaveBeenCalledTimes(1);
-      expect(global.fetch).toHaveBeenCalledWith('https://api.infinitepay.io/invoices/public/checkout/payment_check', {
+      expect(global.fetch).toHaveBeenCalledWith('https://api.checkout.infinitepay.io/payment_check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -144,3 +163,4 @@ describe('Payment Service', () => {
     });
   });
 });
+

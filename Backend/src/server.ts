@@ -113,6 +113,8 @@ import {
 
 // Rotas de WhatsApp
 import { receiveWebhook as receiveWebhookWhatsApp, verifyWebhook as verifyWebhookWhatsApp } from './routes/whatsapp.routes.js';
+// Rotas de notificações (FCM)
+import { registrarTokenFcm, removerTokenFcm } from './routes/notification.routes.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -210,6 +212,10 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   if (method === 'POST' && path === '/usuarios/clientes') return registrarCliente(req, res);
   if (method === 'POST' && path === '/usuarios/gerentes') return registrarGerente(req, res);
   if (method === 'GET' && path === '/usuarios/clientes') return listarTodosClientes(req, res);
+
+  // ── Notificações (FCM) ───────────────────────
+  if (method === 'POST' && path === '/notificacoes/token') return registrarTokenFcm(req, res);
+  if (method === 'DELETE' && path === '/notificacoes/token') return removerTokenFcm(req, res);
 
   // /clientes/me deve vir ANTES de /clientes/:id para não ser capturado pelo regex
   if (method === 'GET' && path === '/usuarios/clientes/me') return buscarMeuPerfil(req, res);

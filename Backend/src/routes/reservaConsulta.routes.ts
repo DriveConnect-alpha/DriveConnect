@@ -4,6 +4,7 @@ import {
     buscarReservaPorId,
     cancelarReserva,
 } from '../services/reservaConsulta.service.js';
+import { notifyReservaCancelada } from '../services/fcm.service.js';
 import { requireCaller, requireTipo } from '../middlewares/auth.js';
 
 // ──────────────────────────────────────────────
@@ -90,7 +91,19 @@ export async function cancelarReservaHandler(req: IncomingMessage, res: ServerRe
         const caller = requireCaller(req);
         // Sem requireTipo aqui, pois todos os perfis podem acessar (regras validadas no service)
 
-        await cancelarReserva(reservaId, caller);
+        const cancelamento = await cancelarReserva(reservaId, caller);
+        void notifyReservaCancelada({
+            reservaId: cancelamento.reservaId,
+            filialId: cancelamento.filialId,
+            clienteId: cancelamento.clienteId,
+            clienteNome: cancelamento.clienteNome,
+            modelo: cancelamento.modelo,
+            dataInicio: cancelamento.dataInicio,
+            dataFim: cancelamento.dataFim,
+            origem: caller.tipo,
+        }).catch((err) => {
+            console.error('[Reservas] Falha ao notificar cancelamento:', err);
+        });
         responder(res, 200, { mensagem: 'Reserva cancelada com sucesso.' });
     } catch (err) {
         const { status, mensagem } = mapearErro(err);

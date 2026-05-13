@@ -505,6 +505,7 @@ async function tryHandlePaymentIntent(params: {
     emailCliente: cliente.email,
     telefoneCliente: cliente.telefone ?? phone,
     descricaoModelo: modelo.descricao,
+    origem: 'WHATSAPP',
   });
 
   await linkReservaToConversation({

@@ -246,6 +246,21 @@ CREATE TABLE whatsapp_reserva (
 CREATE INDEX idx_whatsapp_reserva_phone ON whatsapp_reserva(phone);
 
 -- ──────────────────────────────────────────────
+-- FCM (Tokens de Notificação)
+-- ──────────────────────────────────────────────
+CREATE TABLE fcm_token (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    usuario_id UUID NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+    token TEXT UNIQUE NOT NULL,
+    plataforma VARCHAR(20),
+    device_id VARCHAR(100),
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_fcm_token_usuario ON fcm_token(usuario_id);
+
+-- ──────────────────────────────────────────────
 -- RAG / PGVector (LangChain)
 -- ──────────────────────────────────────────────
 CREATE TABLE langchain_pg_collection (

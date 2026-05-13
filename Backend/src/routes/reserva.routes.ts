@@ -127,7 +127,10 @@ export async function registrarReserva(req: IncomingMessage, res: ServerResponse
     if (cliente.telefone) paramsReserva.telefoneCliente = cliente.telefone;
     if (plano_seguro_id) paramsReserva.planoSeguroId = plano_seguro_id;
 
-    const reserva = await criarReservaPendente(paramsReserva);
+    const reserva = await criarReservaPendente({
+      ...paramsReserva,
+      origem: 'APP',
+    });
 
     responder(res, 201, reserva);
   } catch (err) {

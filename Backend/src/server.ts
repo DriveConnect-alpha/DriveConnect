@@ -113,7 +113,8 @@ import {
   buscar,
   atualizar,
   deletar,
-  listarOpcionais
+  listarOpcionais,
+  listarReservasVeiculoHandler
 } from './routes/veiculo.routes.js';
 
 // Rotas de WhatsApp
@@ -405,10 +406,9 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   if (method === 'GET' && path === '/veiculos') return listar(req, res);
   if (method === 'GET' && path === '/opcionais') return listarOpcionais(req, res);
 
-  const matchImagem = path.match(/^\/veiculos\/([^/]+)\/imagens$/);
-  if (matchImagem && matchImagem[1] && method === 'POST') {
-    const { adicionarImagem } = await import('./routes/veiculo.routes.js');
-    return adicionarImagem(req, res, matchImagem[1]);
+  const matchReservasVeiculo = path.match(/^\/veiculos\/([^/]+)\/reservas$/);
+  if (matchReservasVeiculo && matchReservasVeiculo[1] && method === 'GET') {
+    return listarReservasVeiculoHandler(req, res, matchReservasVeiculo[1]);
   }
 
   const matchVeiculo = path.match(/^\/veiculos\/([^/]+)$/);

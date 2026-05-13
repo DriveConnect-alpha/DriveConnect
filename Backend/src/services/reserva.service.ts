@@ -185,9 +185,12 @@ export async function criarReservaPendente(
     WHERE NOT EXISTS (
       SELECT 1 FROM reserva r
       WHERE r.veiculo_id = $2
-        AND r.status IN ('PENDENTE_PAGAMENTO', 'RESERVADA', 'ATIVA')
-        AND r.data_inicio < $6
-        AND r.data_fim > $5
+        AND (
+          r.status IN ('RESERVADA', 'ATIVA')
+          OR (r.status = 'PENDENTE_PAGAMENTO' AND r.expira_em > NOW())
+        )
+        AND r.data_inicio <= $6
+        AND r.data_fim >= $5
         AND r.deletado_em IS NULL
     )
     RETURNING id;
@@ -510,6 +513,20 @@ export async function verificarDisponibilidadeRetirada(
  * Deve ser chamada periodicamente (ex: a cada 5 minutos via setInterval ou cron).
  */
 export async function expirarReservasPendentes(): Promise<number> {
+  // Busca as reservas que vão expirar para liberar os veículos
+  const expirandoRes = await query(`
+    SELECT veiculo_id FROM reserva 
+    WHERE status = 'PENDENTE_PAGAMENTO' AND expira_em < NOW() AND deletado_em IS NULL
+  `);
+
+  if (expirandoRes.rowCount && expirandoRes.rowCount > 0) {
+    const veiculoIds = expirandoRes.rows.map(r => r.veiculo_id);
+    await query(`
+      UPDATE veiculo SET status = 'DISPONIVEL' 
+      WHERE id = ANY($1)
+    `, [veiculoIds]);
+  }
+
   const sql = `
     UPDATE reserva
     SET status = 'EXPIRADA'

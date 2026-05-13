@@ -263,3 +263,13 @@ export async function listarOpcionais(req: IncomingMessage, res: ServerResponse)
         await tratarErro(res, err);
     }
 }
+
+export async function listarReservasVeiculoHandler(req: IncomingMessage, res: ServerResponse, id: string): Promise<void> {
+    try {
+        const { listarReservasDoVeiculo } = await import('../services/veiculo.service.js');
+        const reservas = await listarReservasDoVeiculo(id);
+        responder(res, 200, reservas);
+    } catch (err) {
+        await tratarErro(res, err);
+    }
+}

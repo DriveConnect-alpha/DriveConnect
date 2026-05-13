@@ -21,6 +21,7 @@ class BookingProvider extends ChangeNotifier {
   Map<String, dynamic>? _availabilityResult;
   String? _currentReservaId;
   String? _paymentStatus;
+  List<DateTimeRange> _occupiedDates = [];
 
   // Getters
   Veiculo? get selectedVehicle => _selectedVehicle;
@@ -32,6 +33,7 @@ class BookingProvider extends ChangeNotifier {
   Map<String, dynamic>? get availabilityResult => _availabilityResult;
   String? get paymentStatus => _paymentStatus;
   String get paymentMethod => _paymentMethod;
+  List<DateTimeRange> get occupiedDates => _occupiedDates;
 
   void setPaymentMethod(String method) {
     _paymentMethod = method;
@@ -40,7 +42,26 @@ class BookingProvider extends ChangeNotifier {
 
   void selectVehicle(Veiculo vehicle) {
     _selectedVehicle = vehicle;
+    _occupiedDates = []; // Limpa anteriores
+    if (vehicle.id != null) {
+      loadOccupiedDates(vehicle.id!);
+    }
     notifyListeners();
+  }
+
+  Future<void> loadOccupiedDates(String veiculoId) async {
+    try {
+      final data = await _service.getOccupiedDates(veiculoId);
+      _occupiedDates = data.map((item) {
+        return DateTimeRange(
+          start: DateTime.parse(item['data_inicio']),
+          end: DateTime.parse(item['data_fim']),
+        );
+      }).toList();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Erro ao carregar datas ocupadas: $e');
+    }
   }
 
   void setDates(DateTime start, DateTime end) {

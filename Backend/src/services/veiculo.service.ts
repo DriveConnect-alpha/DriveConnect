@@ -34,9 +34,20 @@ export async function criarVeiculo(dados: Veiculo & { itens_ids?: string[] }): P
 }
 
 export async function listarVeiculos(filialId?: string): Promise<any[]> {
-    let q = `
+    let queryText = `
     SELECT 
-        v.id, v.modelo_id, v.filial_id, v.placa, v.ano, v.cor, v.status, v.imagem_url, v.criado_em,
+        v.id, v.modelo_id, v.filial_id, v.placa, v.ano, v.cor, 
+        CASE 
+            WHEN v.status = 'DISPONIVEL' AND EXISTS (
+                SELECT 1 FROM reserva r 
+                WHERE r.veiculo_id = v.id 
+                  AND r.status = 'RESERVADA' 
+                  AND NOW() BETWEEN r.data_inicio AND r.data_fim
+                  AND r.deletado_em IS NULL
+            ) THEN 'ALUGADO'
+            ELSE v.status
+        END as status,
+        v.imagem_url, v.criado_em,
         v.preco_diaria,
         (SELECT filename FROM veiculo_imagem WHERE veiculo_id = v.id ORDER BY is_principal DESC, ordem ASC LIMIT 1) as capa_url,
         ARRAY(SELECT i.nome FROM item i JOIN veiculo_item vi ON i.id = vi.item_id WHERE vi.veiculo_id = v.id) as itens,
@@ -62,19 +73,36 @@ export async function listarVeiculos(filialId?: string): Promise<any[]> {
     LEFT JOIN tipo_carro tc ON m.tipo_carro_id = tc.id
     LEFT JOIN filial f ON v.filial_id = f.id
     WHERE v.deletado_em IS NULL
-  `;
+    `;
+    
     const values = [];
     if (filialId) {
-        q += ` AND v.filial_id = $1`;
+        queryText += ` AND v.filial_id = $1`;
         values.push(filialId);
     }
-    q += ` ORDER BY v.criado_em DESC`;
-    const result = await query(q, values);
+    queryText += ` ORDER BY v.criado_em DESC`;
+    
+    const result = await query(queryText, values);
     return result.rows;
 }
 
 export async function buscarVeiculoPorId(id: string): Promise<any | null> {
-    const q = `SELECT * FROM veiculo WHERE id = $1 AND deletado_em IS NULL`;
+    const q = `
+        SELECT 
+            v.*,
+            CASE 
+                WHEN v.status = 'DISPONIVEL' AND EXISTS (
+                    SELECT 1 FROM reserva r 
+                    WHERE r.veiculo_id = v.id 
+                      AND r.status = 'RESERVADA' 
+                      AND NOW() BETWEEN r.data_inicio AND r.data_fim
+                      AND r.deletado_em IS NULL
+                ) THEN 'ALUGADO'
+                ELSE v.status
+            END as status
+        FROM veiculo v 
+        WHERE v.id = $1 AND v.deletado_em IS NULL
+    `;
     const result = await query(q, [id]);
     const veiculo = result.rows[0];
     if (!veiculo) return null;
@@ -132,5 +160,21 @@ export async function deletarVeiculo(id: string): Promise<boolean> {
 export async function listarItens(): Promise<any[]> {
     const q = `SELECT * FROM item ORDER BY nome ASC`;
     const result = await query(q);
+    return result.rows;
+}
+
+export async function listarReservasDoVeiculo(veiculoId: string): Promise<any[]> {
+    const q = `
+        SELECT data_inicio, data_fim 
+        FROM reserva 
+        WHERE veiculo_id = $1 
+          AND (
+            status IN ('RESERVADA', 'ATIVA') 
+            OR (status = 'PENDENTE_PAGAMENTO' AND expira_em > NOW())
+          )
+          AND deletado_em IS NULL
+        ORDER BY data_inicio ASC;
+    `;
+    const result = await query(q, [veiculoId]);
     return result.rows;
 }

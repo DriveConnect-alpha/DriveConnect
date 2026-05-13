@@ -72,4 +72,14 @@ class MockBookingService implements IBookingService {
   Future<void> cancelarReserva(String reservaId) async {
     await Future.delayed(const Duration(seconds: 1));
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> getOccupiedDates(String veiculoId) async {
+    return [];
+  }
+
+  @override
+  Future<void> estenderReserva(String reservaId, DateTime novaDataFim) async {
+    await Future.delayed(const Duration(seconds: 1));
+  }
 }

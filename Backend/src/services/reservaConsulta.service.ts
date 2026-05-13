@@ -263,13 +263,11 @@ async function _cancelarReserva(reservaId: string, caller: Caller): Promise<Rese
         );
     }
 
-    // Se estava RESERVADA, libera o veículo
-    if (reserva.status === 'RESERVADA') {
-        await query(
-            `UPDATE veiculo SET status = 'DISPONIVEL' WHERE id = $1`,
-            [reserva.veiculo_id],
-        );
-    }
+    // Libera o veículo
+    await query(
+        `UPDATE veiculo SET status = 'DISPONIVEL' WHERE id = $1`,
+        [reserva.veiculo_id],
+    );
 
     await query(
         `UPDATE reserva SET status = 'CANCELADA' WHERE id = $1`,

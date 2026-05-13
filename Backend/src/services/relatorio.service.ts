@@ -195,11 +195,22 @@ export async function obterResumo(caller: Caller) {
     }
     const resAtivas = await query(sqlAtivas, paramsAtivas);
 
-    // 2. Veículos Disponíveis
-    let sqlDisp = `SELECT COUNT(*) as qtd FROM veiculo WHERE status = 'DISPONIVEL' AND deletado_em IS NULL`;
+    // 2. Veículos Disponíveis (Desconsidera os que estão com reserva vigente agora)
+    let sqlDisp = `
+        SELECT COUNT(*) as qtd FROM veiculo v
+        WHERE v.status = 'DISPONIVEL' 
+          AND v.deletado_em IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM reserva r 
+              WHERE r.veiculo_id = v.id 
+                AND r.status = 'RESERVADA' 
+                AND NOW() BETWEEN r.data_inicio AND r.data_fim
+                AND r.deletado_em IS NULL
+          )
+    `;
     const paramsDisp: any[] = [];
     if (filialParam) {
-        sqlDisp += ` AND filial_id = $1`;
+        sqlDisp += ` AND v.filial_id = $1`;
         paramsDisp.push(filialParam);
     }
     const resDisp = await query(sqlDisp, paramsDisp);

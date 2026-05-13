@@ -2,6 +2,7 @@ import 'dart:async';
 import '../../../../core/models/reserva.dart';
 import '../../../../calls/reserva.call.dart';
 import '../../../../calls/pagamento.call.dart';
+import '../../../../calls/frota.call.dart';
 import 'ibooking_service.dart';
 
 class BookingService implements IBookingService {
@@ -89,6 +90,32 @@ class BookingService implements IBookingService {
 
     await ReservaCall.cancelar(
       reservaId: reservaId,
+      onSuccess: (_) => completer.complete(),
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getOccupiedDates(String veiculoId) async {
+    final completer = Completer<List<Map<String, dynamic>>>();
+
+    await FrotaCall.listarReservas(
+      id: veiculoId,
+      onSuccess: (data) => completer.complete(data),
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
+  }
+  @override
+  Future<void> estenderReserva(String reservaId, DateTime novaDataFim) async {
+    final completer = Completer<void>();
+
+    await ReservaCall.estender(
+      reservaId: reservaId,
+      novaDataFim: novaDataFim.toIso8601String(),
       onSuccess: (_) => completer.complete(),
       onError: (msg) => completer.completeError(Exception(msg)),
     );

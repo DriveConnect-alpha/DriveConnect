@@ -294,4 +294,22 @@ class FrotaCall {
       onError(e.toString());
     }
   }
+
+  /// Lista as reservas de um veículo para identificar datas ocupadas.
+  /// ROUTE: GET /veiculos/:id/reservas
+  static Future<void> listarReservas({
+    required String id,
+    required void Function(List<Map<String, dynamic>> reservas) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.get<List<dynamic>>('/veiculos/$id/reservas');
+      final data = (response.data ?? []).cast<Map<String, dynamic>>();
+      onSuccess(data);
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
 }

@@ -158,16 +158,91 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
   }
 
   Future<void> _selectDateRange() async {
+    final bookingProvider = context.read<BookingProvider>();
+    
+    // Mostra um loading rápido se necessário
+    if (bookingProvider.selectedVehicle?.id != null) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+      await bookingProvider.loadOccupiedDates(bookingProvider.selectedVehicle!.id!);
+      if (mounted) Navigator.pop(context); // Fecha o loading
+    }
+
+    final occupied = bookingProvider.occupiedDates;
+
+    if (!mounted) return;
+
     final range = await showDateRangePicker(
       context: context,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialEntryMode: DatePickerEntryMode.calendarOnly,
       initialDateRange: _startDate != null && _endDate != null
           ? DateTimeRange(start: _startDate!, end: _endDate!)
           : null,
+      selectableDayPredicate: (day, start, end) {
+        // Bloqueia dias que já estão ocupados por outras reservas
+        final dateToCheck = DateTime(day.year, day.month, day.day);
+        for (final interval in occupied) {
+          final occupiedStart = DateTime(interval.start.year, interval.start.month, interval.start.day);
+          final occupiedEnd = DateTime(interval.end.year, interval.end.month, interval.end.day);
+          
+          if (dateToCheck.isAfter(occupiedStart.subtract(const Duration(seconds: 1))) && 
+              dateToCheck.isBefore(occupiedEnd.add(const Duration(days: 1)))) {
+            return false;
+          }
+        }
+        return true;
+      },
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: const Color(0xFF00628b),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (range != null) {
+      // Validação de limite de 1 mês (30 dias)
+      final duration = range.end.difference(range.start).inDays;
+      if (duration > 30) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('A reserva inicial não pode ultrapassar 30 dias. Você poderá renová-la depois.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Verificação extra se o intervalo selecionado "pula" por cima de datas bloqueadas
+      // (O picker nativo às vezes permite selecionar o início antes e o fim depois de um bloco)
+      bool hasOverlap = false;
+      for (final interval in occupied) {
+        if (range.start.isBefore(interval.end) && range.end.isAfter(interval.start)) {
+          hasOverlap = true;
+          break;
+        }
+      }
+
+      if (hasOverlap) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('O período selecionado contém datas já reservadas.')),
+          );
+        }
+        return;
+      }
+
       setState(() {
         _startDate = range.start;
         _endDate = range.end;

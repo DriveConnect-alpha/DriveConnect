@@ -24,4 +24,8 @@ abstract class IBookingService {
   Future<List<Reserva>> getMyReservations();
 
   Future<void> cancelarReserva(String reservaId);
+
+  Future<List<Map<String, dynamic>>> getOccupiedDates(String veiculoId);
+
+  Future<void> estenderReserva(String reservaId, DateTime novaDataFim);
 }

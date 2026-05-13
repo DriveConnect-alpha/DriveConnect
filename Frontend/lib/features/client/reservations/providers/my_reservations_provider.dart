@@ -51,4 +51,22 @@ class MyReservationsProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<bool> estenderReserva(String reservaId, DateTime novaDataFim) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _bookingService.estenderReserva(reservaId, novaDataFim);
+      await fetchMyReservations();
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 }

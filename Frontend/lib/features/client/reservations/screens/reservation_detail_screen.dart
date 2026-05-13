@@ -149,18 +149,54 @@ class ReservationDetailScreen extends StatelessWidget {
                 },
               ),
 
+            if (reserva.status == 'RESERVADA' || reserva.status == 'ATIVA')
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: DCButton(
+                  label: 'Renovar Locação',
+                  isLoading: provider.isLoading,
+                  onPressed: () => _handleRenew(context),
+                ),
+              ),
+
             if (reserva.status == 'RESERVADA' || reserva.status == 'PENDENTE_PAGAMENTO')
               DCButton(
                 label: 'Cancelar Reserva',
                 isLoading: provider.isLoading,
                 onPressed: () => _handleCancel(context),
-                isPrimary: false, // Define como estilo Outlined
-                color: Colors.red, // Agora o texto e a borda ficarão vermelhos
+                isPrimary: false, 
+                color: Colors.red,
               ),
           ],
         ),
       ),
     );
+  }
+
+  void _handleRenew(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: reserva.dataFim.add(const Duration(days: 1)),
+      firstDate: reserva.dataFim.add(const Duration(days: 1)),
+      lastDate: reserva.dataFim.add(const Duration(days: 30)),
+      helpText: 'Selecione a nova data de devolução',
+    );
+
+    if (picked != null && context.mounted) {
+      final success = await context.read<MyReservationsProvider>().estenderReserva(reserva.id, picked);
+      if (context.mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Reserva renovada com sucesso!')),
+          );
+          context.pop();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.read<MyReservationsProvider>().error ?? 'Erro ao renovar reserva.')),
+          );
+        }
+      }
+    }
   }
 
   void _handleCancel(BuildContext context) async {

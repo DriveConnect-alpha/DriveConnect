@@ -30,13 +30,14 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "@langchain/community": "^0.3.37",
-    "@langchain/core": "^0.3.64",
-    "@langchain/openai": "^0.3.14",
+    "@langchain/community": "^1.1.28",
+    "@langchain/core": "^1.1.46",
+    "@langchain/openai": "^1.4.5",
+    "@langchain/textsplitters": "^1.0.1",
     "argon2": "^0.44.0",
-    "dotenv": "^17.4.2",
+    "dotenv": "^16.6.1",
+    "firebase-admin": "^13.9.0",
     "formidable": "^3.5.4",
-    "langchain": "^0.3.16",
     "pg": "^8.20.0",
     "uuid": "^14.0.0"
   }

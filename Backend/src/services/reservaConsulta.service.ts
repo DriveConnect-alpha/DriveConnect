@@ -30,6 +30,16 @@ export interface ReservaResumo {
     criadoEm: Date;
 }
 
+export interface ReservaCanceladaInfo {
+    reservaId: string;
+    clienteId: string;
+    filialId: string;
+    clienteNome?: string;
+    modelo?: string;
+    dataInicio?: Date;
+    dataFim?: Date;
+}
+
 // ──────────────────────────────────────────────
 // PRIVADAS — lógica real
 // ──────────────────────────────────────────────
@@ -153,13 +163,18 @@ async function _buscarReservaPorId(id: string, caller: Caller): Promise<ReservaR
  * - Gerente só pode cancelar reservas da sua filial.
  * - O veículo retorna para DISPONIVEL se a reserva estava RESERVADA.
  */
-async function _cancelarReserva(reservaId: string, caller: Caller): Promise<void> {
+async function _cancelarReserva(reservaId: string, caller: Caller): Promise<ReservaCanceladaInfo> {
     // Carrega a reserva sem filtro de filial para dar erro correto
     const reservaRes = await query(
         `SELECT r.id, r.status, r.veiculo_id, r.cliente_id, c.usuario_id AS cliente_usuario_id,
-                r.filial_retirada_id, r.filial_devolucao_id
+                c.nome_completo AS cliente_nome,
+                r.filial_retirada_id, r.filial_devolucao_id,
+                r.data_inicio, r.data_fim,
+                m.nome || ' ' || m.marca AS modelo
          FROM reserva r
          JOIN cliente c ON c.id = r.cliente_id
+         JOIN veiculo v ON v.id = r.veiculo_id
+         JOIN modelo m ON m.id = v.modelo_id
          WHERE r.id = $1 AND r.deletado_em IS NULL`,
         [reservaId],
     );
@@ -204,6 +219,18 @@ async function _cancelarReserva(reservaId: string, caller: Caller): Promise<void
         `UPDATE reserva SET status = 'CANCELADA' WHERE id = $1`,
         [reservaId],
     );
+
+    const info: ReservaCanceladaInfo = {
+        reservaId: reserva.id,
+        clienteId: reserva.cliente_id,
+        filialId: reserva.filial_retirada_id,
+    };
+    if (reserva.cliente_nome) info.clienteNome = reserva.cliente_nome;
+    if (reserva.modelo) info.modelo = reserva.modelo;
+    if (reserva.data_inicio) info.dataInicio = reserva.data_inicio;
+    if (reserva.data_fim) info.dataFim = reserva.data_fim;
+
+    return info;
 }
 
 // ──────────────────────────────────────────────
@@ -222,6 +249,6 @@ export async function buscarReservaPorId(id: string, caller: Caller): Promise<Re
     return _buscarReservaPorId(id, caller);
 }
 
-export async function cancelarReserva(reservaId: string, caller: Caller): Promise<void> {
+export async function cancelarReserva(reservaId: string, caller: Caller): Promise<ReservaCanceladaInfo> {
     return _cancelarReserva(reservaId, caller);
 }

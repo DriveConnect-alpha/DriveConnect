@@ -70,6 +70,7 @@ export async function iniciarPagamento(req: IncomingMessage, res: ServerResponse
     emailCliente: dadosCliente.rows[0].email,
     descricaoModelo: `${dadosModelo.rows[0].marca} ${dadosModelo.rows[0].nome}`,
     planoSeguroId: plano_seguro_id,
+    origem: 'APP',
   });
 
   res.writeHead(201, { 'Content-Type': 'application/json' });

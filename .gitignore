@@ -137,3 +137,4 @@ Thumbs.db
 # Build / dist folder (para frontend e backend)
 dist/
 build/
+driveconnectfirebase.json

@@ -74,6 +74,25 @@ async function run() {
         }
 
         try {
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS fcm_token (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    usuario_id UUID NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+                    token TEXT UNIQUE NOT NULL,
+                    plataforma VARCHAR(20),
+                    device_id VARCHAR(100),
+                    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_fcm_token_usuario ON fcm_token(usuario_id);
+            `);
+            console.log('✅ Tabela fcm_token verificada/criada.');
+        } catch (e) {
+            console.error('Erro ao criar tabela fcm_token', e);
+        }
+
+        try {
             await pool.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
         } catch (e) {
             console.error('Erro ao habilitar extensão pgcrypto', e);

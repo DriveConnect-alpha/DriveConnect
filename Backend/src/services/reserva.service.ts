@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { query } from '../db/index.js';
 import { gerarLinkPagamento } from './payment.service.js';
 import { buscarPlanoBasico, buscarPlanoPorId, calcularValorSeguro } from './seguro.service.js';
+import { notifyPagamentoConfirmado, notifyReservaExpirada, notifyReservaPendente } from './fcm.service.js';
 import type { Caller } from '../middlewares/auth.js';
 
 const EXPIRACAO_MINUTOS = Number(process.env.PAGAMENTO_EXPIRACAO_MINUTOS) || 15;
@@ -140,6 +141,7 @@ interface CriarReservaParams {
   telefoneCliente?: string;
   descricaoModelo: string;
   planoSeguroId?: string;    // opcional: se não informado, usa o plano básico da empresa
+  origem?: string;
 }
 
 export interface ReservaCriada {
@@ -233,6 +235,19 @@ export async function criarReservaPendente(
     [link_pagamento, reservaId, slug ?? null, reservaId],
   );
 
+  void notifyReservaPendente({
+    reservaId,
+    filialId: params.filialRetiradaId,
+    clienteId: params.clienteId,
+    clienteNome: params.nomeCliente,
+    modelo: params.descricaoModelo,
+    dataInicio: params.dataInicio,
+    dataFim: params.dataFim,
+    origem: params.origem ?? 'APP',
+  }).catch((err) => {
+    console.error('[Reserva] Falha ao notificar reserva pendente:', err);
+  });
+
   return { reservaId, linkPagamento: link_pagamento, valorTotal, valorSeguro, planoSeguro: planoFinal.nome };
 }
 
@@ -279,6 +294,45 @@ export async function confirmarReserva(dados: DadosWebhook): Promise<'confirmed'
     dados.order_nsu, // order_nsu = reserva.id
     dados.invoice_slug ?? null,
   ]);
+
+  const detalhes = await query(
+    `SELECT r.id, r.cliente_id, r.filial_retirada_id, r.data_inicio, r.data_fim,
+            c.nome_completo AS cliente_nome,
+            m.nome || ' ' || m.marca AS modelo
+     FROM reserva r
+     JOIN cliente c ON c.id = r.cliente_id
+     JOIN veiculo v ON v.id = r.veiculo_id
+     JOIN modelo m ON m.id = v.modelo_id
+     WHERE r.id = $1`,
+    [dados.order_nsu],
+  );
+
+  const row = detalhes.rows[0];
+  if (row) {
+    const params: {
+      reservaId: string;
+      filialId: string;
+      clienteId: string;
+      clienteNome?: string;
+      modelo?: string;
+      dataInicio?: Date;
+      dataFim?: Date;
+      origem?: string;
+    } = {
+      reservaId: row.id,
+      filialId: row.filial_retirada_id,
+      clienteId: row.cliente_id,
+      origem: 'INFINITEPAY',
+    };
+    if (row.cliente_nome) params.clienteNome = row.cliente_nome;
+    if (row.modelo) params.modelo = row.modelo;
+    if (row.data_inicio) params.dataInicio = new Date(row.data_inicio);
+    if (row.data_fim) params.dataFim = new Date(row.data_fim);
+
+    void notifyPagamentoConfirmado(params).catch((err) => {
+      console.error('[Reserva] Falha ao notificar pagamento confirmado:', err);
+    });
+  }
 
   return 'confirmed';
 }
@@ -432,9 +486,47 @@ export async function expirarReservasPendentes(): Promise<number> {
     WHERE status = 'PENDENTE_PAGAMENTO'
       AND expira_em < NOW()
       AND deletado_em IS NULL
-    RETURNING id;
+    RETURNING id, cliente_id, filial_retirada_id, data_inicio, data_fim;
   `;
 
   const resultado = await query(sql);
+  const rows = resultado.rows ?? [];
+
+  await Promise.all(rows.map(async (row) => {
+    const detalhes = await query(
+      `SELECT c.nome_completo AS cliente_nome,
+              m.nome || ' ' || m.marca AS modelo
+       FROM reserva r
+       JOIN cliente c ON c.id = r.cliente_id
+       JOIN veiculo v ON v.id = r.veiculo_id
+       JOIN modelo m ON m.id = v.modelo_id
+       WHERE r.id = $1`,
+      [row.id],
+    );
+
+    const info = detalhes.rows[0] ?? {};
+    const params: {
+      reservaId: string;
+      filialId: string;
+      clienteId: string;
+      clienteNome?: string;
+      modelo?: string;
+      dataInicio?: Date;
+      dataFim?: Date;
+      origem?: string;
+    } = {
+      reservaId: row.id,
+      filialId: row.filial_retirada_id,
+      clienteId: row.cliente_id,
+      origem: 'SISTEMA',
+    };
+    if (info.cliente_nome) params.clienteNome = info.cliente_nome;
+    if (info.modelo) params.modelo = info.modelo;
+    if (row.data_inicio) params.dataInicio = new Date(row.data_inicio);
+    if (row.data_fim) params.dataFim = new Date(row.data_fim);
+
+    await notifyReservaExpirada(params);
+  }));
+
   return resultado.rowCount ?? 0;
 }

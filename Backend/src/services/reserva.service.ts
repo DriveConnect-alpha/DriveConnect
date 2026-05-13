@@ -141,43 +141,47 @@ interface CriarReservaParams {
   telefoneCliente?: string;
   descricaoModelo: string;
   planoSeguroId?: string;    // opcional: se não informado, usa o plano básico da empresa
+  metodoPagamento?: string;  // opcional: se 'DINHEIRO', pula InfinitePay
   origem?: string;
 }
 
 export interface ReservaCriada {
   reservaId: string;
-  linkPagamento: string;
+  linkPagamento?: string;
   valorTotal: number;
   valorSeguro: number;
   planoSeguro: string;
+  status: string;
 }
 
 /**
  * Cria uma reserva em status PENDENTE_PAGAMENTO e gera o link de pagamento.
- * O veículo fica bloqueado por EXPIRACAO_MINUTOS para esse cliente.
+ * Se o método for 'DINHEIRO', cria já como RESERVADA.
  */
 export async function criarReservaPendente(
   params: CriarReservaParams,
 ): Promise<ReservaCriada> {
-  const expiraEm = new Date(Date.now() + EXPIRACAO_MINUTOS * 60 * 1000);
+  const expiraEm = params.metodoPagamento === 'DINHEIRO' ? null : new Date(Date.now() + EXPIRACAO_MINUTOS * 60 * 1000);
+  const statusInicial = params.metodoPagamento === 'DINHEIRO' ? 'RESERVADA' : 'PENDENTE_PAGAMENTO';
 
   // Resolve o plano de seguro: usa o escolhido pelo cliente ou o plano básico global
-  const plano = params.planoSeguroId
-    ? await buscarPlanoPorId(params.planoSeguroId)
+  const isUuid = params.planoSeguroId && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(params.planoSeguroId);
+  const plano = isUuid
+    ? await buscarPlanoPorId(params.planoSeguroId!)
     : null;
 
   const planoFinal = plano ?? await buscarPlanoBasico();
   const valorSeguro = calcularValorSeguro(planoFinal.percentual, params.valorAluguel);
   const valorTotal = params.valorAluguel + valorSeguro;
 
-  // Cria a reserva pendente com seguro incluído, garantindo atomicamente a não-sobreposição
+  // Cria a reserva com seguro incluído
   const sqlInsert = `
     INSERT INTO reserva (
       cliente_id, veiculo_id, filial_retirada_id, filial_devolucao_id,
       data_inicio, data_fim, valor_total, status, expira_em,
-      plano_seguro_id, valor_seguro
+      plano_seguro_id, valor_seguro, metodo_pagamento
     )
-    SELECT $1, $2, $3, $4, $5, $6, $7, 'PENDENTE_PAGAMENTO', $8, $9, $10
+    SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
     WHERE NOT EXISTS (
       SELECT 1 FROM reserva r
       WHERE r.veiculo_id = $2
@@ -197,9 +201,11 @@ export async function criarReservaPendente(
     params.dataInicio,
     params.dataFim,
     valorTotal,
+    statusInicial,
     expiraEm,
     planoFinal.id,
     valorSeguro,
+    params.metodoPagamento ?? 'INFINITEPAY'
   ]);
 
   if (resultado.rowCount === 0) {
@@ -207,6 +213,30 @@ export async function criarReservaPendente(
   }
 
   const reservaId: string = resultado.rows[0].id;
+
+  // Se for dinheiro, não gera link nem NSU
+  if (params.metodoPagamento === 'DINHEIRO') {
+    void notifyReservaPendente({
+      reservaId,
+      filialId: params.filialRetiradaId,
+      clienteId: params.clienteId,
+      clienteNome: params.nomeCliente,
+      modelo: params.descricaoModelo,
+      dataInicio: params.dataInicio,
+      dataFim: params.dataFim,
+      origem: params.origem ?? 'APP',
+    }).catch((err) => {
+      console.error('[Reserva] Falha ao notificar reserva pendente:', err);
+    });
+
+    return {
+      reservaId,
+      valorTotal,
+      valorSeguro,
+      planoSeguro: planoFinal.nome,
+      status: statusInicial
+    };
+  }
 
   // Gera o link na InfinitePay com itens discriminados (aluguel + seguro)
   const { link_pagamento, slug } = await gerarLinkPagamento({
@@ -248,7 +278,7 @@ export async function criarReservaPendente(
     console.error('[Reserva] Falha ao notificar reserva pendente:', err);
   });
 
-  return { reservaId, linkPagamento: link_pagamento, valorTotal, valorSeguro, planoSeguro: planoFinal.nome };
+  return { reservaId, linkPagamento: link_pagamento, valorTotal, valorSeguro, planoSeguro: planoFinal.nome, status: statusInicial };
 }
 
 interface DadosWebhook {

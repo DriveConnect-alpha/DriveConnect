@@ -35,6 +35,7 @@ class BookingService implements IBookingService {
     required DateTime dataFim,
     required String clienteId,
     required String planoSeguroId,
+    String? metodoPagamento,
   }) async {
     final completer = Completer<Map<String, dynamic>>();
 
@@ -46,6 +47,7 @@ class BookingService implements IBookingService {
       dataFim: dataFim.toIso8601String(),
       clienteId: clienteId,
       planoSeguroId: planoSeguroId,
+      metodoPagamento: metodoPagamento,
       onSuccess: (data) => completer.complete(data),
       onError: (msg) => completer.completeError(Exception(msg)),
     );
@@ -70,7 +72,7 @@ class BookingService implements IBookingService {
   Future<List<Reserva>> getMyReservations() async {
     final completer = Completer<List<Reserva>>();
 
-    await ReservaCall.listarReservas(
+    await ReservaCall.listarMinhasReservas(
       onSuccess: (data) {
         final reservas = data.map((r) => Reserva.fromJson(r)).toList();
         completer.complete(reservas);

@@ -179,19 +179,26 @@ export async function listarClientes(): Promise<any[]> {
     `SELECT 
         c.id, 
         c.usuario_id, 
-        c.nome_completo as nome, 
-        u.email, 
-        u.tipo,
+        c.nome_completo, 
         c.cpf, 
         c.rg, 
         c.cnh, 
-        c.criado_em as criado_em
+        c.criado_em,
+        json_build_object(
+          'id', u.id,
+          'email', u.email,
+          'tipo', u.tipo,
+          'criado_em', u.criado_em,
+          'nome', c.nome_completo,
+          'perfilId', c.id
+        ) as usuario
      FROM cliente c
      JOIN usuario u ON u.id = c.usuario_id
      WHERE c.deletado_em IS NULL AND u.deletado_em IS NULL
      ORDER BY c.nome_completo`,
   );
-
+  console.log(`[listarClientes] Encontrados ${r.rows.length} clientes`);
+  if (r.rows.length > 0) console.log(`[listarClientes] Primeiro cliente:`, JSON.stringify(r.rows[0]));
   return r.rows;
 }
 

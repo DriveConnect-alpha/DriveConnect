@@ -20,6 +20,7 @@ class AuthService implements IAuthService {
             email: userData['email'] ?? '',
             nome: userData['nome'] ?? 'Usuário',
             tipo: userData['tipo'] ?? 'CLIENTE',
+            perfilId: userData['perfilId'],
             criadoEm: userData['criado_em'] != null
                 ? DateTime.parse(userData['criado_em'])
                 : DateTime.now(),
@@ -48,8 +49,6 @@ class AuthService implements IAuthService {
       senha: password,
       nomeCompleto: nomeCompleto,
       cpf: cpf,
-      rg: '',
-      cnh: '',
       onSuccess: (_) {
         completer.complete();
       },
@@ -77,6 +76,7 @@ class AuthService implements IAuthService {
           email: email,
           nome: data['nome_completo'] ?? nomeCompleto,
           tipo: 'CLIENTE',
+          perfilId: data['id'] ?? id,
           criadoEm: data['criado_em'] != null
               ? DateTime.parse(data['criado_em'])
               : DateTime.now(),

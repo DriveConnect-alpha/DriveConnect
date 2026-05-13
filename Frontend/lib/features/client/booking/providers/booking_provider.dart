@@ -14,6 +14,7 @@ class BookingProvider extends ChangeNotifier {
   String? _pickupBranchId;
   String? _returnBranchId;
   PlanoSeguro? _selectedInsurance;
+  String _paymentMethod = 'INFINITEPAY'; // 'INFINITEPAY' ou 'DINHEIRO'
   
   bool _isLoading = false;
   String? _error;
@@ -30,6 +31,12 @@ class BookingProvider extends ChangeNotifier {
   String? get error => _error;
   Map<String, dynamic>? get availabilityResult => _availabilityResult;
   String? get paymentStatus => _paymentStatus;
+  String get paymentMethod => _paymentMethod;
+
+  void setPaymentMethod(String method) {
+    _paymentMethod = method;
+    notifyListeners();
+  }
 
   void selectVehicle(Veiculo vehicle) {
     _selectedVehicle = vehicle;
@@ -93,8 +100,10 @@ class BookingProvider extends ChangeNotifier {
         dataFim: _endDate!,
         clienteId: clienteId,
         planoSeguroId: _selectedInsurance?.id ?? 'BASICO',
+        metodoPagamento: _paymentMethod,
       );
-      _currentReservaId = result['id'];
+      _currentReservaId = result['id'] ?? result['reserva_id'];
+      _paymentStatus = result['status']; // Se for DINHEIRO, virá 'RESERVADA'
       return true;
     } catch (e) {
       _error = e.toString();

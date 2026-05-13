@@ -33,6 +33,7 @@ String get apiBaseUrl => _actualBaseUrl;
 String? _jwtToken;
 String? _usuarioId;
 String? _tipo;
+String? _perfilId;
 String? _filialId;
 String? _apiKey; // Se nulo, tentará pegar do dotenv no interceptor
 
@@ -42,17 +43,20 @@ void setIdentity({
   required String token,
   required String usuarioId,
   required String tipo,
+  String? perfilId,
   String? filialId,
 }) {
   _jwtToken = token;
   _usuarioId = usuarioId;
   _tipo = tipo;
+  _perfilId = perfilId;
   _filialId = filialId;
 }
 
 /// Getters for identity data (used by providers/screens)
 String? get currentUserId => _usuarioId;
 String? get currentUserTipo => _tipo;
+String? get currentPerfilId => _perfilId;
 String? get currentFilialId => _filialId;
 bool get isAuthenticated => _jwtToken != null;
 
@@ -66,6 +70,7 @@ void clearIdentity() {
   _jwtToken = null;
   _usuarioId = null;
   _tipo = null;
+  _perfilId = null;
   _filialId = null;
 }
 

@@ -45,6 +45,23 @@ class InventoryProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> updateVehicle(String id, {int? modeloId, String? filialId, String? placa, int? ano, String? cor, String? status}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await _service.updateVehicle(id, modeloId: modeloId, filialId: filialId, placa: placa, ano: ano, cor: cor, status: status);
+      await fetchInventory();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> addVehicle(Veiculo veiculo, {List<dynamic>? images, double? precoDiaria, List<String>? itensIds}) async {
     _isLoading = true;
     _error = null;

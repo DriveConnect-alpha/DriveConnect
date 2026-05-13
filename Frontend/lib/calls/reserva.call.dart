@@ -112,6 +112,31 @@ class ReservaCall {
     }
   }
 
+  /// Lista as próprias reservas do cliente logado.
+  /// ROUTE: GET /reservas/minhas
+  /// AUTH: required (CLIENTE)
+  static Future<void> listarMinhasReservas({
+    String? status,
+    required void Function(List<Map<String, dynamic>> data) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.get<List<dynamic>>(
+        '/reservas/minhas',
+        queryParameters: {
+          if (status != null) 'status': status,
+        },
+      );
+
+      final data = (response.data ?? []).cast<Map<String, dynamic>>();
+      onSuccess(data);
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
+
   /// Detalha uma reserva específica.
   /// ROUTE: GET /reservas/:id
   static Future<void> detalhar({
@@ -217,4 +242,28 @@ class ReservaCall {
       onError(e.toString());
     }
   }
+
+  /// Confirma manualmente o pagamento de uma reserva.
+  /// ROUTE: POST /reservas/:id/confirmar-pagamento
+  /// AUTH: required (Gerente, Admin)
+  static Future<void> confirmarPagamentoManual({
+    required String reservaId,
+    required void Function(String mensagem) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.post<Map<String, dynamic>>(
+        '/reservas/$reservaId/confirmar-pagamento',
+      );
+
+      onSuccess(
+        response.data!['mensagem'] as String? ?? 'Pagamento confirmado.',
+      );
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
 }
+

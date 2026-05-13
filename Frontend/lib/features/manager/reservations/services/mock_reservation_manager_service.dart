@@ -6,7 +6,7 @@ import 'ireservation_manager_service.dart';
 
 class MockReservationManagerService implements IReservationManagerService {
   @override
-  Future<List<Reserva>> getManagerReservations() async {
+  Future<List<Reserva>> getManagerReservations({String? clienteId}) async {
     await Future.delayed(const Duration(seconds: 1));
     return [
       Reserva(

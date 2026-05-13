@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { requireCaller, requireTipo } from '../middlewares/auth.js';
-import { obterFaturamento, obterOcupacao, obterOperacao } from '../services/relatorio.service.js';
+import { obterFaturamento, obterOcupacao, obterOperacao, obterResumo } from '../services/relatorio.service.js';
 
 function responder(res: ServerResponse, status: number, corpo: unknown): void {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -79,6 +79,18 @@ export async function operacaoHandler(req: IncomingMessage, res: ServerResponse)
         }
 
         const dados = await obterOperacao(caller, dataInicio, dataFim, filialId);
+        responder(res, 200, dados);
+    } catch (err) {
+        const { status, mensagem } = mapearErro(err);
+        responder(res, status, { erro: mensagem });
+    }
+}
+export async function resumoHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN');
+
+        const dados = await obterResumo(caller);
         responder(res, 200, dados);
     } catch (err) {
         const { status, mensagem } = mapearErro(err);

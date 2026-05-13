@@ -24,6 +24,7 @@ export async function iniciarPagamento(req: IncomingMessage, res: ServerResponse
     data_fim,
     cliente_id,
     plano_seguro_id,  // opcional: se omitido usa o plano básico da locadora
+    metodo_pagamento, // opcional: se 'DINHEIRO', pula InfinitePay
   } = corpo;
 
   if (!modelo_id || !filial_retirada_id || !data_inicio || !data_fim || !cliente_id) {
@@ -70,6 +71,7 @@ export async function iniciarPagamento(req: IncomingMessage, res: ServerResponse
     emailCliente: dadosCliente.rows[0].email,
     descricaoModelo: `${dadosModelo.rows[0].marca} ${dadosModelo.rows[0].nome}`,
     planoSeguroId: plano_seguro_id,
+    metodoPagamento: metodo_pagamento,
     origem: 'APP',
   });
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:io';
@@ -401,7 +402,9 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(8),
                               image: DecorationImage(
-                                image: FileImage(File(_selectedImages[index].path)),
+                                image: kIsWeb 
+                                  ? NetworkImage(_selectedImages[index].path)
+                                  : FileImage(File(_selectedImages[index].path)) as ImageProvider,
                                 fit: BoxFit.cover,
                               ),
                             ),

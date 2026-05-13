@@ -87,6 +87,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
+              leading: const Icon(Symbols.edit),
+              title: const Text('Editar Veículo'),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/manager/inventory/edit', extra: veiculo);
+              },
+            ),
+            const Divider(),
+            ListTile(
               title: const Text('Disponível'),
               onTap: () => _updateStatus(context, veiculo.id, 'DISPONIVEL'),
             ),

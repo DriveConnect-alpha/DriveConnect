@@ -16,6 +16,7 @@ abstract class IBookingService {
     required DateTime dataFim,
     required String clienteId,
     required String planoSeguroId,
+    String? metodoPagamento,
   });
 
   Future<Map<String, dynamic>> consultarStatusPagamento(String reservaId);

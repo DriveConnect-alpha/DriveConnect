@@ -92,12 +92,14 @@ class GerenteCall {
     required void Function(String message) onError,
   }) async {
     try {
-      final response = await dioClient.get<List<dynamic>>(
-        '/usuarios/clientes',
-      );
-      
-      final data = (response.data ?? []).cast<Map<String, dynamic>>();
-      onSuccess(data);
+      final response = await dioClient.get('/usuarios/clientes');
+      final rawData = response.data;
+      if (rawData is List) {
+        final data = rawData.map((e) => e as Map<String, dynamic>).toList();
+        onSuccess(data);
+      } else {
+        onSuccess([]);
+      }
     } on DioException catch (e) {
       handleApiError(e, onError);
     } catch (e) {

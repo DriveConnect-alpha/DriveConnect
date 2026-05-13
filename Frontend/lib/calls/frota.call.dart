@@ -168,8 +168,9 @@ class FrotaCall {
       if (imagens != null && imagens.isNotEmpty) {
         final List<MultipartFile> multipartFiles = [];
         for (var img in imagens) {
-          final path = (img is String) ? img : (img.path as String);
-          multipartFiles.add(await MultipartFile.fromFile(path));
+          final bytes = await img.readAsBytes();
+          final filename = img.name;
+          multipartFiles.add(MultipartFile.fromBytes(bytes, filename: filename));
         }
         map['imagem'] = multipartFiles;
       }

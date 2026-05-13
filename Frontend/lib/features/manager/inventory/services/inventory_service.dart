@@ -53,4 +53,23 @@ class InventoryService implements IInventoryService {
 
     return completer.future;
   }
+
+  @override
+  Future<void> updateVehicle(String id, {int? modeloId, String? filialId, String? placa, int? ano, String? cor, String? status}) async {
+    final completer = Completer<void>();
+
+    await FrotaCall.atualizarVeiculo(
+      id: id,
+      modeloId: modeloId,
+      filialId: filialId,
+      placa: placa,
+      ano: ano,
+      cor: cor,
+      status: status,
+      onSuccess: (_) => completer.complete(),
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
+  }
 }

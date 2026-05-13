@@ -81,7 +81,7 @@ export async function registrarReserva(req: IncomingMessage, res: ServerResponse
 
     const corpo = await lerCorpo(req) as Record<string, string>;
 
-    const { veiculo_id, filial_retirada_id, filial_devolucao_id, data_inicio, data_fim, plano_seguro_id } = corpo;
+    const { veiculo_id, filial_retirada_id, filial_devolucao_id, data_inicio, data_fim, plano_seguro_id, metodo_pagamento } = corpo;
 
     if (!veiculo_id || !filial_retirada_id || !filial_devolucao_id || !data_inicio || !data_fim) {
       responder(res, 400, { erro: 'Parâmetros obrigatórios ausentes.' });
@@ -126,6 +126,7 @@ export async function registrarReserva(req: IncomingMessage, res: ServerResponse
 
     if (cliente.telefone) paramsReserva.telefoneCliente = cliente.telefone;
     if (plano_seguro_id) paramsReserva.planoSeguroId = plano_seguro_id;
+    if (metodo_pagamento) paramsReserva.metodoPagamento = metodo_pagamento;
 
     const reserva = await criarReservaPendente({
       ...paramsReserva,
@@ -231,6 +232,28 @@ export async function confirmarDevolucao(req: IncomingMessage, res: ServerRespon
     );
 
     responder(res, 200, { mensagem: 'Devolução registrada. Veículo marcado como DISPONIVEL.' });
+  } catch (err) {
+    const { status, mensagem } = mapearErro(err);
+    responder(res, status, { erro: mensagem });
+  }
+}
+// ──────────────────────────────────────────────
+// POST /reservas/:id/confirmar-pagamento
+// Permite que um gerente ou admin confirme manualmente o pagamento
+// (ex: recebimento em dinheiro ou via link externo)
+// Acesso: GERENTE, ADMIN (via JWT)
+// ──────────────────────────────────────────────
+export async function manualConfirmarPagamento(req: IncomingMessage, res: ServerResponse, reservaId: string) {
+  try {
+    const caller = requireCaller(req);
+    requireTipo(caller, 'GERENTE', 'ADMIN');
+
+    await query(
+      `UPDATE reserva SET status = 'RESERVADA', pagamento_em = NOW() WHERE id = $1 AND status = 'PENDENTE_PAGAMENTO'`,
+      [reservaId]
+    );
+
+    responder(res, 200, { mensagem: 'Pagamento confirmado manualmente. Reserva agora está RESERVADA.' });
   } catch (err) {
     const { status, mensagem } = mapearErro(err);
     responder(res, status, { erro: mensagem });

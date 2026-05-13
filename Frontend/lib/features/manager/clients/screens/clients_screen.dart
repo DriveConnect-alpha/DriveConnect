@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/clients_provider.dart';
 import '../../widgets/manager_scaffold.dart';
 
@@ -43,11 +44,23 @@ class _ClientsScreenState extends State<ClientsScreen> {
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
                   leading: const CircleAvatar(child: Icon(Symbols.person)),
-                  title: Text(cliente.usuario?.email ?? 'Sem e-mail'),
-                  subtitle: Text('CPF: ${cliente.cpf}'),
+                  title: Text(cliente.nomeCompleto),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(cliente.usuario?.email ?? 'Sem e-mail'),
+                      Text('CPF: ${cliente.cpf}'),
+                    ],
+                  ),
                   trailing: const Icon(Symbols.chevron_right),
                   onTap: () {
-                    // Detalhes do cliente
+                    context.push(
+                      '/manager/clients/reservations',
+                      extra: {
+                        'clienteId': cliente.id,
+                        'clienteNome': cliente.nomeCompleto,
+                      },
+                    );
                   },
                 ),
               );

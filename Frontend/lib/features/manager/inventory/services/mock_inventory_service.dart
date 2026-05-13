@@ -26,4 +26,9 @@ class MockInventoryService implements IInventoryService {
   Future<void> addVehicle(Veiculo veiculo, {List<dynamic>? images, double? precoDiaria, List<String>? itensIds}) async {
     await Future.delayed(const Duration(seconds: 1));
   }
+
+  @override
+  Future<void> updateVehicle(String id, {int? modeloId, String? filialId, String? placa, int? ano, String? cor, String? status}) async {
+    await Future.delayed(const Duration(seconds: 1));
+  }
 }

@@ -10,6 +10,7 @@ import {
   confirmarRetirada,
   confirmarDevolucao,
   estenderReservaHandler,
+  manualConfirmarPagamento,
 } from './routes/reserva.routes.js';
 
 // Rotas de relatórios / dashboards
@@ -17,6 +18,7 @@ import {
   faturamentoHandler,
   ocupacaoHandler,
   operacaoHandler,
+  resumoHandler,
 } from './routes/relatorio.routes.js';
 
 // Rotas financeiras
@@ -35,6 +37,7 @@ import {
 // Rotas de reserva (consulta e cancelamento)
 import {
   listarTodasReservas,
+  listarMinhasReservas,
   detalharReserva,
   cancelarReservaHandler,
 } from './routes/reservaConsulta.routes.js';
@@ -179,6 +182,7 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   if (method === 'GET' && path === '/relatorios/faturamento') return faturamentoHandler(req, res);
   if (method === 'GET' && path === '/relatorios/ocupacao') return ocupacaoHandler(req, res);
   if (method === 'GET' && path === '/relatorios/operacao') return operacaoHandler(req, res);
+  if (method === 'GET' && path === '/relatorios/resumo') return resumoHandler(req, res);
 
   // ── Webhooks Públicos (Sem API Key) ───────────
   if (path === '/whatsapp/webhook') {
@@ -292,6 +296,7 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
 
   // ── Reservas ─────────────────────────────────
   if (method === 'GET' && path === '/reservas/disponibilidade') return checarDisponibilidade(req, res);
+  if (method === 'GET' && path === '/reservas/minhas') return listarMinhasReservas(req, res);
   if (method === 'POST' && path === '/reservas') return registrarReserva(req, res);
   if (method === 'GET' && path === '/reservas') return listarTodasReservas(req, res);
 
@@ -300,6 +305,12 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   if (matchEstender && method === 'POST') {
     const reservaId = matchEstender[1];
     if (reservaId !== undefined) return estenderReservaHandler(req, res, reservaId);
+  }
+  
+  const matchConfirmarPagamento = path.match(/^\/reservas\/([^/]+)\/confirmar-pagamento$/);
+  if (matchConfirmarPagamento && method === 'POST') {
+    const reservaId = matchConfirmarPagamento[1];
+    if (reservaId !== undefined) return manualConfirmarPagamento(req, res, reservaId);
   }
 
   const matchRetirada = path.match(/^\/reservas\/([^/]+)\/retirada$/);

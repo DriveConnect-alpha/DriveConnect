@@ -68,6 +68,33 @@ class ProfileScreen extends StatelessWidget {
           ],
         ),
       ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 3,
+        onTap: (index) {
+          if (index == 3) return;
+          switch (index) {
+            case 0:
+              context.go('/home');
+              break;
+            case 1:
+              context.go('/explore');
+              break;
+            case 2:
+              context.go('/my-reservations');
+              break;
+          }
+        },
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: theme.colorScheme.primary,
+        unselectedItemColor: Colors.grey,
+        showUnselectedLabels: true,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Symbols.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Symbols.search), label: 'Explorar'),
+          BottomNavigationBarItem(icon: Icon(Symbols.calendar_month), label: 'Reservas'),
+          BottomNavigationBarItem(icon: Icon(Symbols.person), label: 'Perfil'),
+        ],
+      ),
     );
   }
 

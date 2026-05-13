@@ -35,11 +35,32 @@ export async function criarVeiculo(dados: Veiculo & { itens_ids?: string[] }): P
 
 export async function listarVeiculos(filialId?: string): Promise<any[]> {
     let q = `
-    SELECT v.*, m.nome as modelo_nome, m.marca as modelo_marca,
-           (SELECT filename FROM veiculo_imagem WHERE veiculo_id = v.id ORDER BY is_principal DESC, ordem ASC LIMIT 1) as capa_url,
-           ARRAY(SELECT i.nome FROM item i JOIN veiculo_item vi ON i.id = vi.item_id WHERE vi.veiculo_id = v.id) as itens
+    SELECT 
+        v.id, v.modelo_id, v.filial_id, v.placa, v.ano, v.cor, v.status, v.imagem_url, v.criado_em,
+        v.preco_diaria,
+        (SELECT filename FROM veiculo_imagem WHERE veiculo_id = v.id ORDER BY is_principal DESC, ordem ASC LIMIT 1) as capa_url,
+        ARRAY(SELECT i.nome FROM item i JOIN veiculo_item vi ON i.id = vi.item_id WHERE vi.veiculo_id = v.id) as itens,
+        json_build_object(
+            'id', m.id,
+            'nome', m.nome,
+            'marca', m.marca,
+            'tipo_carro_id', m.tipo_carro_id,
+            'tipo', CASE WHEN tc.id IS NOT NULL THEN json_build_object(
+                'id', tc.id,
+                'nome', tc.nome,
+                'preco_base_diaria', tc.preco_base_diaria
+            ) ELSE NULL END
+        ) as modelo,
+        json_build_object(
+            'id', f.id,
+            'nome', f.nome,
+            'cidade', f.cidade,
+            'uf', f.uf
+        ) as filial
     FROM veiculo v
     LEFT JOIN modelo m ON v.modelo_id = m.id
+    LEFT JOIN tipo_carro tc ON m.tipo_carro_id = tc.id
+    LEFT JOIN filial f ON v.filial_id = f.id
     WHERE v.deletado_em IS NULL
   `;
     const values = [];
@@ -47,6 +68,7 @@ export async function listarVeiculos(filialId?: string): Promise<any[]> {
         q += ` AND v.filial_id = $1`;
         values.push(filialId);
     }
+    q += ` ORDER BY v.criado_em DESC`;
     const result = await query(q, values);
     return result.rows;
 }

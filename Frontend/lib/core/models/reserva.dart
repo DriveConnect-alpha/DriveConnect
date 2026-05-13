@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'veiculo.dart';
 import 'cliente.dart';
 
@@ -12,6 +13,7 @@ class Reserva {
   final DateTime? dataRetiradaReal;
   final DateTime? dataDevolucaoReal;
   final double? valorTotal;
+  final double? valorAdicional;
   final String status;
   // Status: 'PENDENTE_PAGAMENTO' | 'RESERVADA' | 'ATIVA' | 'FINALIZADA' | 'CANCELADA' | 'EXPIRADA'
 
@@ -44,6 +46,7 @@ class Reserva {
     this.dataRetiradaReal,
     this.dataDevolucaoReal,
     this.valorTotal,
+    this.valorAdicional,
     required this.status,
     this.infinitepayOrderNsu,
     this.infinitepaySlug,
@@ -59,44 +62,75 @@ class Reserva {
     this.cliente,
   });
 
+  static double? _toDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
   factory Reserva.fromJson(Map<String, dynamic> json) {
-    return Reserva(
-      id: json['id'],
-      clienteId: json['cliente_id'],
-      veiculoId: json['veiculo_id'],
-      filialRetiradaId: json['filial_retirada_id'],
-      filialDevolucaoId: json['filial_devolucao_id'],
-      dataInicio: DateTime.parse(json['data_inicio']),
-      dataFim: DateTime.parse(json['data_fim']),
-      dataRetiradaReal: json['data_retirada_real'] != null
-          ? DateTime.parse(json['data_retirada_real'])
-          : null,
-      dataDevolucaoReal: json['data_devolucao_real'] != null
-          ? DateTime.parse(json['data_devolucao_real'])
-          : null,
-      valorTotal: json['valor_total'] != null
-          ? (json['valor_total'] as num).toDouble()
-          : null,
-      status: json['status'],
-      infinitepayOrderNsu: json['infinitepay_order_nsu'],
-      infinitepaySlug: json['infinitepay_slug'],
-      infinitepayNsu: json['infinitepay_nsu'],
-      metodoPagamento: json['metodo_pagamento'],
-      linkPagamento: json['link_pagamento'],
-      comprovanteUrl: json['comprovante_url'],
-      pagamentoEm: json['pagamento_em'] != null
-          ? DateTime.parse(json['pagamento_em'])
-          : null,
-      expiraEm: json['expira_em'] != null
-          ? DateTime.parse(json['expira_em'])
-          : null,
-      planoSeguroId: json['plano_seguro_id'],
-      valorSeguro: json['valor_seguro'] != null
-          ? (json['valor_seguro'] as num).toDouble()
-          : null,
-      veiculo: json['veiculo'] != null ? Veiculo.fromJson(json['veiculo']) : null,
-      cliente: json['cliente'] != null ? Cliente.fromJson(json['cliente']) : null,
-    );
+    try {
+      return Reserva(
+        id: json['id'] ?? '',
+        clienteId: json['cliente_id'],
+        veiculoId: json['veiculo_id'],
+        filialRetiradaId: json['filial_retirada_id'],
+        filialDevolucaoId: json['filial_devolucao_id'],
+        dataInicio: json['data_inicio'] != null ? DateTime.parse(json['data_inicio']) : DateTime.now(),
+        dataFim: json['data_fim'] != null ? DateTime.parse(json['data_fim']) : DateTime.now(),
+        dataRetiradaReal: json['data_retirada_real'] != null
+            ? DateTime.parse(json['data_retirada_real'])
+            : null,
+        dataDevolucaoReal: json['data_devolucao_real'] != null
+            ? DateTime.parse(json['data_devolucao_real'])
+            : null,
+        valorTotal: _toDouble(json['valor_total']),
+        valorAdicional: _toDouble(json['valor_adicional']),
+        status: json['status'] ?? 'DESCONHECIDO',
+        infinitepayOrderNsu: json['infinitepay_order_nsu'],
+        infinitepaySlug: json['infinitepay_slug'],
+        infinitepayNsu: json['infinitepay_nsu'],
+        metodoPagamento: json['metodo_pagamento'],
+        linkPagamento: json['link_pagamento'],
+        comprovanteUrl: json['comprovante_url'],
+        pagamentoEm: json['pagamento_em'] != null
+            ? DateTime.parse(json['pagamento_em'])
+            : null,
+        expiraEm: json['expira_em'] != null
+            ? DateTime.parse(json['expira_em'])
+            : null,
+        planoSeguroId: json['plano_seguro_id'],
+        valorSeguro: _toDouble(json['valor_seguro']),
+        veiculo: _parseVeiculo(json['veiculo']),
+        cliente: _parseCliente(json['cliente']),
+      );
+    } catch (e) {
+      debugPrint('Erro ao parsear Reserva: $e');
+      // Retorna uma reserva "dummy" com erro para evitar crash total se necessário, 
+      // ou apenas propaga o erro para ser capturado no provider.
+      rethrow;
+    }
+  }
+
+  static Veiculo? _parseVeiculo(dynamic json) {
+    if (json == null || json is! Map<String, dynamic>) return null;
+    try {
+      return Veiculo.fromJson(json);
+    } catch (e) {
+      debugPrint('Erro ao parsear Veiculo na Reserva: $e');
+      return null;
+    }
+  }
+
+  static Cliente? _parseCliente(dynamic json) {
+    if (json == null || json is! Map<String, dynamic>) return null;
+    try {
+      return Cliente.fromJson(json);
+    } catch (e) {
+      debugPrint('Erro ao parsear Cliente na Reserva: $e');
+      return null;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -111,6 +145,7 @@ class Reserva {
       'data_retirada_real': dataRetiradaReal?.toIso8601String(),
       'data_devolucao_real': dataDevolucaoReal?.toIso8601String(),
       'valor_total': valorTotal,
+      'valor_adicional': valorAdicional,
       'status': status,
       'infinitepay_order_nsu': infinitepayOrderNsu,
       'infinitepay_slug': infinitepaySlug,
@@ -125,3 +160,4 @@ class Reserva {
     };
   }
 }
+

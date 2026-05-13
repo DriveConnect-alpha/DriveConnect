@@ -59,6 +59,101 @@ export async function listarTodasReservas(req: IncomingMessage, res: ServerRespo
 }
 
 // ──────────────────────────────────────────────
+// GET /reservas/minhas
+// Lista as reservas do próprio cliente logado.
+// Acesso: CLIENTE
+// ──────────────────────────────────────────────
+export async function listarMinhasReservas(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'CLIENTE');
+
+        const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+        const status = url.searchParams.get('status') ?? undefined;
+
+        const { query } = await import('../db/index.js');
+
+        // Busca o cliente vinculado ao usuário
+        const clienteResult = await query(
+            'SELECT id FROM cliente WHERE usuario_id = $1 AND deletado_em IS NULL',
+            [caller.usuarioId]
+        );
+        
+        if (!clienteResult.rows[0]) {
+            responder(res, 404, { erro: 'Perfil de cliente não encontrado.' });
+            return;
+        }
+        
+        const clienteId = clienteResult.rows[0].id;
+
+        let sql = `
+            SELECT
+                r.id,
+                r.cliente_id,
+                c.nome_completo AS cliente_nome,
+                r.veiculo_id,
+                v.placa AS veiculo_placa,
+                m.nome || ' ' || m.marca AS modelo_nome,
+                r.filial_retirada_id,
+                fr.nome AS filial_retirada_nome,
+                r.filial_devolucao_id,
+                fd.nome AS filial_devolucao_nome,
+                r.data_inicio,
+                r.data_fim,
+                r.data_retirada_real,
+                r.data_devolucao_real,
+                r.valor_total,
+                r.valor_adicional,
+                r.status,
+                r.metodo_pagamento,
+                r.pagamento_em,
+                ps.nome AS plano_seguro_nome,
+                r.valor_seguro,
+                r.criado_em,
+                json_build_object(
+                    'id', v.id,
+                    'placa', v.placa,
+                    'ano', v.ano,
+                    'cor', v.cor,
+                    'status', v.status,
+                    'capa_url', (SELECT filename FROM veiculo_imagem WHERE veiculo_id = v.id ORDER BY is_principal DESC, ordem ASC LIMIT 1),
+                    'modelo', json_build_object(
+                        'id', m.id,
+                        'nome', m.nome,
+                        'marca', m.marca
+                    )
+                ) as veiculo
+            FROM reserva r
+            JOIN cliente c ON c.id = r.cliente_id
+            JOIN veiculo v ON v.id = r.veiculo_id
+            JOIN modelo m ON m.id = v.modelo_id
+            JOIN filial fr ON fr.id = r.filial_retirada_id
+            JOIN filial fd ON fd.id = r.filial_devolucao_id
+            LEFT JOIN plano_seguro ps ON ps.id = r.plano_seguro_id
+            WHERE r.deletado_em IS NULL
+            AND r.cliente_id = $1
+        `;
+
+        const values: any[] = [clienteId];
+        
+        const statusValidos = ['PENDENTE_PAGAMENTO', 'RESERVADA', 'ATIVA', 'FINALIZADA', 'CANCELADA', 'EXPIRADA'];
+        if (status && statusValidos.includes(status)) {
+            sql += ` AND r.status = $2`;
+            values.push(status);
+        }
+        
+        sql += ` ORDER BY r.criado_em DESC`;
+        
+        const resultado = await query(sql, values);
+        responder(res, 200, resultado.rows);
+    } catch (err) {
+        const { status, mensagem } = mapearErro(err);
+        responder(res, status, { erro: mensagem });
+    }
+}
+
+
+// ──────────────────────────────────────────────
 // GET /reservas/:id
 // Acesso: GERENTE (só filial própria) | ADMIN
 // ──────────────────────────────────────────────

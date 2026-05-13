@@ -3,6 +3,7 @@ class Usuario {
   final String email;
   final String nome;
   final String tipo; // 'CLIENTE' | 'GERENTE' | 'ADMIN'
+  final String? perfilId;
   final DateTime criadoEm;
 
   Usuario({
@@ -10,6 +11,7 @@ class Usuario {
     required this.email,
     required this.nome,
     required this.tipo,
+    this.perfilId,
     required this.criadoEm,
   });
 
@@ -19,6 +21,7 @@ class Usuario {
       email: json['email'],
       nome: json['nome'] ?? 'Usuário',
       tipo: json['tipo'],
+      perfilId: json['perfilId'],
       criadoEm: DateTime.parse(json['criado_em']),
     );
   }
@@ -29,6 +32,7 @@ class Usuario {
       'email': email,
       'nome': nome,
       'tipo': tipo,
+      'perfilId': perfilId,
       'criado_em': criadoEm.toIso8601String(),
     };
   }

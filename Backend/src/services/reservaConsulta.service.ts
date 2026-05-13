@@ -7,27 +7,47 @@ import type { Caller } from '../middlewares/auth.js';
 
 export interface ReservaResumo {
     id: string;
-    clienteId: string;
-    clienteNome: string;
-    veiculoId: string;
-    veiculoPlaca: string;
-    modeloNome: string;
-    filialRetiradaId: string;
-    filialRetiradaNome: string | null;
-    filialDevolucaoId: string;
-    filialDevolucaoNome: string | null;
-    dataInicio: Date;
-    dataFim: Date;
-    dataRetiradaReal: Date | null;
-    dataDevolucaoReal: Date | null;
-    valorTotal: number | null;
-    valorAdicional: number | null;
+    cliente_id: string;
+    cliente_nome: string;
+    veiculo_id: string;
+    veiculo_placa: string;
+    modelo_nome: string;
+    filial_retirada_id: string;
+    filial_retirada_nome: string | null;
+    filial_devolucao_id: string;
+    filial_devolucao_nome: string | null;
+    data_inicio: Date;
+    data_fim: Date;
+    data_retirada_real: Date | null;
+    data_devolucao_real: Date | null;
+    valor_total: number | null;
+    valor_adicional: number | null;
     status: string;
-    metodoPagamento: string | null;
-    pagamentoEm: Date | null;
-    planoSeguroNome: string | null;
-    valorSeguro: number | null;
-    criadoEm: Date;
+    metodo_pagamento: string | null;
+    pagamento_em: Date | null;
+    plano_seguro_nome: string | null;
+    valor_seguro: number | null;
+    criado_em: Date;
+
+    // Campos aninhados para o Frontend
+    cliente?: {
+        id: string;
+        usuario_id?: string;
+        nome_completo: string;
+        cpf?: string;
+        criado_em?: string;
+    };
+    veiculo?: {
+        id: string;
+        placa: string;
+        ano?: number;
+        status?: string;
+        modelo?: {
+            id?: number;
+            nome: string;
+            marca?: string;
+        };
+    };
 }
 
 export interface ReservaCanceladaInfo {
@@ -68,9 +88,20 @@ const SQL_SELECT_RESERVA = `
     SELECT
         r.id,
         r.cliente_id,
+        c.usuario_id AS cliente_usuario_id,
         c.nome_completo AS cliente_nome,
+        c.cpf AS cliente_cpf,
+        c.criado_em AS cliente_criado_em,
         r.veiculo_id,
         v.placa AS veiculo_placa,
+        v.ano AS veiculo_ano,
+        v.cor AS veiculo_cor,
+        v.status AS veiculo_status,
+        v.imagem_url AS veiculo_imagem_url,
+        v.filial_id AS veiculo_filial_id,
+        m.id AS modelo_id,
+        m.nome AS modelo_nome_raw,
+        m.marca AS modelo_marca_raw,
         m.nome || ' ' || m.marca AS modelo_nome,
         r.filial_retirada_id,
         fr.nome AS filial_retirada_nome,
@@ -101,27 +132,52 @@ const SQL_SELECT_RESERVA = `
 function _mapearLinha(row: Record<string, unknown>): ReservaResumo {
     return {
         id: row.id as string,
-        clienteId: row.cliente_id as string,
-        clienteNome: row.cliente_nome as string,
-        veiculoId: row.veiculo_id as string,
-        veiculoPlaca: row.veiculo_placa as string,
-        modeloNome: row.modelo_nome as string,
-        filialRetiradaId: row.filial_retirada_id as string,
-        filialRetiradaNome: row.filial_retirada_nome as string | null,
-        filialDevolucaoId: row.filial_devolucao_id as string,
-        filialDevolucaoNome: row.filial_devolucao_nome as string | null,
-        dataInicio: row.data_inicio as Date,
-        dataFim: row.data_fim as Date,
-        dataRetiradaReal: row.data_retirada_real as Date | null,
-        dataDevolucaoReal: row.data_devolucao_real as Date | null,
-        valorTotal: row.valor_total !== null ? Number(row.valor_total) : null,
-        valorAdicional: row.valor_adicional !== null ? Number(row.valor_adicional) : null,
+        cliente_id: row.cliente_id as string,
+        cliente_nome: row.cliente_nome as string,
+        veiculo_id: row.veiculo_id as string,
+        veiculo_placa: row.veiculo_placa as string,
+        modelo_nome: row.modelo_nome as string,
+        filial_retirada_id: row.filial_retirada_id as string,
+        filial_retirada_nome: row.filial_retirada_nome as string | null,
+        filial_devolucao_id: row.filial_devolucao_id as string,
+        filial_devolucao_nome: row.filial_devolucao_nome as string | null,
+        data_inicio: row.data_inicio as Date,
+        data_fim: row.data_fim as Date,
+        data_retirada_real: row.data_retirada_real as Date | null,
+        data_devolucao_real: row.data_devolucao_real as Date | null,
+        valor_total: row.valor_total !== null ? Number(row.valor_total) : null,
+        valor_adicional: row.valor_adicional !== null ? Number(row.valor_adicional) : null,
         status: row.status as string,
-        metodoPagamento: row.metodo_pagamento as string | null,
-        pagamentoEm: row.pagamento_em as Date | null,
-        planoSeguroNome: row.plano_seguro_nome as string | null,
-        valorSeguro: row.valor_seguro !== null ? Number(row.valor_seguro) : null,
-        criadoEm: row.criado_em as Date,
+        metodo_pagamento: row.metodo_pagamento as string | null,
+        pagamento_em: row.pagamento_em as Date | null,
+        plano_seguro_nome: row.plano_seguro_nome as string | null,
+        valor_seguro: row.valor_seguro !== null ? Number(row.valor_seguro) : null,
+        criado_em: row.criado_em as Date,
+
+        // Objetos aninhados para o Frontend (Reserva model expects these)
+        cliente: {
+            id: row.cliente_id as string,
+            usuario_id: row.cliente_usuario_id as string,
+            nome_completo: row.cliente_nome as string,
+            cpf: row.cliente_cpf as string,
+            criado_em: row.cliente_criado_em ? new Date(row.cliente_criado_em as any).toISOString() : new Date().toISOString(),
+        },
+        veiculo: {
+            id: row.veiculo_id as string,
+            placa: row.veiculo_placa as string,
+            ano: row.veiculo_ano as number,
+            cor: row.veiculo_cor as string,
+            status: row.veiculo_status as string,
+            imagem_url: row.veiculo_imagem_url as string,
+            capa_url: null, // Campo não existe no banco, mas mantido como null para o modelo Frontend
+            filial_id: row.veiculo_filial_id as string,
+            modelo_id: row.modelo_id as number,
+            modelo: {
+                id: row.modelo_id as number,
+                nome: row.modelo_nome_raw as string,
+                marca: row.modelo_marca_raw as string,
+            }
+        }
     };
 }
 

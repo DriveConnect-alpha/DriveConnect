@@ -31,13 +31,13 @@ class ClienteCall {
     required String senha,
     required String nomeCompleto,
     required String cpf,
-    required String rg,
-    required String cnh,
+    String? rg,
+    String? cnh,
     required void Function(Map<String, dynamic> data) onSuccess,
     required void Function(String message) onError,
   }) async {
-    if (email.isEmpty || senha.isEmpty || nomeCompleto.isEmpty || cpf.isEmpty || rg.isEmpty || cnh.isEmpty) {
-      onError('Todos os campos (email, senha, nome, cpf, rg, cnh) são obrigatórios.');
+    if (email.isEmpty || senha.isEmpty || nomeCompleto.isEmpty || cpf.isEmpty) {
+      onError('Os campos email, senha, nome completo e CPF são obrigatórios.');
       return;
     }
 
@@ -49,8 +49,8 @@ class ClienteCall {
           'senha': senha,
           'nome_completo': nomeCompleto,
           'cpf': cpf,
-          'rg': rg,
-          'cnh': cnh,
+          if (rg != null && rg.isNotEmpty) 'rg': rg,
+          if (cnh != null && cnh.isNotEmpty) 'cnh': cnh,
         },
       );
       

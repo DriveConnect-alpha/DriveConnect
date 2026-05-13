@@ -24,6 +24,7 @@ class MockBookingService implements IBookingService {
     required DateTime dataFim,
     required String clienteId,
     required String planoSeguroId,
+    String? metodoPagamento,
   }) async {
     await Future.delayed(const Duration(seconds: 1));
     return {

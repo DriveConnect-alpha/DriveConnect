@@ -15,9 +15,9 @@ class CheckoutScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final authProvider = context.read<AuthProvider>();
-    final bookingProvider = context.read<BookingProvider>();
+    final bookingProvider = context.watch<BookingProvider>();
     final veiculo = bookingProvider.selectedVehicle;
-    final clienteId = authProvider.user?.id ?? 'guest';
+    final clienteId = authProvider.user?.perfilId ?? 'guest';
 
     if (veiculo == null || bookingProvider.startDate == null || bookingProvider.endDate == null) {
       return const Scaffold(body: Center(child: Text('Erro: Dados da reserva incompletos')));
@@ -102,11 +102,32 @@ class CheckoutScreen extends StatelessWidget {
             Text('Forma de Pagamento', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             DCCard(
-              child: ListTile(
-                leading: const Icon(Symbols.credit_card, color: Color(0xFF00628b)),
-                title: const Text('Cartão de Crédito (via InfinitePay)'),
-                subtitle: const Text('Pagamento seguro e rápido'),
-                trailing: Radio(value: true, groupValue: true, onChanged: (_) {}),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Symbols.credit_card, color: Color(0xFF00628b)),
+                    title: const Text('Cartão de Crédito (via InfinitePay)'),
+                    subtitle: const Text('Pagamento seguro e rápido'),
+                    trailing: Radio<String>(
+                      value: 'INFINITEPAY',
+                      groupValue: bookingProvider.paymentMethod,
+                      onChanged: (v) => bookingProvider.setPaymentMethod(v!),
+                    ),
+                    onTap: () => bookingProvider.setPaymentMethod('INFINITEPAY'),
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(Symbols.payments, color: Colors.green),
+                    title: const Text('Dinheiro (Pagamento na Retirada)'),
+                    subtitle: const Text('Pague diretamente na filial'),
+                    trailing: Radio<String>(
+                      value: 'DINHEIRO',
+                      groupValue: bookingProvider.paymentMethod,
+                      onChanged: (v) => bookingProvider.setPaymentMethod(v!),
+                    ),
+                    onTap: () => bookingProvider.setPaymentMethod('DINHEIRO'),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 40),
@@ -136,12 +157,16 @@ class CheckoutScreen extends StatelessWidget {
         ),
         child: SafeArea(
           child: DCButton(
-            label: 'Confirmar e Pagar',
+            label: bookingProvider.paymentMethod == 'DINHEIRO' ? 'Confirmar Reserva' : 'Confirmar e Pagar',
             isLoading: bookingProvider.isLoading,
             onPressed: () async {
               final success = await bookingProvider.initiatePayment(clienteId);
               if (success && context.mounted) {
-                _showPaymentModal(context);
+                if (bookingProvider.paymentMethod == 'DINHEIRO') {
+                  context.go('/my-reservations');
+                } else {
+                  _showPaymentModal(context);
+                }
               }
             },
           ),

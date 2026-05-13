@@ -18,6 +18,7 @@ class PagamentoCall {
     required String dataFim,
     required String clienteId,
     required String planoSeguroId,
+    String? metodoPagamento,
     required void Function(Map<String, dynamic> data) onSuccess,
     required void Function(String message) onError,
   }) async {
@@ -32,6 +33,7 @@ class PagamentoCall {
           'data_fim': dataFim,
           'cliente_id': clienteId,
           'plano_seguro_id': planoSeguroId,
+          if (metodoPagamento != null) 'metodo_pagamento': metodoPagamento,
         },
       );
       

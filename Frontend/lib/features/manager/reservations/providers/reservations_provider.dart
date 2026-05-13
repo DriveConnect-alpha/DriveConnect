@@ -17,13 +17,13 @@ class ReservationsProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  Future<void> fetchReservations() async {
+  Future<void> fetchReservations({String? clienteId}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _reservas = await _service.getManagerReservations();
+      _reservas = await _service.getManagerReservations(clienteId: clienteId);
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {

@@ -55,6 +55,7 @@ class UserCall {
         token: token,
         usuarioId: userData['id'] as String,
         tipo: userData['tipo'] as String,
+        perfilId: userData['perfilId'] as String?,
       );
       
       onSuccess(userData);

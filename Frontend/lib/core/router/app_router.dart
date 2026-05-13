@@ -18,6 +18,7 @@ import '../../features/manager/dashboard/screens/dashboard_screen.dart';
 import '../../features/manager/reservations/screens/reservations_screen.dart';
 import '../../features/manager/inventory/screens/inventory_screen.dart';
 import '../../features/manager/inventory/screens/add_vehicle_screen.dart';
+import '../../features/manager/inventory/screens/edit_vehicle_screen.dart';
 import '../../features/manager/clients/screens/clients_screen.dart';
 import '../../features/manager/insurance/screens/insurance_screen.dart';
 import '../../features/manager/settings/screens/manager_settings_screen.dart';
@@ -131,11 +132,30 @@ class AppRouter {
             path: 'add',
             builder: (context, state) => const AddVehicleScreen(),
           ),
+          GoRoute(
+            path: 'edit',
+            builder: (context, state) {
+              final vehicle = state.extra as Veiculo;
+              return EditVehicleScreen(veiculo: vehicle);
+            },
+          ),
         ],
       ),
       GoRoute(
         path: '/manager/clients',
         builder: (context, state) => const ClientsScreen(),
+        routes: [
+          GoRoute(
+            path: 'reservations',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return ReservationsScreen(
+                clienteId: extra?['clienteId'] as String?,
+                clienteNome: extra?['clienteNome'] as String?,
+              );
+            },
+          ),
+        ],
       ),
       GoRoute(
         path: '/manager/insurance',

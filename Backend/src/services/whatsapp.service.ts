@@ -69,6 +69,8 @@ setInterval(cleanupSeen, Math.max(30_000, Math.floor(DEDUPE_TTL_MS / 2))).unref(
 type Cached<T> = { value: T; expiresAt: number };
 const cache = new Map<string, Cached<any>>();
 
+type HistoryMessage = { role: 'user' | 'assistant'; content: string };
+
 function setCache<T>(key: string, value: T, ttlMs: number): void {
   cache.set(key, { value, expiresAt: Date.now() + ttlMs });
 }
@@ -193,10 +195,13 @@ export async function processIncomingMessage(payload: any): Promise<void> {
     return;
   }
 
+  const history = await getConversationHistory(conversation.id, Number.parseInt(process.env.WHATSAPP_HISTORY_LIMIT || '12', 10));
+
   const paymentResult = await tryHandlePaymentIntent({
     messageText: text,
     phone: from,
     conversationId: conversation.id,
+    history,
   });
 
   if (paymentResult?.handled) {
@@ -210,8 +215,6 @@ export async function processIncomingMessage(payload: any): Promise<void> {
     });
     return;
   }
-
-  const history = await getConversationHistory(conversation.id, Number.parseInt(process.env.WHATSAPP_HISTORY_LIMIT || '12', 10));
 
   const quickReplyMsRaw = process.env.WHATSAPP_QUICK_REPLY_MS ?? '0';
   const quickReplyMs = Number.parseInt(quickReplyMsRaw, 10);
@@ -229,7 +232,7 @@ export async function processIncomingMessage(payload: any): Promise<void> {
   }
 
   try {
-    const reply = await answerWhatsAppMessage(text, { history });
+    const reply = sanitizeAiPaymentReply(await answerWhatsAppMessage(text, { history }));
     if (placeholderTimer) clearTimeout(placeholderTimer);
 
     const replyMessageId = await sendMessage(from, reply);
@@ -287,10 +290,73 @@ function normalizePhone(phone: string): string {
   return (phone || '').replace(/\D/g, '');
 }
 
+function looksLikeCardDataRequest(text: string): boolean {
+  const t = (text || '').toLowerCase();
+  if (!t) return false;
+  const patterns = [
+    'cartão',
+    'cartao',
+    'número do cartão',
+    'numero do cartao',
+    'número do cartao',
+    'validade',
+    'cvv',
+    'código de segurança',
+    'codigo de seguranca',
+    'titular do cartão',
+    'titular do cartao',
+    'dados do seu cartão',
+    'dados do seu cartao',
+  ];
+  return patterns.some((p) => t.includes(p));
+}
+
+function sanitizeAiPaymentReply(text: string): string {
+  if (!looksLikeCardDataRequest(text)) return text;
+  const lower = text.toLowerCase();
+  const hasLink = lower.includes('link de pagamento') || lower.includes('checkout');
+  if (hasLink) return text;
+  return 'Para finalizar, eu envio um link de pagamento seguro. Me informe o modelo do carro, a unidade de retirada e as datas (retirada e devolução).';
+}
+
 function isPaymentIntent(text: string): boolean {
   const t = (text || '').toLowerCase();
   const intentWords = ['pagar', 'pagamento', 'link', 'checkout', 'finalizar', 'fechar'];
   return intentWords.some((w) => t.includes(w));
+}
+
+function isConfirmation(text: string): boolean {
+  const t = (text || '').trim().toLowerCase();
+  if (!t) return false;
+  const confirmations = [
+    'sim',
+    'ok',
+    'claro',
+    'confirmo',
+    'quero',
+    'pode',
+    'isso',
+    'perfeito',
+    'segue',
+    'pode sim',
+    'pode prosseguir',
+  ];
+  return confirmations.some((c) => t === c || t.startsWith(`${c} `));
+}
+
+function historyHasReservationContext(history: HistoryMessage[] | undefined): boolean {
+  if (!history || history.length === 0) return false;
+  const combined = history.map((m) => m.content).join(' ').toLowerCase();
+  const hasDate = /\b(\d{1,2}\/\d{1,2}\/20\d{2}|20\d{2}-\d{2}-\d{2})\b/.test(combined);
+  const hasKeywords = ['modelo', 'unidade', 'retirada', 'devolução', 'devolucao', 'reserva'].some((k) => combined.includes(k));
+  return hasDate || hasKeywords;
+}
+
+function buildPaymentContextText(messageText: string, history: HistoryMessage[] | undefined): string {
+  if (!history || history.length === 0) return messageText;
+  const recentUser = history.filter((m) => m.role === 'user').slice(-3).map((m) => m.content);
+  const combined = [...recentUser, messageText].filter(Boolean).join(' ');
+  return combined.trim() || messageText;
 }
 
 async function detectModelo(messageText: string): Promise<{ id: number; descricao: string } | null> {
@@ -367,16 +433,19 @@ async function tryHandlePaymentIntent(params: {
   messageText: string;
   phone: string;
   conversationId: string;
+  history?: HistoryMessage[];
 }): Promise<{ handled: boolean; replyText: string }> {
-  const { messageText, phone, conversationId } = params;
+  const { messageText, phone, conversationId, history } = params;
 
-  if (!isPaymentIntent(messageText)) {
+  const shouldHandle = isPaymentIntent(messageText) || (isConfirmation(messageText) && historyHasReservationContext(history));
+  if (!shouldHandle) {
     return { handled: false, replyText: '' };
   }
 
-  const { startDate, endDate } = extractDateRange(messageText);
-  const modelo = await detectModelo(messageText);
-  const filialId = await detectFilialId(messageText);
+  const intentText = buildPaymentContextText(messageText, history);
+  const { startDate, endDate } = extractDateRange(intentText);
+  const modelo = await detectModelo(intentText);
+  const filialId = await detectFilialId(intentText);
 
   if (startDate && endDate) {
     const inicio = new Date(startDate);

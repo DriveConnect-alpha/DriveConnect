@@ -136,6 +136,25 @@ async function listTokensForUsuario(usuarioId: string): Promise<string[]> {
   return result.rows.map((row) => String(row.token)).filter(Boolean);
 }
 
+async function resolveUsuarioIdFromClienteOrUsuarioId(id: string): Promise<string | null> {
+  if (!id) return null;
+
+  // 1) Se já for um usuário, retorna.
+  const user = await query(
+    `SELECT id FROM usuario WHERE id = $1 AND deletado_em IS NULL LIMIT 1`,
+    [id],
+  );
+  if (user.rows[0]?.id) return String(user.rows[0].id);
+
+  // 2) Se for cliente.id, resolve para cliente.usuario_id
+  const cliente = await query(
+    `SELECT usuario_id FROM cliente WHERE id = $1 AND deletado_em IS NULL LIMIT 1`,
+    [id],
+  );
+  const usuarioId = cliente.rows[0]?.usuario_id;
+  return usuarioId ? String(usuarioId) : null;
+}
+
 async function sendMulticastNotification(params: {
   tokens: string[];
   notification: { title: string; body: string };
@@ -251,6 +270,7 @@ export async function notifyReservaPendente(params: {
 
   const inicio = dataInicio ? dataInicio.toISOString() : null;
   const fim = dataFim ? dataFim.toISOString() : null;
+  const usuarioId = await resolveUsuarioIdFromClienteOrUsuarioId(clienteId);
 
   const managerParams: {
     reservaId: string;
@@ -269,8 +289,8 @@ export async function notifyReservaPendente(params: {
 
   await Promise.all([
     notifyNovoServicoPendente(managerParams),
-    notifyUsuario({
-      usuarioId: clienteId,
+    ...(usuarioId ? [notifyUsuario({
+      usuarioId,
       notification: {
         title: 'Reserva pendente',
         body: 'Seu pagamento está aguardando confirmação.',
@@ -286,7 +306,7 @@ export async function notifyReservaPendente(params: {
         dataFim: fim,
         status: 'PENDENTE_PAGAMENTO',
       },
-    }),
+    })] : []),
   ]);
 }
 
@@ -305,6 +325,7 @@ export async function notifyPagamentoConfirmado(params: {
 
   const inicio = dataInicio ? dataInicio.toISOString() : null;
   const fim = dataFim ? dataFim.toISOString() : null;
+  const usuarioId = await resolveUsuarioIdFromClienteOrUsuarioId(clienteId);
 
   await Promise.all([
     notifyManagers({
@@ -325,8 +346,8 @@ export async function notifyPagamentoConfirmado(params: {
         status: 'RESERVADA',
       },
     }),
-    notifyUsuario({
-      usuarioId: clienteId,
+    ...(usuarioId ? [notifyUsuario({
+      usuarioId,
       notification: {
         title: 'Pagamento confirmado',
         body: 'Sua reserva foi confirmada com sucesso.',
@@ -342,7 +363,7 @@ export async function notifyPagamentoConfirmado(params: {
         dataFim: fim,
         status: 'RESERVADA',
       },
-    }),
+    })] : []),
   ]);
 }
 
@@ -361,6 +382,7 @@ export async function notifyReservaCancelada(params: {
 
   const inicio = dataInicio ? dataInicio.toISOString() : null;
   const fim = dataFim ? dataFim.toISOString() : null;
+  const usuarioId = await resolveUsuarioIdFromClienteOrUsuarioId(clienteId);
 
   await Promise.all([
     notifyManagers({
@@ -381,8 +403,8 @@ export async function notifyReservaCancelada(params: {
         status: 'CANCELADA',
       },
     }),
-    notifyUsuario({
-      usuarioId: clienteId,
+    ...(usuarioId ? [notifyUsuario({
+      usuarioId,
       notification: {
         title: 'Reserva cancelada',
         body: 'Sua reserva foi cancelada.',
@@ -398,7 +420,7 @@ export async function notifyReservaCancelada(params: {
         dataFim: fim,
         status: 'CANCELADA',
       },
-    }),
+    })] : []),
   ]);
 }
 
@@ -417,6 +439,7 @@ export async function notifyReservaExpirada(params: {
 
   const inicio = dataInicio ? dataInicio.toISOString() : null;
   const fim = dataFim ? dataFim.toISOString() : null;
+  const usuarioId = await resolveUsuarioIdFromClienteOrUsuarioId(clienteId);
 
   await Promise.all([
     notifyManagers({
@@ -437,8 +460,8 @@ export async function notifyReservaExpirada(params: {
         status: 'EXPIRADA',
       },
     }),
-    notifyUsuario({
-      usuarioId: clienteId,
+    ...(usuarioId ? [notifyUsuario({
+      usuarioId,
       notification: {
         title: 'Reserva expirada',
         body: 'Seu pagamento não foi confirmado a tempo.',
@@ -454,6 +477,6 @@ export async function notifyReservaExpirada(params: {
         dataFim: fim,
         status: 'EXPIRADA',
       },
-    }),
+    })] : []),
   ]);
 }

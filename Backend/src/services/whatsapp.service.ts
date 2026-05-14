@@ -598,7 +598,10 @@ async function tryHandlePaymentIntent(params: {
 }): Promise<{ handled: boolean; replyText: string }> {
   const { messageText, phone, conversationId, history } = params;
 
-  const shouldHandle = isPaymentIntent(messageText) || (isConfirmation(messageText) && historyHasReservationContext(history));
+  let cliente = await findClienteByPhone(phone);
+  const shouldHandle = isPaymentIntent(messageText) ||
+                       (isReservationIntent(messageText) && !!cliente) ||
+                       (isConfirmation(messageText) && historyHasReservationContext(history));
   if (!shouldHandle) {
     return { handled: false, replyText: '' };
   }
@@ -631,8 +634,6 @@ async function tryHandlePaymentIntent(params: {
       replyText: 'Consigo gerar seu link de pagamento. Me envie: modelo do carro, unidade de retirada e datas (retirada e devolução).',
     };
   }
-
-  let cliente = await findClienteByPhone(phone);
   if (!cliente) {
     // Verificar se a mensagem contém CPF e email para cadastro automático
     const { cpf, email } = extractCpfAndEmail(messageText);

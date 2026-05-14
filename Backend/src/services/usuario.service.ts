@@ -85,7 +85,7 @@ export async function criarCliente(params: CriarClienteParams): Promise<{ usuari
   Usuario.validarEmail(params.email);
   Usuario.validarSenha(params.senha);
   Cliente.validarNome(params.nomeCompleto);
-  Cliente.validarCpf(params.cpf);
+  const cpfNormalizado = Cliente.normalizarCpf(params.cpf);
 
   const senhaHash = await gerarHash(params.senha);
   const client = await getClient();
@@ -101,7 +101,7 @@ export async function criarCliente(params: CriarClienteParams): Promise<{ usuari
 
     const clienteRes = await client.query(
       `INSERT INTO cliente (usuario_id, nome_completo, cpf, rg, cnh, telefone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [usuarioId, params.nomeCompleto, params.cpf, params.rg ?? null, params.cnh ?? null, params.telefone ?? null],
+      [usuarioId, params.nomeCompleto, cpfNormalizado, params.rg ?? null, params.cnh ?? null, params.telefone ?? null],
     );
     const clienteId: string = clienteRes.rows[0].id;
 

@@ -3,6 +3,7 @@ import * as argon2 from 'argon2';
 import jwt from 'jsonwebtoken';
 import { query, getClient } from '../db/index.js';
 import { checkRole } from '../utils/auth.js';
+import { Cliente } from '../entities/Cliente.js';
 
 export async function login(req: IncomingMessage, res: ServerResponse) {
   const corpo = await lerCorpo(req);
@@ -82,6 +83,16 @@ export async function register(req: IncomingMessage, res: ServerResponse) {
 
   const client = await getClient();
   try {
+    let cpfNormalizado: string;
+    try {
+      cpfNormalizado = Cliente.normalizarCpf(cpf);
+    } catch {
+      client.release();
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ erro: 'CPF inválido.' }));
+      return;
+    }
+
     const userExists = await client.query('SELECT id FROM usuario WHERE email = $1', [email]);
     if (userExists.rows.length > 0) {
       client.release();
@@ -90,7 +101,7 @@ export async function register(req: IncomingMessage, res: ServerResponse) {
       return;
     }
 
-    const cpfExists = await client.query('SELECT id FROM cliente WHERE cpf = $1', [cpf]);
+    const cpfExists = await client.query('SELECT id FROM cliente WHERE cpf = $1', [cpfNormalizado]);
     if (cpfExists.rows.length > 0) {
       client.release();
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -110,7 +121,7 @@ export async function register(req: IncomingMessage, res: ServerResponse) {
 
     await client.query(
       'INSERT INTO cliente (usuario_id, nome_completo, cpf) VALUES ($1, $2, $3)',
-      [newUser.id, nome_completo, cpf]
+      [newUser.id, nome_completo, cpfNormalizado]
     );
 
     await client.query('COMMIT');

@@ -10,11 +10,17 @@ class TipoCarro {
   });
 
   factory TipoCarro.fromJson(Map<String, dynamic> json) {
-    return TipoCarro(
-      id: json['id'],
-      nome: json['nome'],
-      precoBaseDiaria: (json['preco_base_diaria'] as num).toDouble(),
-    );
+    try {
+      return TipoCarro(
+        id: json['id'] != null ? int.tryParse(json['id'].toString()) ?? 0 : 0,
+        nome: json['nome']?.toString() ?? '',
+        precoBaseDiaria: json['preco_base_diaria'] != null ? double.tryParse(json['preco_base_diaria'].toString()) ?? 0.0 : 0.0,
+      );
+    } catch (e) {
+      print('Error parsing TipoCarro: $e');
+      print('JSON data: $json');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {

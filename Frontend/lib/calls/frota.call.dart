@@ -196,18 +196,37 @@ class FrotaCall {
     required void Function(String message) onError,
   }) async {
     try {
-      final response = await dioClient.get<List<dynamic>>(
+      final response = await dioClient.get(
         '/veiculos',
         queryParameters: {
           if (filialId != null) 'filialId': filialId,
         },
       );
-      final data = (response.data ?? []).cast<Map<String, dynamic>>();
+
+      // Handle different response formats
+      List<dynamic> rawData;
+      if (response.data is List) {
+        rawData = response.data as List;
+      } else if (response.data is Map && response.data['data'] is List) {
+        // In case the response is wrapped in a data object
+        rawData = response.data['data'] as List;
+      } else {
+        rawData = [];
+      }
+
+      final data = rawData.map((item) {
+        if (item is Map<String, dynamic>) {
+          return item;
+        } else {
+          throw Exception('Invalid vehicle data format: $item');
+        }
+      }).toList();
+
       onSuccess(data);
     } on DioException catch (e) {
       handleApiError(e, onError);
     } catch (e) {
-      onError(e.toString());
+      onError('Erro ao processar dados dos veículos: ${e.toString()}');
     }
   }
 

@@ -28,20 +28,26 @@ class Filial {
   });
 
   factory Filial.fromJson(Map<String, dynamic> json) {
-    return Filial(
-      id: json['id'],
-      nome: json['nome'],
-      cep: json['cep'],
-      uf: json['uf'],
-      cidade: json['cidade'],
-      bairro: json['bairro'],
-      rua: json['rua'],
-      numero: json['numero'],
-      complemento: json['complemento'],
-      ativo: json['ativo'] ?? true,
-      criadoEm: json['criado_em'] != null ? DateTime.parse(json['criado_em']) : null,
-      deletadoEm: json['deletado_em'] != null ? DateTime.parse(json['deletado_em']) : null,
-    );
+    try {
+      return Filial(
+        id: json['id']?.toString() ?? '',
+        nome: json['nome']?.toString(),
+        cep: json['cep']?.toString(),
+        uf: json['uf']?.toString(),
+        cidade: json['cidade']?.toString(),
+        bairro: json['bairro']?.toString(),
+        rua: json['rua']?.toString(),
+        numero: json['numero']?.toString(),
+        complemento: json['complemento']?.toString(),
+        ativo: json['ativo'] ?? true,
+        criadoEm: json['criado_em'] != null ? DateTime.tryParse(json['criado_em'].toString()) : null,
+        deletadoEm: json['deletado_em'] != null ? DateTime.tryParse(json['deletado_em'].toString()) : null,
+      );
+    } catch (e) {
+      print('Error parsing Filial: $e');
+      print('JSON data: $json');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {

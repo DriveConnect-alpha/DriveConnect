@@ -16,13 +16,19 @@ class Modelo {
   });
 
   factory Modelo.fromJson(Map<String, dynamic> json) {
-    return Modelo(
-      id: json['id'],
-      nome: json['nome'],
-      marca: json['marca'],
-      tipoCarroId: json['tipo_carro_id'],
-      tipoCarro: Modelo._tipoCarroFromJson(json),
-    );
+    try {
+      return Modelo(
+        id: json['id'] != null ? int.tryParse(json['id'].toString()) ?? 0 : 0,
+        nome: json['nome']?.toString() ?? '',
+        marca: json['marca']?.toString(),
+        tipoCarroId: json['tipo_carro_id'] != null ? int.tryParse(json['tipo_carro_id'].toString()) : null,
+        tipoCarro: Modelo._tipoCarroFromJson(json),
+      );
+    } catch (e) {
+      print('Error parsing Modelo: $e');
+      print('JSON data: $json');
+      rethrow;
+    }
   }
 
   /// Aceita `tipo_carro` (API de modelos / veículos) ou `tipo` (legado).

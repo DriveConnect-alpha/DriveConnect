@@ -35,21 +35,27 @@ class Veiculo {
   });
 
   factory Veiculo.fromJson(Map<String, dynamic> json) {
-    return Veiculo(
-      id: json['id'],
-      modeloId: json['modelo_id'],
-      filialId: json['filial_id'],
-      placa: json['placa'] as String,
-      ano: (json['ano'] as num).toInt(),
-      cor: json['cor'],
-      status: json['status'],
-      imagemUrl: json['imagem_url'],
-      precoDiaria: json['preco_diaria'] != null ? (json['preco_diaria'] as num).toDouble() : null,
-      criadoEm: DateTime.parse(json['criado_em']),
-      deletadoEm: json['deletado_em'] != null ? DateTime.parse(json['deletado_em']) : null,
-      modelo: json['modelo'] != null ? Modelo.fromJson(json['modelo']) : null,
-      filial: json['filial'] != null ? Filial.fromJson(json['filial']) : null,
-    );
+    try {
+      return Veiculo(
+        id: json['id']?.toString() ?? '',
+        modeloId: json['modelo_id'] != null ? int.tryParse(json['modelo_id'].toString()) : null,
+        filialId: json['filial_id']?.toString(),
+        placa: json['placa']?.toString() ?? '',
+        ano: json['ano'] != null ? int.tryParse(json['ano'].toString()) ?? 0 : 0,
+        cor: json['cor']?.toString(),
+        status: json['status']?.toString() ?? 'DISPONIVEL',
+        imagemUrl: json['imagem_url']?.toString(),
+        precoDiaria: json['preco_diaria'] != null ? double.tryParse(json['preco_diaria'].toString()) : null,
+        criadoEm: json['criado_em'] != null ? DateTime.tryParse(json['criado_em'].toString()) ?? DateTime.now() : DateTime.now(),
+        deletadoEm: json['deletado_em'] != null ? DateTime.tryParse(json['deletado_em'].toString()) : null,
+        modelo: json['modelo'] != null ? Modelo.fromJson(json['modelo']) : null,
+        filial: json['filial'] != null ? Filial.fromJson(json['filial']) : null,
+      );
+    } catch (e) {
+      print('Error parsing Veiculo: $e');
+      print('JSON data: $json');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {

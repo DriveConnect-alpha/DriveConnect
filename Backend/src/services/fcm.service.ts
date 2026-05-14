@@ -144,6 +144,21 @@ async function listTokensForUsuario(usuarioId: string): Promise<string[]> {
   return result.rows.map((row) => String(row.token)).filter(Boolean);
 }
 
+async function listTokensForAllManagers(): Promise<string[]> {
+  const result = await query(
+    `SELECT DISTINCT ft.token
+     FROM fcm_token ft
+     JOIN usuario u ON u.id = ft.usuario_id
+     LEFT JOIN gerente g ON g.usuario_id = u.id
+     WHERE u.deletado_em IS NULL
+       AND (
+         (u.tipo = 'GERENTE' AND g.deletado_em IS NULL)
+         OR u.tipo = 'ADMIN'
+       )`,
+  );
+  return result.rows.map((row) => String(row.token)).filter(Boolean);
+}
+
 async function resolveUsuarioIdFromClienteOrUsuarioId(id: string): Promise<string | null> {
   if (!id) return null;
 
@@ -252,6 +267,80 @@ async function notifyUsuario(params: {
     tokens,
     notification: params.notification,
     data: params.data,
+  });
+}
+
+export async function notifyVeiculoStatusAlteradoAllManagers(params: {
+  veiculoId: string;
+  placa?: string;
+  statusAnterior?: string | null;
+  statusNovo: string;
+  filialId?: string | null;
+  filialNome?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+  modelo?: string | null;
+  origem?: string;
+  motivo?: string;
+}): Promise<void> {
+  const tokens = await listTokensForAllManagers();
+  console.log(`[FCM] Tokens todos gerentes/admin: ${tokens.length}`);
+
+  const local = [params.filialNome, params.cidade, params.uf].filter(Boolean).join(' / ');
+  const header = [params.placa, params.modelo].filter(Boolean).join(' - ');
+  const fromTo = params.statusAnterior ? `${params.statusAnterior} → ${params.statusNovo}` : params.statusNovo;
+  const bodyParts = [
+    header ? `${header}: ${fromTo}` : `Status do veículo: ${fromTo}`,
+    local ? `Unidade: ${local}` : null,
+    params.motivo ? `Motivo: ${params.motivo}` : null,
+  ].filter(Boolean);
+
+  await sendMulticastNotification({
+    tokens,
+    notification: {
+      title: 'Status do veículo atualizado',
+      body: bodyParts.join(' | '),
+    },
+    data: {
+      tipo: 'VEICULO_STATUS_ALTERADO',
+      veiculoId: params.veiculoId,
+      placa: params.placa,
+      statusAnterior: params.statusAnterior ?? null,
+      statusNovo: params.statusNovo,
+      filialId: params.filialId ?? null,
+      origem: params.origem ?? 'BACKEND',
+      motivo: params.motivo ?? null,
+    },
+  });
+}
+
+export async function notifyVeiculoStatusAlteradoBulkAllManagers(params: {
+  statusNovo: string;
+  quantidade: number;
+  placas?: string[];
+  origem?: string;
+  motivo?: string;
+}): Promise<void> {
+  const tokens = await listTokensForAllManagers();
+  console.log(`[FCM] Tokens todos gerentes/admin: ${tokens.length}`);
+
+  const placas = (params.placas || []).filter(Boolean);
+  const preview = placas.length ? ` Placas: ${placas.slice(0, 5).join(', ')}${placas.length > 5 ? '…' : ''}` : '';
+  const motivo = params.motivo ? ` Motivo: ${params.motivo}` : '';
+
+  await sendMulticastNotification({
+    tokens,
+    notification: {
+      title: 'Frota atualizada',
+      body: `${params.quantidade} veículo(s) agora estão como ${params.statusNovo}.${preview}${motivo}`.trim(),
+    },
+    data: {
+      tipo: 'VEICULO_STATUS_BULK',
+      statusNovo: params.statusNovo,
+      quantidade: params.quantidade,
+      origem: params.origem ?? 'BACKEND',
+      motivo: params.motivo ?? null,
+    },
   });
 }
 

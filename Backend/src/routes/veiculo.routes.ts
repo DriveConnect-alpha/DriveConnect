@@ -5,7 +5,8 @@ import {
     buscarVeiculoPorId,
     atualizarVeiculo,
     deletarVeiculo,
-    listarItens
+    listarItens,
+    atualizarStatusVeiculoE_Notificar
 } from '../services/veiculo.service.js';
 import { processarUpload } from '../services/storage.service.js';
 import { requireCaller, requireTipo } from '../middlewares/auth.js';
@@ -187,7 +188,21 @@ export async function atualizar(req: IncomingMessage, res: ServerResponse, id: s
             dadosParaAtualizar.imagem_url = caminhosImagens[0];
         }
 
-        const veiculoAtualizado = await atualizarVeiculo(id, dadosParaAtualizar);
+        // Se estiver alterando status, usamos o helper que notifica todos os gerentes/admin.
+        if (typeof dadosParaAtualizar.status === 'string' && dadosParaAtualizar.status) {
+            const novoStatus = String(dadosParaAtualizar.status);
+            delete dadosParaAtualizar.status;
+            if (Object.keys(dadosParaAtualizar).length > 0) {
+                await atualizarVeiculo(id, dadosParaAtualizar);
+            }
+            await atualizarStatusVeiculoE_Notificar({
+                veiculoId: id,
+                novoStatus,
+                origem: 'VEICULO_ROUTE',
+            });
+        }
+
+        const veiculoAtualizado = await buscarVeiculoPorId(id);
 
         if (!veiculoAtualizado) {
             responder(res, 404, { erro: 'Veículo não encontrado ou nenhum campo válido enviado.' });

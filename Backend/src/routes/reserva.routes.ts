@@ -8,6 +8,7 @@ import {
   estenderReserva,
 } from '../services/reserva.service.js';
 import { requireCaller, requireTipo } from '../middlewares/auth.js';
+import { atualizarStatusVeiculoPorReservaE_Notificar } from '../services/veiculo.service.js';
 
 function lerCorpo(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
@@ -181,12 +182,12 @@ export async function confirmarRetirada(req: IncomingMessage, res: ServerRespons
       return;
     }
 
-    // Atualiza veículo para ALUGADO e reserva para ATIVA
-    await query(
-      `UPDATE veiculo SET status = 'ALUGADO'
-       WHERE id = (SELECT veiculo_id FROM reserva WHERE id = $1)`,
-      [reservaId],
-    );
+    // Atualiza veículo para ALUGADO (com notificação FCM) e reserva para ATIVA
+    await atualizarStatusVeiculoPorReservaE_Notificar({
+      reservaId,
+      novoStatus: 'ALUGADO',
+      origem: 'RESERVA_RETIRADA',
+    });
 
     await query(
       `UPDATE reserva SET status = 'ATIVA', data_retirada_real = NOW() WHERE id = $1`,
@@ -221,10 +222,11 @@ export async function confirmarDevolucao(req: IncomingMessage, res: ServerRespon
       return;
     }
 
-    await query(
-      `UPDATE veiculo SET status = 'DISPONIVEL' WHERE id = $1`,
-      [reserva.rows[0].veiculo_id],
-    );
+    await atualizarStatusVeiculoPorReservaE_Notificar({
+      reservaId,
+      novoStatus: 'DISPONIVEL',
+      origem: 'RESERVA_DEVOLUCAO',
+    });
 
     await query(
       `UPDATE reserva SET status = 'FINALIZADA', data_devolucao_real = NOW() WHERE id = $1`,

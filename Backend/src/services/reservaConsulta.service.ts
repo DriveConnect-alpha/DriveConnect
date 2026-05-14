@@ -1,5 +1,6 @@
 import { query } from '../db/index.js';
 import type { Caller } from '../middlewares/auth.js';
+import { atualizarStatusVeiculoE_Notificar } from './veiculo.service.js';
 
 // ──────────────────────────────────────────────
 // Interfaces de retorno seguro
@@ -282,10 +283,11 @@ async function _cancelarReserva(reservaId: string, caller: Caller): Promise<Rese
     }
 
     // Libera o veículo
-    await query(
-        `UPDATE veiculo SET status = 'DISPONIVEL' WHERE id = $1`,
-        [reserva.veiculo_id],
-    );
+    await atualizarStatusVeiculoE_Notificar({
+        veiculoId: reserva.veiculo_id,
+        novoStatus: 'DISPONIVEL',
+        origem: 'RESERVA_CANCELAMENTO',
+    });
 
     await query(
         `UPDATE reserva SET status = 'CANCELADA' WHERE id = $1`,

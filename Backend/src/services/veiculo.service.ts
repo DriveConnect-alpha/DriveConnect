@@ -1,5 +1,6 @@
 import { query } from '../db/index.js';
 import type { Veiculo } from '../entities/Veiculo.js';
+import { notifyVeiculoStatusAlteradoAllManagers } from './fcm.service.js';
 
 export async function criarVeiculo(dados: Veiculo & { itens_ids?: string[] }): Promise<Veiculo> {
     const q = `
@@ -191,6 +192,71 @@ export async function atualizarVeiculo(id: string, dados: Partial<Veiculo>): Pro
 
     const result = await query(q, values);
     return result.rows[0] || null;
+}
+
+export async function atualizarStatusVeiculoE_Notificar(params: {
+    veiculoId: string;
+    novoStatus: string;
+    origem?: string;
+    motivo?: string;
+}): Promise<void> {
+    const { veiculoId, novoStatus, origem, motivo } = params;
+    if (!veiculoId || !novoStatus) return;
+
+    const before = await query(
+        `SELECT v.id, v.placa, v.status, v.filial_id,
+                f.nome AS filial_nome, f.cidade, f.uf,
+                m.nome AS modelo_nome, m.marca AS modelo_marca
+         FROM veiculo v
+         JOIN filial f ON f.id = v.filial_id
+         JOIN modelo m ON m.id = v.modelo_id
+         WHERE v.id = $1 AND v.deletado_em IS NULL
+         LIMIT 1`,
+        [veiculoId],
+    );
+    const row = before.rows[0];
+    if (!row) return;
+
+    const statusAnterior = String(row.status || '');
+    const statusNovo = String(novoStatus);
+    if (statusAnterior === statusNovo) return;
+
+    await query(
+        `UPDATE veiculo SET status = $1 WHERE id = $2 AND deletado_em IS NULL`,
+        [statusNovo, veiculoId],
+    );
+
+    const modelo = [row.modelo_marca, row.modelo_nome].filter(Boolean).join(' ').trim() || null;
+
+    await notifyVeiculoStatusAlteradoAllManagers({
+        veiculoId,
+        placa: row.placa ?? null,
+        statusAnterior,
+        statusNovo,
+        filialId: row.filial_id ?? null,
+        filialNome: row.filial_nome ?? null,
+        cidade: row.cidade ?? null,
+        uf: row.uf ?? null,
+        modelo,
+        origem: origem ?? 'BACKEND',
+        motivo,
+    });
+}
+
+export async function atualizarStatusVeiculoPorReservaE_Notificar(params: {
+    reservaId: string;
+    novoStatus: string;
+    origem?: string;
+    motivo?: string;
+}): Promise<void> {
+    const { reservaId, novoStatus, origem, motivo } = params;
+    if (!reservaId || !novoStatus) return;
+
+    const r = await query(`SELECT veiculo_id FROM reserva WHERE id = $1 AND deletado_em IS NULL LIMIT 1`, [reservaId]);
+    const veiculoId = r.rows[0]?.veiculo_id as string | undefined;
+    if (!veiculoId) return;
+
+    await atualizarStatusVeiculoE_Notificar({ veiculoId, novoStatus, origem, motivo });
 }
 
 export async function deletarVeiculo(id: string): Promise<boolean> {

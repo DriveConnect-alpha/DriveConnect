@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { query } from '../db/index.js';
 import { gerarLinkPagamento } from './payment.service.js';
 import { buscarPlanoBasico, buscarPlanoPorId, calcularValorSeguro } from './seguro.service.js';
-import { notifyPagamentoConfirmado, notifyReservaExpirada, notifyReservaPendente } from './fcm.service.js';
+import { notifyPagamentoConfirmado, notifyReservaExpirada, notifyReservaPendente, notifyVeiculoStatusAlteradoBulkAllManagers } from './fcm.service.js';
 import type { Caller } from '../middlewares/auth.js';
 
 const EXPIRACAO_MINUTOS = Number(process.env.PAGAMENTO_EXPIRACAO_MINUTOS) || 15;
@@ -534,6 +534,25 @@ export async function expirarReservasPendentes(): Promise<number> {
       UPDATE veiculo SET status = 'DISPONIVEL' 
       WHERE id = ANY($1)
     `, [veiculoIds]);
+
+    try {
+      const placasRes = await query(
+        `SELECT placa FROM veiculo WHERE id = ANY($1) ORDER BY placa ASC LIMIT 6`,
+        [veiculoIds],
+      );
+      const placas = (placasRes.rows || []).map((r: any) => String(r.placa || '')).filter(Boolean);
+      void notifyVeiculoStatusAlteradoBulkAllManagers({
+        statusNovo: 'DISPONIVEL',
+        quantidade: veiculoIds.length,
+        placas,
+        origem: 'JOB_EXPIRACAO',
+        motivo: 'Expiração de pagamento pendente',
+      }).catch((err) => {
+        console.error('[Reserva] Falha ao notificar mudança de status dos veículos (expiração):', err);
+      });
+    } catch (err) {
+      console.error('[Reserva] Falha ao listar placas para notificação de expiração:', err);
+    }
   }
 
   const sql = `

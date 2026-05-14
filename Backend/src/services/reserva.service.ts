@@ -21,6 +21,11 @@ export async function buscarVeiculoDisponivel(
   dataInicio: Date,
   dataFim: Date,
 ): Promise<string | null> {
+  // Normaliza para "dia cheio": muitos fluxos passam apenas YYYY-MM-DD.
+  // Usar recorte por DATE evita problemas de fuso (JS Date cria em UTC).
+  const inicioDia = new Date(Date.UTC(dataInicio.getUTCFullYear(), dataInicio.getUTCMonth(), dataInicio.getUTCDate(), 12, 0, 0));
+  const fimDiaExclusive = new Date(Date.UTC(dataFim.getUTCFullYear(), dataFim.getUTCMonth(), dataFim.getUTCDate() + 1, 12, 0, 0));
+
   const sql = `
     SELECT v.id
     FROM veiculo v
@@ -38,7 +43,7 @@ export async function buscarVeiculoDisponivel(
     LIMIT 1;
   `;
 
-  const resultado = await query(sql, [modeloId, dataInicio, dataFim]);
+  const resultado = await query(sql, [modeloId, inicioDia, fimDiaExclusive]);
   return resultado.rows[0]?.id ?? null;
 }
 
@@ -51,6 +56,10 @@ export async function buscarVeiculoDisponivelPorFilial(
   dataInicio: Date,
   dataFim: Date,
 ): Promise<string | null> {
+  // Normaliza para "dia cheio" e evita bugs de timezone (Date(YYYY-MM-DD) é UTC).
+  const inicioDia = new Date(Date.UTC(dataInicio.getUTCFullYear(), dataInicio.getUTCMonth(), dataInicio.getUTCDate(), 12, 0, 0));
+  const fimDiaExclusive = new Date(Date.UTC(dataFim.getUTCFullYear(), dataFim.getUTCMonth(), dataFim.getUTCDate() + 1, 12, 0, 0));
+
   const sql = `
     SELECT v.id
     FROM veiculo v
@@ -69,7 +78,7 @@ export async function buscarVeiculoDisponivelPorFilial(
     LIMIT 1;
   `;
 
-  const resultado = await query(sql, [modeloId, filialId, dataInicio, dataFim]);
+  const resultado = await query(sql, [modeloId, filialId, inicioDia, fimDiaExclusive]);
   return resultado.rows[0]?.id ?? null;
 }
 

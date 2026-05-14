@@ -5,6 +5,7 @@ import '../models/usuario.dart';
 import '../constants/app_constants.dart';
 import '../../features/auth/services/iauth_service.dart';
 import '../../calls/api_core.dart';
+import '../../services/fcm_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final IAuthService _authService;
@@ -42,6 +43,7 @@ class AuthProvider extends ChangeNotifier {
           perfilId: _user!.perfilId,
           filialId: _user!.filialId,
         );
+        await FcmService().flushPendingToken();
       } catch (_) {
         _token = null;
         _user = null;
@@ -68,6 +70,7 @@ class AuthProvider extends ChangeNotifier {
       await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
       
       // Note: setIdentity is already called inside UserCall.login
+      await FcmService().flushPendingToken();
     } catch (e) {
       _error = e.toString();
     } finally {

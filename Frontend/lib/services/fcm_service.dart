@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../calls/notification.call.dart';
+import '../calls/api_core.dart' show isAuthenticated;
 import 'package:flutter/foundation.dart';
 
 class FcmService {
@@ -9,6 +10,8 @@ class FcmService {
   FcmService._internal();
 
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
+  String? _pendingToken;
+  String? _lastRegisteredToken;
 
   Future<void> init() async {
     // Request permissions for iOS and Android 13+
@@ -57,12 +60,35 @@ class FcmService {
     if (kDebugMode) {
       print('FCM Token: $token');
     }
-    
+
+    // Sem JWT ainda (app abre antes de login): guarda e registra após autenticar.
+    if (!isAuthenticated) {
+      _pendingToken = token;
+      if (kDebugMode) {
+        debugPrint('FCM token pendente (aguardando login).');
+      }
+      return;
+    }
+
+    if (_lastRegisteredToken == token) return;
+
     await saveFcmToken(
       token: token,
       plataforma: Platform.isAndroid ? 'android' : 'ios',
       onSuccess: () => debugPrint('Token registered successfully'),
       onError: (err) => debugPrint('Error registering token: $err'),
     );
+
+    _lastRegisteredToken = token;
+    if (_pendingToken == token) _pendingToken = null;
+  }
+
+  /// Chame após login/restore de sessão para registrar um token que foi obtido
+  /// antes do usuário estar autenticado.
+  Future<void> flushPendingToken() async {
+    if (!isAuthenticated) return;
+    final token = _pendingToken;
+    if (token == null || token.isEmpty) return;
+    await _registerToken(token);
   }
 }

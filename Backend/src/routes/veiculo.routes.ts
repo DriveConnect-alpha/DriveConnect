@@ -117,7 +117,7 @@ export async function registrarVeiculo(req: IncomingMessage, res: ServerResponse
 export async function listar(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
         const caller = requireCaller(req);
-        requireTipo(caller, 'GERENTE', 'ADMIN');
+        requireTipo(caller, 'GERENTE', 'ADMIN', 'CLIENTE');
 
         // Para simplificar a rota pura do Node sem urlSearchParams parser manual completo
         // Poderíamos parsear req.url para extrar filialId se fôssemos usar searchParams.

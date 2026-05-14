@@ -19,6 +19,8 @@ import {
   storeMessage,
   updateMessageStatus,
 } from './whatsappStorage.service.js';
+import { criarCliente } from './usuario.service.js';
+import crypto from 'crypto';
 
 type WhatsAppTextMessage = {
   from: string;
@@ -197,6 +199,25 @@ export async function processIncomingMessage(payload: any): Promise<void> {
 
   const history = await getConversationHistory(conversation.id, Number.parseInt(process.env.WHATSAPP_HISTORY_LIMIT || '12', 10));
 
+  // Verificar se há intenção de reserva e cliente não cadastrado
+  const reservationCheck = await tryHandleReservationIntent({
+    messageText: text,
+    phone: from,
+    conversationId: conversation.id,
+  });
+
+  if (reservationCheck?.handled) {
+    const replyMessageId = await sendMessage(from, reservationCheck.replyText);
+    await storeMessage({
+      conversationId: conversation.id,
+      direction: 'OUT',
+      waMessageId: replyMessageId,
+      text: reservationCheck.replyText,
+      status: 'sent',
+    });
+    return;
+  }
+
   const paymentResult = await tryHandlePaymentIntent({
     messageText: text,
     phone: from,
@@ -290,6 +311,74 @@ function normalizePhone(phone: string): string {
   return (phone || '').replace(/\D/g, '');
 }
 
+/**
+ * Gera uma senha aleatória segura
+ */
+function generateSecurePassword(): string {
+  const length = 12;
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  let password = '';
+
+  // Garantir pelo menos um de cada tipo
+  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // maiúscula
+  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // minúscula
+  password += '0123456789'[Math.floor(Math.random() * 10)]; // número
+  password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // especial
+
+  // Preencher o resto aleatoriamente
+  for (let i = password.length; i < length; i++) {
+    password += chars[Math.floor(Math.random() * chars.length)];
+  }
+
+  // Embaralhar a senha
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+}
+
+/**
+ * Valida formato de email
+ */
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+/**
+ * Valida formato de CPF (apenas formato, não verifica se é real)
+ */
+function isValidCpfFormat(cpf: string): boolean {
+  const cleanCpf = cpf.replace(/\D/g, '');
+  return cleanCpf.length === 11 && /^\d{11}$/.test(cleanCpf);
+}
+
+/**
+ * Extrai CPF e email de uma mensagem de texto
+ */
+function extractCpfAndEmail(text: string): { cpf: string | null; email: string | null } {
+  const t = text.trim();
+
+  // Extrair CPF - vários formatos possíveis
+  const cpfPatterns = [
+    /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/, // 123.456.789-01
+    /\b\d{11}\b/, // 12345678901
+    /\b\d{3}\d{3}\d{3}\d{2}\b/, // 12345678901 sem pontuação
+  ];
+
+  let cpf: string | null = null;
+  for (const pattern of cpfPatterns) {
+    const match = t.match(pattern);
+    if (match) {
+      cpf = match[0].replace(/\D/g, ''); // normalizar para apenas dígitos
+      break;
+    }
+  }
+
+  // Extrair email
+  const emailMatch = t.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/i);
+  const email = emailMatch ? emailMatch[0] : null;
+
+  return { cpf, email };
+}
+
 function looksLikeCardDataRequest(text: string): boolean {
   const t = (text || '').toLowerCase();
   if (!t) return false;
@@ -323,6 +412,13 @@ function isPaymentIntent(text: string): boolean {
   const t = (text || '').toLowerCase();
   const intentWords = ['pagar', 'pagamento', 'link', 'checkout', 'finalizar', 'fechar'];
   return intentWords.some((w) => t.includes(w));
+}
+
+function isReservationIntent(text: string): boolean {
+  const t = (text || '').toLowerCase();
+  const intentWords = ['alugar', 'aluguel', 'locar', 'locação', 'reserva', 'reservar', 'quero', 'gostaria', 'interessado'];
+  const carWords = ['carro', 'veículo', 'veiculo', 'automóvel', 'automovel'];
+  return intentWords.some((w) => t.includes(w)) && carWords.some((c) => t.includes(c));
 }
 
 function isConfirmation(text: string): boolean {
@@ -429,6 +525,75 @@ async function findClienteByPhone(phone: string): Promise<{ id: string; nome: st
   }
 }
 
+async function tryHandleReservationIntent(params: {
+  messageText: string;
+  phone: string;
+  conversationId: string;
+}): Promise<{ handled: boolean; replyText: string }> {
+  const { messageText, phone } = params;
+
+  // Verificar se há intenção de reserva/aluguel
+  if (!isReservationIntent(messageText)) {
+    return { handled: false, replyText: '' };
+  }
+
+  // Verificar se o cliente já está cadastrado
+  const cliente = await findClienteByPhone(phone);
+  if (cliente) {
+    // Cliente já cadastrado, deixar o fluxo normal continuar
+    return { handled: false, replyText: '' };
+  }
+
+  // Cliente não cadastrado - verificar se forneceu CPF e email na mensagem
+  const { cpf, email } = extractCpfAndEmail(messageText);
+
+  if (cpf && email && isValidCpfFormat(cpf) && isValidEmail(email)) {
+    // Tentar cadastrar o cliente automaticamente
+    try {
+      const nomeCliente = `Cliente WhatsApp ${phone.slice(-4)}`; // Nome temporário baseado no telefone
+      const senhaGerada = generateSecurePassword();
+
+      const resultadoCadastro = await criarCliente({
+        email,
+        senha: senhaGerada,
+        nomeCompleto: nomeCliente,
+        cpf,
+        telefone: phone,
+      });
+
+      console.log(`[WhatsApp] Cliente cadastrado automaticamente via reserva: ${resultadoCadastro.usuarioId}`);
+
+      // Enviar mensagem com as credenciais
+      const mensagemCredenciais = `✅ Cadastro realizado com sucesso!\n\n` +
+        `📧 Email: ${email}\n` +
+        `🔑 Senha temporária: ${senhaGerada}\n\n` +
+        `⚠️ Guarde essas informações! Você pode alterar a senha no app ou site.\n\n` +
+        `Agora posso te ajudar com sua reserva. Me informe o modelo do carro, unidade e datas (retirada e devolução).`;
+
+      return {
+        handled: true,
+        replyText: mensagemCredenciais,
+      };
+    } catch (error) {
+      console.error('[WhatsApp] Erro no cadastro automático via reserva:', error);
+      const frontendUrl = (process.env.FRONTEND_URL || '').trim();
+      const cadastro = frontendUrl ? ` Você pode se cadastrar em ${frontendUrl}/cadastro.` : '';
+      return {
+        handled: true,
+        replyText: `Olá! Vejo que você quer alugar um carro, mas preciso do seu cadastro primeiro.${cadastro} Se preferir, me informe seu CPF e e‑mail para fazer o cadastro automático.`,
+      };
+    }
+  } else {
+    // Cliente não cadastrado e não forneceu dados suficientes
+    const frontendUrl = (process.env.FRONTEND_URL || '').trim();
+    const cadastro = frontendUrl ? ` Você pode se cadastrar em ${frontendUrl}/cadastro.` : '';
+    return {
+      handled: true,
+      replyText: `Olá! Vejo que você quer alugar um carro, mas preciso do seu cadastro primeiro.${cadastro} Se preferir, me informe seu CPF e e‑mail para fazer o cadastro automático.`,
+    };
+  }
+}
+
 async function tryHandlePaymentIntent(params: {
   messageText: string;
   phone: string;
@@ -471,14 +636,62 @@ async function tryHandlePaymentIntent(params: {
     };
   }
 
-  const cliente = await findClienteByPhone(phone);
+  let cliente = await findClienteByPhone(phone);
   if (!cliente) {
-    const frontendUrl = (process.env.FRONTEND_URL || '').trim();
-    const cadastro = frontendUrl ? ` Você pode se cadastrar em ${frontendUrl}/cadastro.` : '';
-    return {
-      handled: true,
-      replyText: `Para gerar o link, preciso do seu cadastro.${cadastro} Se preferir, me informe seu CPF e e‑mail para localizar sua conta.`,
-    };
+    // Verificar se a mensagem contém CPF e email para cadastro automático
+    const { cpf, email } = extractCpfAndEmail(messageText);
+
+    if (cpf && email && isValidCpfFormat(cpf) && isValidEmail(email)) {
+      // Tentar cadastrar o cliente automaticamente
+      try {
+        const nomeCliente = `Cliente WhatsApp ${phone.slice(-4)}`; // Nome temporário baseado no telefone
+        const senhaGerada = generateSecurePassword();
+
+        const resultadoCadastro = await criarCliente({
+          email,
+          senha: senhaGerada,
+          nomeCompleto: nomeCliente,
+          cpf,
+          telefone: phone,
+        });
+
+        console.log(`[WhatsApp] Cliente cadastrado automaticamente: ${resultadoCadastro.usuarioId}`);
+
+        // Buscar o cliente recém-criado
+        cliente = await findClienteByPhone(phone);
+
+        if (cliente) {
+          // Enviar mensagem com as credenciais
+          const mensagemCredenciais = `✅ Cadastro realizado com sucesso!\n\n` +
+            `📧 Email: ${email}\n` +
+            `🔑 Senha temporária: ${senhaGerada}\n\n` +
+            `⚠️ Guarde essas informações! Você pode alterar a senha no app ou site.\n\n` +
+            `Agora posso gerar seu link de pagamento.`;
+
+          // Enviar mensagem separada com credenciais primeiro
+          await sendMessage(phone, mensagemCredenciais);
+
+          // Continuar com o fluxo normal
+        } else {
+          throw new Error('Falha ao buscar cliente recém-cadastrado');
+        }
+      } catch (error) {
+        console.error('[WhatsApp] Erro no cadastro automático:', error);
+        const frontendUrl = (process.env.FRONTEND_URL || '').trim();
+        const cadastro = frontendUrl ? ` Você pode se cadastrar em ${frontendUrl}/cadastro.` : '';
+        return {
+          handled: true,
+          replyText: `Não consegui fazer seu cadastro automático. Verifique se o CPF e email estão corretos.${cadastro}`,
+        };
+      }
+    } else {
+      const frontendUrl = (process.env.FRONTEND_URL || '').trim();
+      const cadastro = frontendUrl ? ` Você pode se cadastrar em ${frontendUrl}/cadastro.` : '';
+      return {
+        handled: true,
+        replyText: `Para gerar o link, preciso do seu cadastro.${cadastro} Se preferir, me informe seu CPF e e‑mail para localizar sua conta.`,
+      };
+    }
   }
 
   const inicio = new Date(startDate);

@@ -85,6 +85,68 @@ class ReservationDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
+            // Dados do Cliente
+            if (reserva.cliente != null) ...[
+              Text('Dados do Locatário', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              DCCard(
+                child: Column(
+                  children: [
+                    _buildInfoRow(
+                      context,
+                      Symbols.person,
+                      'Nome',
+                      reserva.cliente!.nomeCompleto,
+                    ),
+                    const Divider(height: 24),
+                    _buildInfoRow(
+                      context,
+                      Symbols.email,
+                      'E-mail',
+                      reserva.cliente!.usuario?.email ?? 'N/A',
+                    ),
+                    if (reserva.cliente!.cpf != null) ...[
+                      const Divider(height: 24),
+                      _buildInfoRow(
+                        context,
+                        Symbols.badge,
+                        'CPF',
+                        reserva.cliente!.cpf,
+                      ),
+                    ],
+                    if (reserva.cliente!.telefone != null) ...[
+                      const Divider(height: 24),
+                      _buildInfoRow(
+                        context,
+                        Symbols.phone,
+                        'Telefone',
+                        reserva.cliente!.telefone!,
+                      ),
+                    ],
+                    if (reserva.cliente!.rg != null) ...[
+                      const Divider(height: 24),
+                      _buildInfoRow(
+                        context,
+                        Symbols.badge,
+                        'RG',
+                        reserva.cliente!.rg!,
+                      ),
+                    ],
+                    if (reserva.cliente!.cnh != null) ...[
+                      const Divider(height: 24),
+                      _buildInfoRow(
+                        context,
+                        Symbols.drive_eta,
+                        'CNH',
+                        reserva.cliente!.cnh!,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+
             // Datas e Locais
             Text('Retirada e Devolução', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),

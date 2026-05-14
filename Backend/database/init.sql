@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS veiculo (
 
 -- ──────────────────────────────────────────────
 -- ITENS / ACESSÓRIOS DO VEÍCULO
--- ──────────────────────────────────────────────
+-- ─────────────────────────────────────────faça com que o bot de whatsapp consiga cadastrar clientes, bastando pedir cpf e email─────
 CREATE TABLE IF NOT EXISTS item (
     id SERIAL PRIMARY KEY,
     nome VARCHAR(100) UNIQUE NOT NULL

@@ -7,7 +7,9 @@ class Cliente {
   final String cpf;
   final String? rg;
   final String? cnh;
+  final String? telefone;
   final DateTime criadoEm;
+  final DateTime? deletadoEm;
 
   // Campos de JOIN
   final Usuario? usuario;
@@ -19,7 +21,9 @@ class Cliente {
     required this.cpf,
     this.rg,
     this.cnh,
+    this.telefone,
     required this.criadoEm,
+    this.deletadoEm,
     this.usuario,
   });
 
@@ -31,7 +35,9 @@ class Cliente {
       cpf: json['cpf'],
       rg: json['rg'],
       cnh: json['cnh'],
+      telefone: json['telefone'],
       criadoEm: DateTime.parse(json['criado_em']),
+      deletadoEm: json['deletado_em'] != null ? DateTime.parse(json['deletado_em']) : null,
       usuario: json['usuario'] != null ? Usuario.fromJson(json['usuario']) : null,
     );
   }
@@ -44,7 +50,9 @@ class Cliente {
       'cpf': cpf,
       'rg': rg,
       'cnh': cnh,
+      'telefone': telefone,
       'criado_em': criadoEm.toIso8601String(),
+      'deletado_em': deletadoEm?.toIso8601String(),
     };
   }
 }

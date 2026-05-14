@@ -67,6 +67,7 @@ interface CriarClienteParams {
   cpf: string;
   rg?: string;
   cnh?: string;
+  telefone?: string;
 }
 
 interface CriarGerenteParams {
@@ -99,8 +100,8 @@ export async function criarCliente(params: CriarClienteParams): Promise<{ usuari
     const usuarioId: string = usuarioRes.rows[0].id;
 
     const clienteRes = await client.query(
-      `INSERT INTO cliente (usuario_id, nome_completo, cpf, rg, cnh) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [usuarioId, params.nomeCompleto, params.cpf, params.rg ?? null, params.cnh ?? null],
+      `INSERT INTO cliente (usuario_id, nome_completo, cpf, rg, cnh, telefone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [usuarioId, params.nomeCompleto, params.cpf, params.rg ?? null, params.cnh ?? null, params.telefone ?? null],
     );
     const clienteId: string = clienteRes.rows[0].id;
 

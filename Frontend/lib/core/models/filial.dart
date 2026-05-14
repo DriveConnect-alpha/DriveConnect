@@ -9,6 +9,8 @@ class Filial {
   final String? numero;
   final String? complemento;
   final bool ativo;
+  final DateTime criadoEm;
+  final DateTime? deletadoEm;
 
   Filial({
     required this.id,
@@ -21,6 +23,8 @@ class Filial {
     this.numero,
     this.complemento,
     required this.ativo,
+    required this.criadoEm,
+    this.deletadoEm,
   });
 
   factory Filial.fromJson(Map<String, dynamic> json) {
@@ -35,6 +39,8 @@ class Filial {
       numero: json['numero'],
       complemento: json['complemento'],
       ativo: json['ativo'] ?? true,
+      criadoEm: DateTime.parse(json['criado_em']),
+      deletadoEm: json['deletado_em'] != null ? DateTime.parse(json['deletado_em']) : null,
     );
   }
 
@@ -50,6 +56,8 @@ class Filial {
       'numero': numero,
       'complemento': complemento,
       'ativo': ativo,
+      'criado_em': criadoEm.toIso8601String(),
+      'deletado_em': deletadoEm?.toIso8601String(),
     };
   }
 }

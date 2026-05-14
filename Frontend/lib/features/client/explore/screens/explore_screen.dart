@@ -119,12 +119,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                   decoration: BoxDecoration(
                                     color: theme.colorScheme.surfaceVariant,
                                     borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                                    image: DecorationImage(
-                                      image: veiculo.capaUrl != null
-                                        ? NetworkImage('$apiBaseUrl/storage/carros/${veiculo.capaUrl}')
-                                        : const NetworkImage('https://placehold.co/600x400/png?text=Sem+Imagem'),
-                                      fit: BoxFit.cover,
-                                    ),
+                                     image: DecorationImage(
+                                       image: veiculo.imagemUrl != null
+                                         ? NetworkImage('$apiBaseUrl/storage/carros/${veiculo.imagemUrl}')
+                                         : const NetworkImage('https://placehold.co/600x400/png?text=Sem+Imagem'),
+                                       fit: BoxFit.cover,
+                                     ),
                                   ),
                                 ),
                                 Positioned(

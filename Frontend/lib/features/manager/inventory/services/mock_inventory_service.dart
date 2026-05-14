@@ -12,6 +12,7 @@ class MockInventoryService implements IInventoryService {
         placa: 'ABC-1234',
         ano: 2023,
         status: 'DISPONIVEL',
+        criadoEm: DateTime.now(),
         modelo: Modelo(id: 1, nome: 'Corolla', marca: 'Toyota'),
       ),
     ];

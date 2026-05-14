@@ -13,6 +13,7 @@ class MockExploreService implements IExploreService {
         placa: 'ABC-1234',
         ano: 2023,
         status: 'DISPONIVEL',
+        criadoEm: DateTime.now(),
         modelo: Modelo(
           id: 1,
           nome: 'Corolla',
@@ -25,6 +26,7 @@ class MockExploreService implements IExploreService {
         placa: 'XYZ-5678',
         ano: 2022,
         status: 'DISPONIVEL',
+        criadoEm: DateTime.now(),
         modelo: Modelo(
           id: 2,
           nome: 'Compass',

@@ -10,7 +10,9 @@ class Veiculo {
   final String? cor;
   final String status; // 'DISPONIVEL' | 'ALUGADO' | 'MANUTENCAO'
   final String? imagemUrl;
-  final String? capaUrl;
+  final double? precoDiaria;
+  final DateTime criadoEm;
+  final DateTime? deletadoEm;
 
   // Campos JOIN
   final Modelo? modelo;
@@ -25,7 +27,9 @@ class Veiculo {
     this.cor,
     required this.status,
     this.imagemUrl,
-    this.capaUrl,
+    this.precoDiaria,
+    required this.criadoEm,
+    this.deletadoEm,
     this.modelo,
     this.filial,
   });
@@ -40,7 +44,9 @@ class Veiculo {
       cor: json['cor'],
       status: json['status'],
       imagemUrl: json['imagem_url'],
-      capaUrl: json['capa_url'],
+      precoDiaria: json['preco_diaria'] != null ? (json['preco_diaria'] as num).toDouble() : null,
+      criadoEm: DateTime.parse(json['criado_em']),
+      deletadoEm: json['deletado_em'] != null ? DateTime.parse(json['deletado_em']) : null,
       modelo: json['modelo'] != null ? Modelo.fromJson(json['modelo']) : null,
       filial: json['filial'] != null ? Filial.fromJson(json['filial']) : null,
     );
@@ -56,6 +62,9 @@ class Veiculo {
       'cor': cor,
       'status': status,
       'imagem_url': imagemUrl,
+      'preco_diaria': precoDiaria,
+      'criado_em': criadoEm.toIso8601String(),
+      'deletado_em': deletadoEm?.toIso8601String(),
     };
   }
 }

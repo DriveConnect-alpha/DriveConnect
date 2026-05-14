@@ -123,6 +123,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
         ano: int.parse(_anoController.text),
         cor: _corController.text,
         status: 'DISPONIVEL',
+        criadoEm: DateTime.now(),
       );
 
       final success = await provider.addVehicle(

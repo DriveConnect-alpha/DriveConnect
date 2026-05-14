@@ -49,11 +49,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
-                  leading: veiculo.capaUrl != null
+                  leading: veiculo.imagemUrl != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: Image.network(
-                            '$apiBaseUrl/storage/carros/${veiculo.capaUrl}',
+                            '$apiBaseUrl/storage/carros/${veiculo.imagemUrl}',
                             width: 60,
                             height: 60,
                             fit: BoxFit.cover,

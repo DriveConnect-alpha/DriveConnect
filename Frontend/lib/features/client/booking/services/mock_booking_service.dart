@@ -56,6 +56,7 @@ class MockBookingService implements IBookingService {
           cor: 'Prata',
           ano: 2023,
           status: 'DISPONIVEL',
+          criadoEm: DateTime.now(),
           filialId: 'f1',
           modeloId: 1,
           modelo: Modelo(

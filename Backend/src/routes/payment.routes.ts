@@ -137,6 +137,15 @@ export async function statusPagamento(req: IncomingMessage, res: ServerResponse,
     return;
   }
 
+  // Se o status já estiver confirmado e a notificação do WhatsApp ainda não tiver acontecido
+  // (por exemplo: webhook perdido), tenta notificar no caminho de polling também.
+  const status = String(resultado.rows[0]?.status || '');
+  if (status === 'RESERVADA') {
+    void notifyPaymentConfirmed(reservaId).catch((err) => {
+      console.error('[Pagamento] Falha ao notificar WhatsApp (polling):', err);
+    });
+  }
+
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(resultado.rows[0]));
 }

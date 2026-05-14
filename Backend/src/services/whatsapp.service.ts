@@ -574,22 +574,18 @@ async function tryHandleReservationIntent(params: {
         handled: true,
         replyText: mensagemCredenciais,
       };
-    } catch (error) {
-      console.error('[WhatsApp] Erro no cadastro automático via reserva:', error);
-      const frontendUrl = (process.env.FRONTEND_URL || '').trim();
-      const cadastro = frontendUrl ? ` Você pode se cadastrar em ${frontendUrl}/cadastro.` : '';
-      return {
-        handled: true,
-        replyText: `Olá! Vejo que você quer alugar um carro, mas preciso do seu cadastro primeiro.${cadastro} Se preferir, me informe seu CPF e e‑mail para fazer o cadastro automático.`,
-      };
-    }
+     } catch (error) {
+       console.error('[WhatsApp] Erro no cadastro automático via reserva:', error);
+       return {
+         handled: true,
+         replyText: `Olá! Vejo que você quer alugar um carro, mas preciso do seu cadastro primeiro. Me informe seu CPF e e‑mail para fazer o cadastro automático.`,
+       };
+     }
   } else {
     // Cliente não cadastrado e não forneceu dados suficientes
-    const frontendUrl = (process.env.FRONTEND_URL || '').trim();
-    const cadastro = frontendUrl ? ` Você pode se cadastrar em ${frontendUrl}/cadastro.` : '';
     return {
       handled: true,
-      replyText: `Olá! Vejo que você quer alugar um carro, mas preciso do seu cadastro primeiro.${cadastro} Se preferir, me informe seu CPF e e‑mail para fazer o cadastro automático.`,
+      replyText: `Olá! Vejo que você quer alugar um carro, mas preciso do seu cadastro primeiro. Me informe seu CPF e e‑mail para fazer o cadastro automático.`,
     };
   }
 }
@@ -675,21 +671,17 @@ async function tryHandlePaymentIntent(params: {
         } else {
           throw new Error('Falha ao buscar cliente recém-cadastrado');
         }
-      } catch (error) {
-        console.error('[WhatsApp] Erro no cadastro automático:', error);
-        const frontendUrl = (process.env.FRONTEND_URL || '').trim();
-        const cadastro = frontendUrl ? ` Você pode se cadastrar em ${frontendUrl}/cadastro.` : '';
-        return {
-          handled: true,
-          replyText: `Não consegui fazer seu cadastro automático. Verifique se o CPF e email estão corretos.${cadastro}`,
-        };
-      }
+       } catch (error) {
+         console.error('[WhatsApp] Erro no cadastro automático:', error);
+         return {
+           handled: true,
+           replyText: `Não consegui fazer seu cadastro automático. Verifique se o CPF e email estão corretos.`,
+         };
+       }
     } else {
-      const frontendUrl = (process.env.FRONTEND_URL || '').trim();
-      const cadastro = frontendUrl ? ` Você pode se cadastrar em ${frontendUrl}/cadastro.` : '';
       return {
         handled: true,
-        replyText: `Para gerar o link, preciso do seu cadastro.${cadastro} Se preferir, me informe seu CPF e e‑mail para localizar sua conta.`,
+        replyText: `Para gerar o link, preciso do seu cadastro. Se preferir, me informe seu CPF e e‑mail para localizar sua conta.`,
       };
     }
   }

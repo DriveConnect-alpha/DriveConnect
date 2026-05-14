@@ -56,7 +56,7 @@ export async function listarVeiculos(filialId?: string): Promise<any[]> {
             'nome', m.nome,
             'marca', m.marca,
             'tipo_carro_id', m.tipo_carro_id,
-            'tipo', CASE WHEN tc.id IS NOT NULL THEN json_build_object(
+            'tipo_carro', CASE WHEN tc.id IS NOT NULL THEN json_build_object(
                 'id', tc.id,
                 'nome', tc.nome,
                 'preco_base_diaria', tc.preco_base_diaria
@@ -65,8 +65,16 @@ export async function listarVeiculos(filialId?: string): Promise<any[]> {
         json_build_object(
             'id', f.id,
             'nome', f.nome,
+            'cep', f.cep,
+            'uf', f.uf,
             'cidade', f.cidade,
-            'uf', f.uf
+            'bairro', f.bairro,
+            'rua', f.rua,
+            'numero', f.numero,
+            'complemento', f.complemento,
+            'ativo', f.ativo,
+            'criado_em', f.criado_em,
+            'deletado_em', f.deletado_em
         ) as filial
     FROM veiculo v
     LEFT JOIN modelo m ON v.modelo_id = m.id

@@ -4,6 +4,8 @@ class Usuario {
   final String nome;
   final String tipo; // 'CLIENTE' | 'GERENTE' | 'ADMIN'
   final String? perfilId;
+  /// Filial do gerente (null para cliente, admin ou gerente global).
+  final String? filialId;
   final DateTime criadoEm;
 
   Usuario({
@@ -12,17 +14,21 @@ class Usuario {
     required this.nome,
     required this.tipo,
     this.perfilId,
+    this.filialId,
     required this.criadoEm,
   });
 
   factory Usuario.fromJson(Map<String, dynamic> json) {
     return Usuario(
-      id: json['id'],
-      email: json['email'],
-      nome: json['nome'] ?? 'Usuário',
-      tipo: json['tipo'],
-      perfilId: json['perfilId'],
-      criadoEm: DateTime.parse(json['criado_em']),
+      id: json['id'] as String,
+      email: json['email'] as String,
+      nome: json['nome'] as String? ?? 'Usuário',
+      tipo: json['tipo'] as String,
+      perfilId: json['perfilId'] as String? ?? json['perfil_id'] as String?,
+      filialId: json['filialId'] as String? ?? json['filial_id'] as String?,
+      criadoEm: json['criado_em'] != null
+          ? DateTime.parse(json['criado_em'] as String)
+          : DateTime.now(),
     );
   }
 
@@ -33,6 +39,7 @@ class Usuario {
       'nome': nome,
       'tipo': tipo,
       'perfilId': perfilId,
+      'filialId': filialId,
       'criado_em': criadoEm.toIso8601String(),
     };
   }

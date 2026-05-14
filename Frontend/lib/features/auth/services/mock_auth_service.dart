@@ -15,6 +15,8 @@ class MockAuthService implements IAuthService {
           nome: isActuallyAdmin ? 'Administrador do Sistema' : 'Gerente da Filial',
           email: email,
           tipo: isActuallyAdmin ? 'ADMIN' : 'GERENTE',
+          perfilId: isActuallyAdmin ? null : 'g1',
+          filialId: isActuallyAdmin ? null : 'f1',
           criadoEm: DateTime.now(),
         ),
       };
@@ -26,6 +28,8 @@ class MockAuthService implements IAuthService {
           nome: 'Nome do Cliente',
           email: email,
           tipo: 'CLIENTE',
+          perfilId: 'c1',
+          filialId: null,
           criadoEm: DateTime.now(),
         ),
       };
@@ -54,6 +58,8 @@ class MockAuthService implements IAuthService {
       nome: nomeCompleto,
       email: email,
       tipo: 'CLIENTE',
+      perfilId: id,
+      filialId: null,
       criadoEm: DateTime.now(),
     );
   }

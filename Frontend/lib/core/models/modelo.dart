@@ -21,10 +21,16 @@ class Modelo {
       nome: json['nome'],
       marca: json['marca'],
       tipoCarroId: json['tipo_carro_id'],
-      tipoCarro: json['tipo_carro'] != null
-          ? TipoCarro.fromJson(json['tipo_carro'])
-          : null,
+      tipoCarro: Modelo._tipoCarroFromJson(json),
     );
+  }
+
+  /// Aceita `tipo_carro` (API de modelos / veículos) ou `tipo` (legado).
+  static TipoCarro? _tipoCarroFromJson(Map<String, dynamic> json) {
+    final raw = json['tipo_carro'] ?? json['tipo'];
+    if (raw == null) return null;
+    if (raw is Map<String, dynamic>) return TipoCarro.fromJson(raw);
+    return null;
   }
 
   Map<String, dynamic> toJson() {

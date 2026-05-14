@@ -72,6 +72,7 @@ import {
   buscarMeuPerfil,
   editarCliente,
   editarMeuPerfil,
+  desativarMinhaContaCliente,
   trocarSenha,
   deletarUsuario,
 } from './routes/usuario.routes.js';
@@ -228,6 +229,7 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   // /clientes/me deve vir ANTES de /clientes/:id para não ser capturado pelo regex
   if (method === 'GET' && path === '/usuarios/clientes/me') return buscarMeuPerfil(req, res);
   if (method === 'PUT' && path === '/usuarios/clientes/me') return editarMeuPerfil(req, res);
+  if (method === 'DELETE' && path === '/usuarios/clientes/me') return desativarMinhaContaCliente(req, res);
 
   const matchCliente = path.match(/^\/usuarios\/clientes\/([^/]+)$/);
   if (matchCliente) {

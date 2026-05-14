@@ -47,6 +47,9 @@ export interface ReservaResumo {
         capa_url?: string | null;
         filial_id?: string;
         modelo_id?: number;
+        criado_em?: string;
+        deletado_em?: string | null;
+        preco_diaria?: number | null;
         modelo?: {
             id?: number;
             nome: string;
@@ -103,6 +106,9 @@ const SQL_SELECT_RESERVA = `
         v.cor AS veiculo_cor,
         v.status AS veiculo_status,
         v.imagem_url AS veiculo_imagem_url,
+        v.criado_em AS veiculo_criado_em,
+        v.deletado_em AS veiculo_deletado_em,
+        v.preco_diaria AS veiculo_preco_diaria,
         v.filial_id AS veiculo_filial_id,
         m.id AS modelo_id,
         m.nome AS modelo_nome_raw,
@@ -177,6 +183,13 @@ function _mapearLinha(row: Record<string, unknown>): ReservaResumo {
             capa_url: null, // Campo não existe no banco, mas mantido como null para o modelo Frontend
             filial_id: row.veiculo_filial_id as string,
             modelo_id: row.modelo_id as number,
+            criado_em: row.veiculo_criado_em
+                ? new Date(row.veiculo_criado_em as string | Date).toISOString()
+                : new Date().toISOString(),
+            deletado_em: row.veiculo_deletado_em
+                ? new Date(row.veiculo_deletado_em as string | Date).toISOString()
+                : null,
+            preco_diaria: row.veiculo_preco_diaria != null ? Number(row.veiculo_preco_diaria) : null,
             modelo: {
                 id: row.modelo_id as number,
                 nome: row.modelo_nome_raw as string,

@@ -18,6 +18,11 @@ class InventoryProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
   Future<void> fetchInventory() async {
     _isLoading = true;
     _error = null;

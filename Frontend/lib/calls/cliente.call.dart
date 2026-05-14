@@ -126,4 +126,23 @@ class ClienteCall {
       onError(e.toString());
     }
   }
+
+  /// Desativa a conta do cliente autenticado (soft delete de usuário + cliente).
+  /// ROUTE: DELETE /usuarios/clientes/me
+  /// AUTH: required (CLIENTE)
+  static Future<void> desativarMinhaConta({
+    required void Function(String mensagem) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.delete<Map<String, dynamic>>(
+        '/usuarios/clientes/me',
+      );
+      onSuccess(response.data!['mensagem'] as String? ?? 'Conta desativada.');
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
 }

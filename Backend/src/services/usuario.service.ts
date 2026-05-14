@@ -21,6 +21,8 @@ export interface UsuarioAutenticado {
   email: string;
   tipo: TipoUsuario;
   perfilId: string | null;
+  /** Filial do gerente (null = global ou não-gerente). Usado no JWT para escopo de dados. */
+  filialId: string | null;
 }
 
 /**
@@ -39,21 +41,19 @@ export async function autenticarUsuario(payload: LoginPayload): Promise<UsuarioA
   const senhaCorreta = await verificarHash(row.senha, payload.senha);
   if (!senhaCorreta) throw new Error('Credenciais inválidas.');
 
-  const perfilId = await buscarPerfilId(row.id, row.tipo);
+  let perfilId: string | null = null;
+  let filialId: string | null = null;
 
-  return { id: row.id, email: row.email, tipo: row.tipo, perfilId };
-}
+  if (row.tipo === 'CLIENTE') {
+    const r = await query(`SELECT id FROM cliente WHERE usuario_id = $1`, [row.id]);
+    perfilId = r.rows[0]?.id ?? null;
+  } else if (row.tipo === 'GERENTE') {
+    const r = await query(`SELECT id, filial_id FROM gerente WHERE usuario_id = $1`, [row.id]);
+    perfilId = r.rows[0]?.id ?? null;
+    filialId = r.rows[0]?.filial_id ?? null;
+  }
 
-async function buscarPerfilId(usuarioId: string, tipo: TipoUsuario): Promise<string | null> {
-  if (tipo === 'CLIENTE') {
-    const r = await query(`SELECT id FROM cliente WHERE usuario_id = $1`, [usuarioId]);
-    return r.rows[0]?.id ?? null;
-  }
-  if (tipo === 'GERENTE') {
-    const r = await query(`SELECT id FROM gerente WHERE usuario_id = $1`, [usuarioId]);
-    return r.rows[0]?.id ?? null;
-  }
-  return null; // ADMIN não tem perfil separado
+  return { id: row.id, email: row.email, tipo: row.tipo, perfilId, filialId };
 }
 
 // ──────────────────────────────────────────────

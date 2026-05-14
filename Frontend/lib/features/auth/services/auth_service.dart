@@ -20,9 +20,10 @@ class AuthService implements IAuthService {
             email: userData['email'] ?? '',
             nome: userData['nome'] ?? 'Usuário',
             tipo: userData['tipo'] ?? 'CLIENTE',
-            perfilId: userData['perfilId'],
+            perfilId: userData['perfilId'] as String?,
+            filialId: userData['filialId'] as String?,
             criadoEm: userData['criado_em'] != null
-                ? DateTime.parse(userData['criado_em'])
+                ? DateTime.parse(userData['criado_em'] as String)
                 : DateTime.now(),
           ),
         });
@@ -72,13 +73,14 @@ class AuthService implements IAuthService {
       nomeCompleto: nomeCompleto,
       onSuccess: (data) {
         completer.complete(Usuario(
-          id: data['usuario_id'] ?? id,
+          id: data['usuario_id'] as String? ?? id,
           email: email,
-          nome: data['nome_completo'] ?? nomeCompleto,
+          nome: data['nome_completo'] as String? ?? nomeCompleto,
           tipo: 'CLIENTE',
-          perfilId: data['id'] ?? id,
+          perfilId: data['id'] as String? ?? id,
+          filialId: null,
           criadoEm: data['criado_em'] != null
-              ? DateTime.parse(data['criado_em'])
+              ? DateTime.parse(data['criado_em'] as String)
               : DateTime.now(),
         ));
       },
@@ -94,9 +96,7 @@ class AuthService implements IAuthService {
   Future<void> deleteAccount(String id) async {
     final completer = Completer<void>();
 
-    await UserCall.trocarSenha(
-      usuarioId: id,
-      novaSenha: '',
+    await ClienteCall.desativarMinhaConta(
       onSuccess: (_) => completer.complete(),
       onError: (msg) => completer.completeError(Exception(msg)),
     );

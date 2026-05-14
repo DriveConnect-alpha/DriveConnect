@@ -104,8 +104,8 @@ class ProfileScreen extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Excluir Conta'),
         content: const Text(
-          'Tem certeza que deseja excluir permanentemente sua conta? '
-          'Esta ação não pode ser desfeita e você perderá acesso a todo o seu histórico.',
+          'Tem certeza que deseja desativar sua conta? '
+          'Você perderá o acesso ao aplicativo e aos dados vinculados a este perfil.',
         ),
         actions: [
           TextButton(

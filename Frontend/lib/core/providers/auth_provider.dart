@@ -40,6 +40,7 @@ class AuthProvider extends ChangeNotifier {
           usuarioId: _user!.id,
           tipo: _user!.tipo,
           perfilId: _user!.perfilId,
+          filialId: _user!.filialId,
         );
       } catch (_) {
         _token = null;

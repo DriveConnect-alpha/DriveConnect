@@ -56,6 +56,7 @@ class UserCall {
         usuarioId: userData['id'] as String,
         tipo: userData['tipo'] as String,
         perfilId: userData['perfilId'] as String?,
+        filialId: userData['filialId'] as String?,
       );
       
       onSuccess(userData);

@@ -44,6 +44,9 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<InventoryProvider>().clearError();
+    });
     _loadInitialData();
   }
 

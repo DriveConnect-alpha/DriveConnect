@@ -101,7 +101,12 @@ export async function login(req: IncomingMessage, res: ServerResponse): Promise<
     }
 
     const usuario = await autenticarUsuario({ email, senha });
-    const token = gerarToken({ id: usuario.id, email: usuario.email, tipo: usuario.tipo });
+    const token = gerarToken({
+      id: usuario.id,
+      email: usuario.email,
+      tipo: usuario.tipo,
+      filialId: usuario.filialId,
+    });
 
     responder(res, 200, { token, ...usuario });
   } catch (err) {
@@ -261,6 +266,22 @@ export async function editarMeuPerfil(req: IncomingMessage, res: ServerResponse)
     if (!atualizado) { responder(res, 400, { erro: 'Nenhum campo válido para atualizar.' }); return; }
 
     responder(res, 200, atualizado);
+  } catch (err) {
+    await tratarErro(res, err);
+  }
+}
+
+// ──────────────────────────────────────────────
+// DELETE /usuarios/clientes/me
+// Acesso: CLIENTE (desativa a própria conta e o perfil de cliente)
+// ──────────────────────────────────────────────
+export async function desativarMinhaContaCliente(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  try {
+    const caller = requireCaller(req);
+    requireTipo(caller, 'CLIENTE');
+
+    await desativarUsuario(caller.usuarioId);
+    responder(res, 200, { mensagem: 'Conta desativada com sucesso.' });
   } catch (err) {
     await tratarErro(res, err);
   }

@@ -7,7 +7,7 @@ dotenv.config();
 const { Pool } = pg;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/driveconnect',
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/driveconnect',
 });
 
 // Helpers para geração de dados
@@ -128,6 +128,17 @@ async function seed() {
       }
     }
     console.log(`✅ ${modeloIds.length} Modelos prontos.`);
+
+    // 5.5. Itens de Veículo
+    console.log('🔌 Criando itens opcionais...');
+    const itensData = [
+      'Ar Condicionado', 'Direção Hidráulica', 'Vidros Elétricos', 'Trava Elétrica',
+      'Airbag', 'ABS', 'Som Bluetooth', 'Sensor de Estacionamento', 'Câmera de Ré'
+    ];
+    for (const itemNome of itensData) {
+      await client.query("INSERT INTO item (nome) VALUES ($1) ON CONFLICT (nome) DO NOTHING", [itemNome]);
+    }
+    console.log('✅ Itens opcionais criados.');
 
     // 6. Clientes (10)
     console.log('👥 Criando clientes...');

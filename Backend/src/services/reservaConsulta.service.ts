@@ -41,7 +41,12 @@ export interface ReservaResumo {
         id: string;
         placa: string;
         ano?: number;
+        cor?: string;
         status?: string;
+        imagem_url?: string | null;
+        capa_url?: string | null;
+        filial_id?: string;
+        modelo_id?: number;
         modelo?: {
             id?: number;
             nome: string;

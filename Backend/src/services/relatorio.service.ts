@@ -36,7 +36,7 @@ async function validarDataInicio(dataInicio: string, filialId: string | null): P
 
     if (dataIn < criadoEm) {
         // Em vez de erro, retornamos a data de criação como início efetivo
-        return criadoEm.toISOString().split('T')[0];
+        return criadoEm.toISOString().split('T')[0] as string;
     }
     return dataInicio;
 }
@@ -217,8 +217,8 @@ export async function obterResumo(caller: Caller) {
 
     // 3. Faturamento Mensal (mês atual)
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0] as string;
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0] as string;
     const resFat = await obterFaturamento(caller, startOfMonth, endOfMonth, filialParam);
 
     // 4. Novos Clientes (mês atual)

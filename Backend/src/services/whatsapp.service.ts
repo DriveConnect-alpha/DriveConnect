@@ -404,8 +404,14 @@ function extractPtBrLongDates(messageText: string): { startDate: string | null; 
   // Range compacto: "15 a 16 de maio de 2026"
   const range = t.match(/\b(\d{1,2})\s*(?:a|ate|até|e|-|–|—)\s*(\d{1,2})\s*de\s*(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*de\s*(20\d{2})\b/);
   if (range) {
-    const startDate = toIso(range[1], range[3], range[4]);
-    const endDate = toIso(range[2], range[3], range[4]);
+    const ddStart = range[1];
+    const ddEnd = range[2];
+    const monthName = range[3];
+    const yyyy = range[4];
+    if (!ddStart || !ddEnd || !monthName || !yyyy) return { startDate: null, endDate: null };
+
+    const startDate = toIso(ddStart, monthName, yyyy);
+    const endDate = toIso(ddEnd, monthName, yyyy);
     return { startDate, endDate };
   }
 
@@ -418,7 +424,9 @@ function extractPtBrLongDates(messageText: string): { startDate: string | null; 
     if (dates.length >= 2) break;
   }
   if (dates.length >= 1) {
-    return { startDate: dates[0], endDate: dates[1] ?? dates[0] };
+    const startDate = dates[0] ?? null;
+    const endDate = (dates[1] ?? dates[0]) ?? null;
+    return { startDate, endDate };
   }
 
   return { startDate: null, endDate: null };

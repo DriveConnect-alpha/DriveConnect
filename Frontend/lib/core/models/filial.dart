@@ -9,7 +9,7 @@ class Filial {
   final String? numero;
   final String? complemento;
   final bool ativo;
-  final DateTime criadoEm;
+  final DateTime? criadoEm;
   final DateTime? deletadoEm;
 
   Filial({
@@ -23,7 +23,7 @@ class Filial {
     this.numero,
     this.complemento,
     required this.ativo,
-    required this.criadoEm,
+    this.criadoEm,
     this.deletadoEm,
   });
 
@@ -39,7 +39,7 @@ class Filial {
       numero: json['numero'],
       complemento: json['complemento'],
       ativo: json['ativo'] ?? true,
-      criadoEm: DateTime.parse(json['criado_em']),
+      criadoEm: json['criado_em'] != null ? DateTime.parse(json['criado_em']) : null,
       deletadoEm: json['deletado_em'] != null ? DateTime.parse(json['deletado_em']) : null,
     );
   }
@@ -56,8 +56,8 @@ class Filial {
       'numero': numero,
       'complemento': complemento,
       'ativo': ativo,
-      'criado_em': criadoEm.toIso8601String(),
-      'deletado_em': deletadoEm?.toIso8601String(),
+      if (criadoEm != null) 'criado_em': criadoEm!.toIso8601String(),
+      if (deletadoEm != null) 'deletado_em': deletadoEm!.toIso8601String(),
     };
   }
 }

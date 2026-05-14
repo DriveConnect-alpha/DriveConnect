@@ -73,6 +73,19 @@ const cache = new Map<string, Cached<any>>();
 
 type HistoryMessage = { role: 'user' | 'assistant'; content: string };
 
+type RegistrationDraft = { cpf: string | null; email: string | null; expiresAt: number };
+const REGISTRATION_TTL_MS = Number.parseInt(process.env.WHATSAPP_REGISTRATION_TTL_MS || '900000', 10); // 15 min
+const registrationDrafts = new Map<string, RegistrationDraft>();
+
+function cleanupRegistrationDrafts(): void {
+  const now = Date.now();
+  for (const [key, value] of registrationDrafts.entries()) {
+    if (now > value.expiresAt) registrationDrafts.delete(key);
+  }
+}
+
+setInterval(cleanupRegistrationDrafts, Math.max(30_000, Math.floor(REGISTRATION_TTL_MS / 2))).unref();
+
 function setCache<T>(key: string, value: T, ttlMs: number): void {
   cache.set(key, { value, expiresAt: Date.now() + ttlMs });
 }
@@ -198,6 +211,27 @@ export async function processIncomingMessage(payload: any): Promise<void> {
   }
 
   const history = await getConversationHistory(conversation.id, Number.parseInt(process.env.WHATSAPP_HISTORY_LIMIT || '12', 10));
+
+  // Cadastro automático: se o usuário enviar CPF e/ou email (mesmo sem mencionar "alugar")
+  // e ainda não existir cliente para esse telefone, tenta cadastrar/localizar.
+  const registrationResult = await tryHandleAutoRegistration({
+    messageText: text,
+    phone: from,
+    conversationId: conversation.id,
+    history,
+  });
+
+  if (registrationResult?.handled) {
+    const replyMessageId = await sendMessage(from, registrationResult.replyText);
+    await storeMessage({
+      conversationId: conversation.id,
+      direction: 'OUT',
+      waMessageId: replyMessageId,
+      text: registrationResult.replyText,
+      status: 'sent',
+    });
+    return;
+  }
 
   // Verificar se há intenção de reserva e cliente não cadastrado
   const reservationCheck = await tryHandleReservationIntent({
@@ -350,33 +384,30 @@ function isValidCpfFormat(cpf: string): boolean {
   return cleanCpf.length === 11 && /^\d{11}$/.test(cleanCpf);
 }
 
+function extractCpf(text: string): string | null {
+  const t = (text || '').trim();
+  const cpfPatterns = [
+    /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/, // 123.456.789-01
+    /\b\d{11}\b/, // 12345678901
+  ];
+  for (const pattern of cpfPatterns) {
+    const match = t.match(pattern);
+    if (match) return match[0].replace(/\D/g, '');
+  }
+  return null;
+}
+
+function extractEmail(text: string): string | null {
+  const t = (text || '').trim();
+  const emailMatch = t.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/i);
+  return emailMatch ? emailMatch[0] : null;
+}
+
 /**
  * Extrai CPF e email de uma mensagem de texto
  */
 function extractCpfAndEmail(text: string): { cpf: string | null; email: string | null } {
-  const t = text.trim();
-
-  // Extrair CPF - vários formatos possíveis
-  const cpfPatterns = [
-    /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/, // 123.456.789-01
-    /\b\d{11}\b/, // 12345678901
-    /\b\d{3}\d{3}\d{3}\d{2}\b/, // 12345678901 sem pontuação
-  ];
-
-  let cpf: string | null = null;
-  for (const pattern of cpfPatterns) {
-    const match = t.match(pattern);
-    if (match) {
-      cpf = match[0].replace(/\D/g, ''); // normalizar para apenas dígitos
-      break;
-    }
-  }
-
-  // Extrair email
-  const emailMatch = t.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/i);
-  const email = emailMatch ? emailMatch[0] : null;
-
-  return { cpf, email };
+  return { cpf: extractCpf(text), email: extractEmail(text) };
 }
 
 function looksLikeCardDataRequest(text: string): boolean {
@@ -522,6 +553,204 @@ async function findClienteByPhone(phone: string): Promise<{ id: string; nome: st
   } catch (err) {
     console.error('[WhatsApp] Erro buscando cliente por telefone:', err);
     return null;
+  }
+}
+
+async function findClienteByCpfOrEmail(params: { cpfDigits?: string | null; email?: string | null }): Promise<{ id: string; nome: string; email: string; telefone?: string | null } | null> {
+  const cpfDigits = params.cpfDigits ? params.cpfDigits.replace(/\D/g, '') : null;
+  const email = params.email ? String(params.email).trim() : null;
+  if (!cpfDigits && !email) return null;
+
+  try {
+    // CPF no banco é armazenado como 000.000.000-00, então comparamos pelos dígitos via regexp_replace.
+    const result = await query(
+      `SELECT c.id, c.nome_completo, u.email, c.telefone
+       FROM cliente c
+       JOIN usuario u ON u.id = c.usuario_id
+       WHERE ( $1::text IS NOT NULL AND regexp_replace(c.cpf, '\\D', '', 'g') = $1 )
+          OR ( $2::text IS NOT NULL AND lower(u.email) = lower($2) )
+       ORDER BY c.criado_em DESC
+       LIMIT 1`,
+      [cpfDigits, email],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return { id: row.id, nome: row.nome_completo, email: row.email, telefone: row.telefone ?? null };
+  } catch (err) {
+    console.error('[WhatsApp] Erro buscando cliente por CPF/email:', err);
+    return null;
+  }
+}
+
+async function updateClienteTelefoneIfNeeded(clienteId: string, phone: string): Promise<void> {
+  const normalized = normalizePhone(phone);
+  if (!clienteId || !normalized) return;
+  try {
+    await query(
+      `UPDATE cliente
+       SET telefone = $1
+       WHERE id = $2
+         AND (telefone IS NULL OR regexp_replace(telefone, '\\D', '', 'g') <> $1)`,
+      [normalized, clienteId],
+    );
+  } catch (err) {
+    console.error('[WhatsApp] Erro atualizando telefone do cliente:', err);
+  }
+}
+
+function historyAskedForCadastro(history: HistoryMessage[] | undefined): boolean {
+  if (!history || history.length === 0) return false;
+  const lastAssistant = [...history].reverse().find((m) => m.role === 'assistant')?.content?.toLowerCase() ?? '';
+  return (
+    lastAssistant.includes('cadastro') &&
+    lastAssistant.includes('cpf') &&
+    (lastAssistant.includes('e-mail') || lastAssistant.includes('email'))
+  );
+}
+
+function buildRecentUserContext(messageText: string, history: HistoryMessage[] | undefined, maxUserMessages = 4): string {
+  if (!history || history.length === 0) return messageText;
+  const recentUser = history.filter((m) => m.role === 'user').slice(-maxUserMessages).map((m) => m.content);
+  return [...recentUser, messageText].filter(Boolean).join(' ').trim() || messageText;
+}
+
+async function tryHandleAutoRegistration(params: {
+  messageText: string;
+  phone: string;
+  conversationId: string;
+  history?: HistoryMessage[];
+}): Promise<{ handled: boolean; replyText: string }> {
+  const { messageText, phone, history } = params;
+
+  const alreadyCliente = await findClienteByPhone(phone);
+  if (alreadyCliente) {
+    registrationDrafts.delete(phone);
+    return { handled: false, replyText: '' };
+  }
+
+  const cpfDigits = extractCpf(messageText);
+  const email = extractEmail(messageText);
+
+  const draft = registrationDrafts.get(phone);
+  const mergedCpf = cpfDigits ?? draft?.cpf ?? null;
+  const mergedEmail = email ?? draft?.email ?? null;
+
+  const shouldTrackDraft = Boolean(cpfDigits || email || historyAskedForCadastro(history));
+  if (shouldTrackDraft) {
+    registrationDrafts.set(phone, {
+      cpf: mergedCpf,
+      email: mergedEmail,
+      expiresAt: Date.now() + REGISTRATION_TTL_MS,
+    });
+  }
+
+  const hasBoth = Boolean(mergedCpf && mergedEmail);
+  const valid = Boolean(mergedCpf && mergedEmail && isValidCpfFormat(mergedCpf) && isValidEmail(mergedEmail));
+
+  // Só tenta cadastrar se:
+  // - ele forneceu CPF/email agora, OU
+  // - estamos no fluxo de cadastro (bot pediu antes) e já temos dados acumulados.
+  const shouldAttempt = valid && (Boolean(cpfDigits || email) || historyAskedForCadastro(history));
+  if (!shouldAttempt) return { handled: false, replyText: '' };
+
+  // Se já existir cliente com esse CPF/email, só vincula o telefone e segue.
+  const existing = await findClienteByCpfOrEmail({ cpfDigits: mergedCpf, email: mergedEmail });
+  if (existing) {
+    await updateClienteTelefoneIfNeeded(existing.id, phone);
+    registrationDrafts.delete(phone);
+
+    const contextText = buildRecentUserContext(messageText, history);
+    const { startDate, endDate } = extractDateRange(contextText);
+    const modelo = await detectModelo(contextText);
+    const filialId = await detectFilialId(contextText);
+
+    if (startDate && endDate && modelo && filialId) {
+      const inicio = new Date(startDate);
+      const fim = new Date(endDate);
+      const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, inicio, fim);
+      if (!veiculoId) {
+        return {
+          handled: true,
+          replyText: `Encontrei seu cadastro ✅\n\nNão encontrei disponibilidade para *${modelo.descricao}* nessas datas. Quer tentar outras datas ou outra categoria?`,
+        };
+      }
+      const valor = await calcularValorTotal(modelo.id, filialId, inicio, fim);
+      return {
+        handled: true,
+        replyText:
+          `Encontrei seu cadastro ✅\n\n` +
+          `Tenho disponibilidade para *${modelo.descricao}* de ${inicio.toLocaleDateString('pt-BR')} a ${fim.toLocaleDateString('pt-BR')}.\n` +
+          `Valor estimado: R$ ${Number(valor).toFixed(2)}.\n\n` +
+          `Quer que eu gere o link de pagamento? Responda *sim*.`,
+      };
+    }
+
+    return {
+      handled: true,
+      replyText: `Encontrei seu cadastro ✅\n\nAgora me informe o modelo do carro, a unidade (ex: Rio) e as datas (retirada e devolução).`,
+    };
+  }
+
+  try {
+    const nomeCliente = `Cliente WhatsApp ${phone.slice(-4)}`;
+    const senhaGerada = generateSecurePassword();
+
+    const resultadoCadastro = await criarCliente({
+      email: mergedEmail!,
+      senha: senhaGerada,
+      nomeCompleto: nomeCliente,
+      cpf: mergedCpf!,
+      telefone: phone,
+    });
+
+    console.log(`[WhatsApp] Cliente cadastrado automaticamente: ${resultadoCadastro.usuarioId}`);
+    registrationDrafts.delete(phone);
+
+    const contextText = buildRecentUserContext(messageText, history);
+    const { startDate, endDate } = extractDateRange(contextText);
+    const modelo = await detectModelo(contextText);
+    const filialId = await detectFilialId(contextText);
+
+    const baseCreds =
+      `✅ Cadastro realizado com sucesso!\n\n` +
+      `📧 Email: ${mergedEmail}\n` +
+      `🔑 Senha temporária: ${senhaGerada}\n\n` +
+      `⚠️ Guarde essas informações! Você pode alterar a senha no app ou site.\n\n`;
+
+    if (startDate && endDate && modelo && filialId) {
+      const inicio = new Date(startDate);
+      const fim = new Date(endDate);
+      const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, inicio, fim);
+      if (!veiculoId) {
+        return {
+          handled: true,
+          replyText: baseCreds + `Não encontrei disponibilidade para *${modelo.descricao}* nessas datas. Quer tentar outras datas ou outra categoria?`,
+        };
+      }
+      const valor = await calcularValorTotal(modelo.id, filialId, inicio, fim);
+      return {
+        handled: true,
+        replyText:
+          baseCreds +
+          `Tenho disponibilidade para *${modelo.descricao}* de ${inicio.toLocaleDateString('pt-BR')} a ${fim.toLocaleDateString('pt-BR')}.\n` +
+          `Valor estimado: R$ ${Number(valor).toFixed(2)}.\n\n` +
+          `Quer que eu gere o link de pagamento? Responda *sim*.`,
+      };
+    }
+
+    return {
+      handled: true,
+      replyText: baseCreds + `Agora posso te ajudar com sua reserva. Me informe o modelo do carro, unidade e datas (retirada e devolução).`,
+    };
+  } catch (error) {
+    console.error('[WhatsApp] Erro no cadastro automático:', error);
+    return {
+      handled: true,
+      replyText:
+        `Não consegui fazer seu cadastro automático.\n\n` +
+        `Envie assim (pode ser sem pontuação):\n` +
+        `cpf 00000000000\nemail nome@dominio.com`,
+    };
   }
 }
 

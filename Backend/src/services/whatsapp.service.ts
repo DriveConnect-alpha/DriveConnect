@@ -315,11 +315,23 @@ export async function processIncomingMessage(payload: any): Promise<void> {
 }
 
 function extractDateRange(messageText: string): { startDate: string | null; endDate: string | null } {
-  const matches = (messageText || '').match(/\b(\d{1,2}\/\d{1,2}\/20\d{2}|20\d{2}-\d{2}-\d{2})\b/g);
-  if (!matches || matches.length === 0) return { startDate: null, endDate: null };
-  const startDate = parseDateToIso(matches[0]);
-  const endDate = parseDateToIso(matches[1] || matches[0]);
-  return { startDate, endDate };
+  const raw = messageText || '';
+
+  // 1) Datas numéricas (DD/MM/AAAA ou ISO)
+  const numericMatches = raw.match(/\b(\d{1,2}\/\d{1,2}\/20\d{2}|20\d{2}-\d{2}-\d{2})\b/g);
+  if (numericMatches && numericMatches.length > 0) {
+    const startDate = parseDateToIso(numericMatches[0]);
+    const endDate = parseDateToIso(numericMatches[1] || numericMatches[0]);
+    return { startDate, endDate };
+  }
+
+  // 2) Datas por extenso (pt-BR), ex:
+  // - "15 de maio de 2026"
+  // - "15 a 16 de maio de 2026"
+  const long = extractPtBrLongDates(raw);
+  if (long.startDate || long.endDate) return long;
+
+  return { startDate: null, endDate: null };
 }
 
 function parseDateToIso(text: string | null): string | null {
@@ -339,6 +351,77 @@ function parseDateToIso(text: string | null): string | null {
   }
 
   return null;
+}
+
+function normalizeText(text: string): string {
+  return (text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function containsWord(haystack: string, needle: string): boolean {
+  if (!haystack || !needle) return false;
+  const n = escapeRegex(needle);
+  return new RegExp(`\\b${n}\\b`, 'i').test(haystack);
+}
+
+function extractPtBrLongDates(messageText: string): { startDate: string | null; endDate: string | null } {
+  const t = normalizeText(messageText);
+  if (!t) return { startDate: null, endDate: null };
+
+  const monthMap: Record<string, string> = {
+    janeiro: '01',
+    fevereiro: '02',
+    marco: '03',
+    abril: '04',
+    maio: '05',
+    junho: '06',
+    julho: '07',
+    agosto: '08',
+    setembro: '09',
+    outubro: '10',
+    novembro: '11',
+    dezembro: '12',
+  };
+
+  const toIso = (ddRaw: string, monthName: string, yyyyRaw: string): string | null => {
+    const dd = String(ddRaw).padStart(2, '0');
+    const mm = monthMap[monthName];
+    const yyyy = String(yyyyRaw);
+    if (!mm) return null;
+    if (!/^\d{2}$/.test(dd) || !/^\d{2}$/.test(mm) || !/^20\d{2}$/.test(yyyy)) return null;
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // Range compacto: "15 a 16 de maio de 2026"
+  const range = t.match(/\b(\d{1,2})\s*(?:a|ate|até|e|-|–|—)\s*(\d{1,2})\s*de\s*(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*de\s*(20\d{2})\b/);
+  if (range) {
+    const startDate = toIso(range[1], range[3], range[4]);
+    const endDate = toIso(range[2], range[3], range[4]);
+    return { startDate, endDate };
+  }
+
+  // Duas datas completas no texto: "15 de maio de 2026 ... 16 de maio de 2026"
+  const regex = /\b(\d{1,2})\s*(?:de\s*)?(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*(?:de\s*)?(20\d{2})\b/g;
+  const dates: string[] = [];
+  for (const m of t.matchAll(regex)) {
+    const iso = toIso(String(m[1]), String(m[2]), String(m[3]));
+    if (iso) dates.push(iso);
+    if (dates.length >= 2) break;
+  }
+  if (dates.length >= 1) {
+    return { startDate: dates[0], endDate: dates[1] ?? dates[0] };
+  }
+
+  return { startDate: null, endDate: null };
 }
 
 function normalizePhone(phone: string): string {
@@ -510,7 +593,7 @@ async function detectModelo(messageText: string): Promise<{ id: number; descrica
 }
 
 async function detectFilialId(messageText: string): Promise<string | null> {
-  const t = (messageText || '').toLowerCase();
+  const t = normalizeText(messageText || '');
   const cached = getCache<Array<{ id: string; nome: string; cidade: string; uf: string }>>('filiais');
   const rows = cached ?? (await query(
     `SELECT id, nome, cidade, uf FROM filial WHERE deletado_em IS NULL AND ativo = TRUE ORDER BY nome`,
@@ -520,12 +603,20 @@ async function detectFilialId(messageText: string): Promise<string | null> {
   if (rows.length === 1) return String(rows[0].id);
 
   for (const row of rows) {
-    const nome = String(row.nome || '').toLowerCase();
-    const cidade = String(row.cidade || '').toLowerCase();
-    const uf = String(row.uf || '').toLowerCase();
-    if ((nome && t.includes(nome)) || (cidade && t.includes(cidade)) || (uf && t.includes(uf))) {
-      return String(row.id);
+    const nome = normalizeText(String(row.nome || ''));
+    const cidade = normalizeText(String(row.cidade || ''));
+    const uf = normalizeText(String(row.uf || ''));
+
+    if (nome && t.includes(nome)) return String(row.id);
+    if (cidade && t.includes(cidade)) return String(row.id);
+
+    // Match por "apelido" / token (ex: usuário escreve só "rio", cidade é "rio de janeiro")
+    if (cidade) {
+      const cityTokens = cidade.split(' ').filter((x) => x.length >= 3);
+      if (cityTokens.some((tok) => containsWord(t, tok))) return String(row.id);
     }
+
+    if (uf && containsWord(t, uf)) return String(row.id);
   }
   return null;
 }

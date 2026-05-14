@@ -158,7 +158,7 @@ export async function processIncomingMessage(payload: any): Promise<void> {
   const value = changes?.value;
   const message = value?.messages?.[0];
   const statuses = Array.isArray(value?.statuses)
-    ? (value?.statuses as Array<{ id?: string; status?: string }> )
+    ? (value?.statuses as Array<{ id?: string; status?: string }>)
     : [];
 
   if (statuses.length > 0) {
@@ -803,13 +803,13 @@ async function tryHandleReservationIntent(params: {
         handled: true,
         replyText: mensagemCredenciais,
       };
-     } catch (error) {
-       console.error('[WhatsApp] Erro no cadastro automático via reserva:', error);
-       return {
-         handled: true,
-         replyText: `Olá! Vejo que você quer alugar um carro, mas preciso do seu cadastro primeiro. Me informe seu CPF e e‑mail para fazer o cadastro automático.`,
-       };
-     }
+    } catch (error) {
+      console.error('[WhatsApp] Erro no cadastro automático via reserva:', error);
+      return {
+        handled: true,
+        replyText: `Olá! Vejo que você quer alugar um carro, mas preciso do seu cadastro primeiro. Me informe seu CPF e e‑mail para fazer o cadastro automático.`,
+      };
+    }
   } else {
     // Cliente não cadastrado e não forneceu dados suficientes
     return {
@@ -829,8 +829,8 @@ async function tryHandlePaymentIntent(params: {
 
   let cliente = await findClienteByPhone(phone);
   const shouldHandle = isPaymentIntent(messageText) ||
-                       (isReservationIntent(messageText) && !!cliente) ||
-                       (isConfirmation(messageText) && historyHasReservationContext(history));
+    (isReservationIntent(messageText) && !!cliente) ||
+    (isConfirmation(messageText) && historyHasReservationContext(history));
   if (!shouldHandle) {
     return { handled: false, replyText: '' };
   }
@@ -901,13 +901,13 @@ async function tryHandlePaymentIntent(params: {
         } else {
           throw new Error('Falha ao buscar cliente recém-cadastrado');
         }
-       } catch (error) {
-         console.error('[WhatsApp] Erro no cadastro automático:', error);
-         return {
-           handled: true,
-           replyText: `Não consegui fazer seu cadastro automático. Verifique se o CPF e email estão corretos.`,
-         };
-       }
+      } catch (error) {
+        console.error('[WhatsApp] Erro no cadastro automático:', error);
+        return {
+          handled: true,
+          replyText: `Não consegui fazer seu cadastro automático. Verifique se o CPF e email estão corretos.`,
+        };
+      }
     } else {
       return {
         handled: true,

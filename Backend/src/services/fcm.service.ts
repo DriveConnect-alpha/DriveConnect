@@ -6,6 +6,14 @@ import { query } from '../db/index.js';
 
 let firebaseApp: App | null = null;
 let firebaseDisabledLogged = false;
+let firebaseSendDisabledLogged = false;
+
+function maskToken(token: string): string {
+  if (!token) return '';
+  const t = String(token);
+  if (t.length <= 10) return `${t.slice(0, 2)}…${t.slice(-2)}`;
+  return `${t.slice(0, 4)}…${t.slice(-4)}`;
+}
 
 function getServiceAccount(): ServiceAccount | null {
   const jsonFromEnv = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
@@ -164,7 +172,25 @@ async function sendMulticastNotification(params: {
   if (tokens.length === 0) return;
 
   const messaging = getMessagingClient();
-  if (!messaging) return;
+  if (!messaging) {
+    if (!firebaseSendDisabledLogged) {
+      console.warn('[FCM] Envio desabilitado (firebase-admin não configurado).');
+      firebaseSendDisabledLogged = true;
+    }
+    return;
+  }
+
+  const tipo = typeof (data as any)?.tipo === 'string' ? String((data as any).tipo) : '';
+  const reservaId = typeof (data as any)?.reservaId === 'string' ? String((data as any).reservaId) : '';
+  const filialId = typeof (data as any)?.filialId === 'string' ? String((data as any).filialId) : '';
+  const origem = typeof (data as any)?.origem === 'string' ? String((data as any).origem) : '';
+
+  console.log(
+    `[FCM] Enviando: title="${notification.title}" tipo="${tipo}" tokens=${tokens.length}` +
+      `${reservaId ? ` reservaId=${reservaId}` : ''}` +
+      `${filialId ? ` filialId=${filialId}` : ''}` +
+      `${origem ? ` origem=${origem}` : ''}`,
+  );
 
   const multicastMessage: MulticastMessage = {
     tokens,
@@ -178,11 +204,17 @@ async function sendMulticastNotification(params: {
 
   if (!response) return;
 
+  console.log(`[FCM] Resultado: success=${response.successCount} failure=${response.failureCount}`);
+
   if (response.failureCount > 0) {
     const invalidTokens: string[] = [];
     response.responses.forEach((resp, idx) => {
       if (resp.success) return;
-      const code = (resp.error as { code?: string } | undefined)?.code;
+      const err: any = resp.error as any;
+      const code = err?.code ? String(err.code) : 'unknown';
+      const msg = err?.message ? String(err.message) : 'unknown';
+      console.warn(`[FCM] Falha token=${maskToken(tokens[idx])} code=${code} msg=${msg}`);
+
       if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
         const token = tokens[idx];
         if (token) invalidTokens.push(token);
@@ -190,6 +222,7 @@ async function sendMulticastNotification(params: {
     });
     if (invalidTokens.length > 0) {
       await deleteInvalidTokens(invalidTokens);
+      console.warn(`[FCM] Tokens inválidos removidos: ${invalidTokens.length}`);
     }
   }
 }
@@ -200,6 +233,7 @@ async function notifyManagers(params: {
   data: Record<string, unknown>;
 }): Promise<void> {
   const tokens = await listTokensForFilial(params.filialId);
+  console.log(`[FCM] Tokens gerentes/admin filialId=${params.filialId}: ${tokens.length}`);
   await sendMulticastNotification({
     tokens,
     notification: params.notification,
@@ -213,6 +247,7 @@ async function notifyUsuario(params: {
   data: Record<string, unknown>;
 }): Promise<void> {
   const tokens = await listTokensForUsuario(params.usuarioId);
+  console.log(`[FCM] Tokens usuário usuarioId=${params.usuarioId}: ${tokens.length}`);
   await sendMulticastNotification({
     tokens,
     notification: params.notification,

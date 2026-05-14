@@ -228,7 +228,7 @@ async function sendMulticastNotification(params: {
       const err: any = resp.error as any;
       const code = err?.code ? String(err.code) : 'unknown';
       const msg = err?.message ? String(err.message) : 'unknown';
-      console.warn(`[FCM] Falha token=${maskToken(tokens[idx])} code=${code} msg=${msg}`);
+      console.warn(`[FCM] Falha token=${maskToken(tokens[idx] ?? '')} code=${code} msg=${msg}`);
 
       if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
         const token = tokens[idx];

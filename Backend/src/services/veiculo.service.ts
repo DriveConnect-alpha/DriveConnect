@@ -228,19 +228,33 @@ export async function atualizarStatusVeiculoE_Notificar(params: {
 
     const modelo = [row.modelo_marca, row.modelo_nome].filter(Boolean).join(' ').trim() || null;
 
-    await notifyVeiculoStatusAlteradoAllManagers({
+    const payload: {
+        veiculoId: string;
+        placa?: string;
+        statusAnterior?: string | null;
+        statusNovo: string;
+        filialId?: string | null;
+        filialNome?: string | null;
+        cidade?: string | null;
+        uf?: string | null;
+        modelo?: string | null;
+        origem?: string;
+        motivo?: string;
+    } = {
         veiculoId,
-        placa: row.placa ?? null,
-        statusAnterior,
         statusNovo,
+        statusAnterior,
         filialId: row.filial_id ?? null,
         filialNome: row.filial_nome ?? null,
         cidade: row.cidade ?? null,
         uf: row.uf ?? null,
         modelo,
         origem: origem ?? 'BACKEND',
-        motivo,
-    });
+    };
+    if (row.placa) payload.placa = String(row.placa);
+    if (motivo) payload.motivo = motivo;
+
+    await notifyVeiculoStatusAlteradoAllManagers(payload);
 }
 
 export async function atualizarStatusVeiculoPorReservaE_Notificar(params: {
@@ -256,7 +270,10 @@ export async function atualizarStatusVeiculoPorReservaE_Notificar(params: {
     const veiculoId = r.rows[0]?.veiculo_id as string | undefined;
     if (!veiculoId) return;
 
-    await atualizarStatusVeiculoE_Notificar({ veiculoId, novoStatus, origem, motivo });
+    const next: { veiculoId: string; novoStatus: string; origem?: string; motivo?: string } = { veiculoId, novoStatus };
+    if (origem) next.origem = origem;
+    if (motivo) next.motivo = motivo;
+    await atualizarStatusVeiculoE_Notificar(next);
 }
 
 export async function deletarVeiculo(id: string): Promise<boolean> {

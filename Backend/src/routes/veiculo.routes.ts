@@ -116,6 +116,9 @@ export async function registrarVeiculo(req: IncomingMessage, res: ServerResponse
 // ──────────────────────────────────────────────
 export async function listar(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN');
+
         // Para simplificar a rota pura do Node sem urlSearchParams parser manual completo
         // Poderíamos parsear req.url para extrar filialId se fôssemos usar searchParams.
         // get filialId opcional
@@ -134,6 +137,9 @@ export async function listar(req: IncomingMessage, res: ServerResponse): Promise
 // ──────────────────────────────────────────────
 export async function buscar(req: IncomingMessage, res: ServerResponse, id: string): Promise<void> {
     try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN', 'CLIENTE');
+
         const veiculo = await buscarVeiculoPorId(id);
         if (!veiculo) {
             responder(res, 404, { erro: 'Veículo não encontrado.' });
@@ -257,6 +263,9 @@ export async function deletar(req: IncomingMessage, res: ServerResponse, id: str
 
 export async function listarOpcionais(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN');
+
         const itens = await listarItens();
         responder(res, 200, itens);
     } catch (err) {
@@ -266,6 +275,9 @@ export async function listarOpcionais(req: IncomingMessage, res: ServerResponse)
 
 export async function listarReservasVeiculoHandler(req: IncomingMessage, res: ServerResponse, id: string): Promise<void> {
     try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN', 'CLIENTE');
+
         const { listarReservasDoVeiculo } = await import('../services/veiculo.service.js');
         const reservas = await listarReservasDoVeiculo(id);
         responder(res, 200, reservas);

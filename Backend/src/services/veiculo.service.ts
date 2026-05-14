@@ -35,21 +35,22 @@ export async function criarVeiculo(dados: Veiculo & { itens_ids?: string[] }): P
 
 export async function listarVeiculos(filialId?: string): Promise<any[]> {
     let queryText = `
-    SELECT 
-        v.id, v.modelo_id, v.filial_id, v.placa, v.ano, v.cor, 
-        CASE 
+    SELECT
+        v.id, v.modelo_id, v.filial_id, v.placa, v.ano, v.cor,
+        CASE
             WHEN v.status = 'DISPONIVEL' AND EXISTS (
-                SELECT 1 FROM reserva r 
-                WHERE r.veiculo_id = v.id 
-                  AND r.status = 'RESERVADA' 
+                SELECT 1 FROM reserva r
+                WHERE r.veiculo_id = v.id
+                  AND r.status = 'RESERVADA'
                   AND NOW() BETWEEN r.data_inicio AND r.data_fim
                   AND r.deletado_em IS NULL
             ) THEN 'ALUGADO'
             ELSE v.status
         END as status,
-        v.imagem_url, v.criado_em,
+        COALESCE(v.imagem_url, (SELECT filename FROM veiculo_imagem WHERE veiculo_id = v.id ORDER BY is_principal DESC, ordem ASC LIMIT 1)) as imagem_url,
+        v.criado_em,
+        v.deletado_em,
         v.preco_diaria,
-        (SELECT filename FROM veiculo_imagem WHERE veiculo_id = v.id ORDER BY is_principal DESC, ordem ASC LIMIT 1) as capa_url,
         ARRAY(SELECT i.nome FROM item i JOIN veiculo_item vi ON i.id = vi.item_id WHERE vi.veiculo_id = v.id) as itens,
         json_build_object(
             'id', m.id,
@@ -77,9 +78,9 @@ export async function listarVeiculos(filialId?: string): Promise<any[]> {
             'deletado_em', f.deletado_em
         ) as filial
     FROM veiculo v
-    LEFT JOIN modelo m ON v.modelo_id = m.id
+    INNER JOIN modelo m ON v.modelo_id = m.id
     LEFT JOIN tipo_carro tc ON m.tipo_carro_id = tc.id
-    LEFT JOIN filial f ON v.filial_id = f.id
+    INNER JOIN filial f ON v.filial_id = f.id
     WHERE v.deletado_em IS NULL
     `;
     
@@ -96,19 +97,52 @@ export async function listarVeiculos(filialId?: string): Promise<any[]> {
 
 export async function buscarVeiculoPorId(id: string): Promise<any | null> {
     const q = `
-        SELECT 
-            v.*,
-            CASE 
+        SELECT
+            v.id, v.modelo_id, v.filial_id, v.placa, v.ano, v.cor,
+            CASE
                 WHEN v.status = 'DISPONIVEL' AND EXISTS (
-                    SELECT 1 FROM reserva r 
-                    WHERE r.veiculo_id = v.id 
-                      AND r.status = 'RESERVADA' 
+                    SELECT 1 FROM reserva r
+                    WHERE r.veiculo_id = v.id
+                      AND r.status = 'RESERVADA'
                       AND NOW() BETWEEN r.data_inicio AND r.data_fim
                       AND r.deletado_em IS NULL
                 ) THEN 'ALUGADO'
                 ELSE v.status
-            END as status
-        FROM veiculo v 
+            END as status,
+            COALESCE(v.imagem_url, (SELECT filename FROM veiculo_imagem WHERE veiculo_id = v.id ORDER BY is_principal DESC, ordem ASC LIMIT 1)) as imagem_url,
+            v.criado_em,
+            v.deletado_em,
+            v.preco_diaria,
+            ARRAY(SELECT i.nome FROM item i JOIN veiculo_item vi ON i.id = vi.item_id WHERE vi.veiculo_id = v.id) as itens,
+            json_build_object(
+                'id', m.id,
+                'nome', m.nome,
+                'marca', m.marca,
+                'tipo_carro_id', m.tipo_carro_id,
+                'tipo_carro', CASE WHEN tc.id IS NOT NULL THEN json_build_object(
+                    'id', tc.id,
+                    'nome', tc.nome,
+                    'preco_base_diaria', tc.preco_base_diaria
+                ) ELSE NULL END
+            ) as modelo,
+            json_build_object(
+                'id', f.id,
+                'nome', f.nome,
+                'cep', f.cep,
+                'uf', f.uf,
+                'cidade', f.cidade,
+                'bairro', f.bairro,
+                'rua', f.rua,
+                'numero', f.numero,
+                'complemento', f.complemento,
+                'ativo', f.ativo,
+                'criado_em', f.criado_em,
+                'deletado_em', f.deletado_em
+            ) as filial
+        FROM veiculo v
+        INNER JOIN modelo m ON v.modelo_id = m.id
+        LEFT JOIN tipo_carro tc ON m.tipo_carro_id = tc.id
+        INNER JOIN filial f ON v.filial_id = f.id
         WHERE v.id = $1 AND v.deletado_em IS NULL
     `;
     const result = await query(q, [id]);

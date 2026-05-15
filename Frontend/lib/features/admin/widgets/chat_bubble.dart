@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-/// Widget para exibir uma mensagem de chat no estilo WhatsApp
 class ChatBubble extends StatelessWidget {
   final String text;
   final DateTime timestamp;
@@ -20,16 +19,15 @@ class ChatBubble extends StatelessWidget {
 
   String _formatTime(DateTime date) {
     final local = date.toLocal();
-    String two(int n) => n.toString().padLeft(2, '0');
+    String two(int value) => value.toString().padLeft(2, '0');
     return '${two(local.hour)}:${two(local.minute)}';
   }
 
-  IconData _getStatusIcon(String status) {
-    switch (status.toLowerCase()) {
+  IconData _getStatusIcon(String value) {
+    switch (value.toLowerCase()) {
       case 'sent':
         return Symbols.done;
       case 'delivered':
-        return Symbols.done_all;
       case 'read':
         return Symbols.done_all;
       default:
@@ -39,8 +37,7 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final outgoingGradient = isOutgoing
         ? LinearGradient(
             begin: Alignment.topLeft,
@@ -54,30 +51,29 @@ class ChatBubble extends StatelessWidget {
 
     return Align(
       alignment: isOutgoing ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        constraints: const BoxConstraints(maxWidth: 420),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: isOutgoing ? MainAxisAlignment.end : MainAxisAlignment.start,
           children: [
-            if (!isOutgoing)
-              Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: CircleAvatar(
-                  radius: 17,
-                  backgroundColor: colorScheme.tertiaryContainer,
-                  child: Text(
-                    senderLabel.isNotEmpty ? senderLabel[0].toUpperCase() : 'C',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: colorScheme.onTertiaryContainer,
-                    ),
+            if (!isOutgoing) ...[
+              CircleAvatar(
+                radius: 17,
+                backgroundColor: colorScheme.tertiaryContainer,
+                child: Text(
+                  senderLabel.isNotEmpty ? senderLabel[0].toUpperCase() : 'C',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onTertiaryContainer,
                   ),
                 ),
               ),
-            Flexible(
+              const SizedBox(width: 10),
+            ],
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
               child: Container(
                 decoration: BoxDecoration(
                   gradient: outgoingGradient,
@@ -88,7 +84,7 @@ class ChatBubble extends StatelessWidget {
                     bottomLeft: Radius.circular(isOutgoing ? 20 : 6),
                     bottomRight: Radius.circular(isOutgoing ? 6 : 20),
                   ),
-                  border: isOutgoing ? null : Border.all(color: colorScheme.outlineVariant.withOpacity(0.7)),
+                  border: isOutgoing ? null : Border.all(color: colorScheme.outlineVariant.withOpacity(0.75)),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.08),
@@ -100,6 +96,7 @@ class ChatBubble extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     if (senderLabel.isNotEmpty) ...[
                       Text(
@@ -121,7 +118,7 @@ class ChatBubble extends StatelessWidget {
                         height: 1.35,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -147,19 +144,18 @@ class ChatBubble extends StatelessWidget {
                 ),
               ),
             ),
-            if (isOutgoing)
-              Padding(
-                padding: const EdgeInsets.only(left: 10),
-                child: CircleAvatar(
-                  radius: 17,
-                  backgroundColor: colorScheme.primaryContainer,
-                  child: Icon(
-                    Symbols.smart_toy,
-                    size: 19,
-                    color: colorScheme.onPrimaryContainer,
-                  ),
+            if (isOutgoing) ...[
+              const SizedBox(width: 10),
+              CircleAvatar(
+                radius: 17,
+                backgroundColor: colorScheme.primaryContainer,
+                child: Icon(
+                  Symbols.smart_toy,
+                  size: 19,
+                  color: colorScheme.onPrimaryContainer,
                 ),
               ),
+            ],
           ],
         ),
       ),
@@ -167,27 +163,27 @@ class ChatBubble extends StatelessWidget {
   }
 }
 
-/// Widget para separador de data no chat
 class DateSeparator extends StatelessWidget {
   final DateTime date;
 
   const DateSeparator({super.key, required this.date});
 
-  String _formatDate(DateTime date) {
-    final local = date.toLocal();
+  String _formatDate(DateTime value) {
+    final local = value.toLocal();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
     final messageDate = DateTime(local.year, local.month, local.day);
 
-    if (messageDate.isAtSameMomentAs(today)) {
+    if (messageDate == today) {
       return 'Hoje';
-    } else if (messageDate.isAtSameMomentAs(yesterday)) {
-      return 'Ontem';
-    } else {
-      String two(int n) => n.toString().padLeft(2, '0');
-      return '${two(local.day)}/${two(local.month)}/${local.year}';
     }
+    if (messageDate == yesterday) {
+      return 'Ontem';
+    }
+
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${two(local.day)}/${two(local.month)}/${local.year}';
   }
 
   @override
@@ -224,7 +220,6 @@ class DateSeparator extends StatelessWidget {
   }
 }
 
-/// Widget para campo de entrada de mensagem no estilo WhatsApp
 class ChatInputField extends StatefulWidget {
   final TextEditingController controller;
   final VoidCallback onSendPressed;
@@ -242,7 +237,7 @@ class ChatInputField extends StatefulWidget {
 }
 
 class _ChatInputFieldState extends State<ChatInputField> {
-  late FocusNode _focusNode;
+  late final FocusNode _focusNode;
 
   @override
   void initState() {
@@ -258,85 +253,65 @@ class _ChatInputFieldState extends State<ChatInputField> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       decoration: BoxDecoration(
+        color: colorScheme.surface,
         border: Border(
-          top: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-          ),
+          top: BorderSide(color: colorScheme.outline.withOpacity(0.16)),
         ),
       ),
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       child: SafeArea(
         child: Row(
           children: [
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(24),
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: widget.controller,
-                        focusNode: _focusNode,
-                        decoration: const InputDecoration(
-                          final colorScheme = Theme.of(context).colorScheme;
-
-                          hintText: 'Mensagem...',
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(vertical: 12),
-                        ),
-                                  color: colorScheme.outline.withOpacity(0.16),
-                        minLines: 1,
-                        textInputAction: TextInputAction.send,
-                              color: colorScheme.surface,
-                        onSubmitted: (_) {
-                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                            widget.onSendPressed();
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                                        color: colorScheme.surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(28),
-                                        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: TextField(
+                  controller: widget.controller,
+                  focusNode: _focusNode,
+                  decoration: InputDecoration(
+                    hintText: 'Escreva uma resposta...',
+                    hintStyle: TextStyle(color: colorScheme.outline),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 13),
+                  ),
+                  minLines: 1,
+                  maxLines: null,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) {
+                    if (!widget.isLoading) {
+                      widget.onSendPressed();
+                    }
+                  },
+                ),
+              ),
             ),
-                                      padding: const EdgeInsets.symmetric(horizontal: 14),
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: Theme.of(context).colorScheme.primary,
+            const SizedBox(width: 10),
+            FilledButton(
+              onPressed: widget.isLoading ? null : widget.onSendPressed,
+              style: FilledButton.styleFrom(
+                shape: const CircleBorder(),
+                padding: const EdgeInsets.all(14),
+              ),
               child: widget.isLoading
-                  ? SizedBox(
-                                              decoration: InputDecoration(
-                                                hintText: 'Escreva uma resposta...',
-                      child: CircularProgressIndicator(
-                                                hintStyle: TextStyle(color: colorScheme.outline),
-                                                contentPadding: const EdgeInsets.symmetric(vertical: 13),
-                        valueColor: AlwaysStoppedAnimation(
-                          Theme.of(context).colorScheme.onPrimary,
-                        ),
-                      ),
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : IconButton(
-                      icon: Icon(
-                        Symbols.send,
-                        color: Theme.of(context).colorScheme.onPrimary,
-                                  const SizedBox(width: 10),
-                                  FilledButton(
-                                    onPressed: widget.isLoading ? null : widget.onSendPressed,
-                                    style: FilledButton.styleFrom(
-                                      shape: const CircleBorder(),
-                                      padding: const EdgeInsets.all(14),
-                                    ),
-                                    child: widget.isLoading
-                                        ? const SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(strokeWidth: 2),
-                                          )
-                                        : const Icon(Symbols.send, size: 18),
+                  : const Icon(Symbols.send, size: 18),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

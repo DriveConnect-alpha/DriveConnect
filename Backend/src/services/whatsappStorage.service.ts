@@ -12,6 +12,16 @@ export type StoredMessage = {
   createdAt: Date;
 };
 
+export type WhatsappConversationSummary = {
+  id: string;
+  phone: string;
+  status: string;
+  lastMessageAt: Date | null;
+  createdAt: Date;
+  lastMessageText: string | null;
+  lastMessageDirection: WhatsappMessageDirection | null;
+};
+
 export async function ensureConversation(phone: string): Promise<{ id: string } | null> {
   if (!phone) return null;
 
@@ -162,4 +172,88 @@ export async function getConversationHistory(conversationId: string, limit = 12)
       };
     })
     .filter((msg) => msg.content.length > 0);
+}
+
+export async function listConversations(params?: {
+  limit?: number;
+  offset?: number;
+  phone?: string;
+}): Promise<WhatsappConversationSummary[]> {
+  const limit = Math.max(1, Math.min(100, Number(params?.limit ?? 30)));
+  const offset = Math.max(0, Number(params?.offset ?? 0));
+  const phone = (params?.phone || '').trim();
+
+  const values: Array<string | number> = [];
+  let whereSql = '';
+  if (phone) {
+    values.push(`%${phone}%`);
+    whereSql = `WHERE c.phone ILIKE $${values.length}`;
+  }
+
+  values.push(limit);
+  const limitIndex = values.length;
+  values.push(offset);
+  const offsetIndex = values.length;
+
+  const result = await query(
+    `SELECT
+       c.id,
+       c.phone,
+       c.status,
+       c.last_message_at,
+       c.created_at,
+       m.text AS last_message_text,
+       m.direction AS last_message_direction
+     FROM whatsapp_conversation c
+     LEFT JOIN LATERAL (
+       SELECT wm.text, wm.direction
+       FROM whatsapp_message wm
+       WHERE wm.conversation_id = c.id
+       ORDER BY wm.created_at DESC
+       LIMIT 1
+     ) m ON TRUE
+     ${whereSql}
+     ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
+     LIMIT $${limitIndex}
+     OFFSET $${offsetIndex}`,
+    values,
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    phone: row.phone,
+    status: row.status,
+    lastMessageAt: row.last_message_at ?? null,
+    createdAt: row.created_at,
+    lastMessageText: row.last_message_text ?? null,
+    lastMessageDirection: row.last_message_direction ?? null,
+  }));
+}
+
+export async function listConversationMessages(params: {
+  conversationId: string;
+  limit?: number;
+  offset?: number;
+}): Promise<StoredMessage[]> {
+  const limit = Math.max(1, Math.min(200, Number(params.limit ?? 50)));
+  const offset = Math.max(0, Number(params.offset ?? 0));
+
+  const result = await query(
+    `SELECT id, conversation_id, direction, wa_message_id, text, status, created_at
+     FROM whatsapp_message
+     WHERE conversation_id = $1
+     ORDER BY created_at DESC
+     LIMIT $2 OFFSET $3`,
+    [params.conversationId, limit, offset],
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    conversationId: row.conversation_id,
+    direction: row.direction,
+    waMessageId: row.wa_message_id,
+    text: row.text,
+    status: row.status,
+    createdAt: row.created_at,
+  }));
 }

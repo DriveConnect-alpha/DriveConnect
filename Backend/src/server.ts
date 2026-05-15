@@ -119,7 +119,12 @@ import {
 } from './routes/veiculo.routes.js';
 
 // Rotas de WhatsApp
-import { receiveWebhook as receiveWebhookWhatsApp, verifyWebhook as verifyWebhookWhatsApp } from './routes/whatsapp.routes.js';
+import {
+  listAdminConversationMessages,
+  listAdminConversations,
+  receiveWebhook as receiveWebhookWhatsApp,
+  verifyWebhook as verifyWebhookWhatsApp,
+} from './routes/whatsapp.routes.js';
 // Rotas de notificações (FCM)
 import { registrarTokenFcm, removerTokenFcm } from './routes/notification.routes.js';
 
@@ -225,6 +230,15 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   // ── Notificações (FCM) ───────────────────────
   if (method === 'POST' && path === '/notificacoes/token') return registrarTokenFcm(req, res);
   if (method === 'DELETE' && path === '/notificacoes/token') return removerTokenFcm(req, res);
+
+  // ── WhatsApp (Admin) ─────────────────────────
+  if (method === 'GET' && path === '/whatsapp/conversations') return listAdminConversations(req, res);
+
+  const matchWhatsAppMessages = path.match(/^\/whatsapp\/conversations\/([^/]+)\/messages$/);
+  if (matchWhatsAppMessages && method === 'GET') {
+    const conversationId = matchWhatsAppMessages[1];
+    if (conversationId !== undefined) return listAdminConversationMessages(req, res, conversationId);
+  }
 
   // /clientes/me deve vir ANTES de /clientes/:id para não ser capturado pelo regex
   if (method === 'GET' && path === '/usuarios/clientes/me') return buscarMeuPerfil(req, res);

@@ -1,6 +1,8 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import * as crypto from 'crypto';
 import { processIncomingMessage } from '../services/whatsapp.service.js';
+import { listConversationMessages, listConversations } from '../services/whatsappStorage.service.js';
+import { checkRole } from '../utils/auth.js';
 
 type CorpoLido = { raw: Buffer; json: Record<string, any> };
 
@@ -172,4 +174,87 @@ export async function receiveWebhook(req: IncomingMessage, res: ServerResponse) 
   void processIncomingMessage(json).catch((err) => {
     console.error('[WhatsApp] Erro ao processar webhook:', err);
   });
+}
+
+function parsePositiveInt(value: string | null, fallback: number): number {
+  const parsed = Number.parseInt(value ?? '', 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return parsed;
+}
+
+// ──────────────────────────────────────────────
+// GET /whatsapp/conversations
+// Listagem administrativa de conversas
+// ──────────────────────────────────────────────
+export async function listAdminConversations(req: IncomingMessage, res: ServerResponse) {
+  const currentUser = checkRole(req, res, ['ADMIN']);
+  if (!currentUser) return;
+
+  try {
+    const url = new URL(req.url ?? '', `http://${req.headers.host}`);
+    const limit = parsePositiveInt(url.searchParams.get('limit'), 30);
+    const offset = parsePositiveInt(url.searchParams.get('offset'), 0);
+    const phone = (url.searchParams.get('phone') ?? '').trim();
+
+    const rows = await listConversations({
+      limit,
+      offset,
+      phone: phone || undefined,
+    });
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      data: rows,
+      page: {
+        limit,
+        offset,
+        count: rows.length,
+      },
+    }));
+  } catch (error) {
+    console.error('[WhatsApp] Erro ao listar conversas:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ erro: 'Erro ao listar conversas do WhatsApp.' }));
+  }
+}
+
+// ──────────────────────────────────────────────
+// GET /whatsapp/conversations/:id/messages
+// Mensagens de uma conversa (admin)
+// ──────────────────────────────────────────────
+export async function listAdminConversationMessages(req: IncomingMessage, res: ServerResponse, conversationId: string) {
+  const currentUser = checkRole(req, res, ['ADMIN']);
+  if (!currentUser) return;
+
+  if (!conversationId) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ erro: 'conversationId é obrigatório.' }));
+    return;
+  }
+
+  try {
+    const url = new URL(req.url ?? '', `http://${req.headers.host}`);
+    const limit = parsePositiveInt(url.searchParams.get('limit'), 100);
+    const offset = parsePositiveInt(url.searchParams.get('offset'), 0);
+
+    const rows = await listConversationMessages({
+      conversationId,
+      limit,
+      offset,
+    });
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      data: rows,
+      page: {
+        limit,
+        offset,
+        count: rows.length,
+      },
+    }));
+  } catch (error) {
+    console.error('[WhatsApp] Erro ao listar mensagens da conversa:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ erro: 'Erro ao listar mensagens da conversa.' }));
+  }
 }

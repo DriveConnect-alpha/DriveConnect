@@ -220,4 +220,74 @@ class GerenteCall {
       onError(e.toString());
     }
   }
+
+  /// Lista conversas registradas do WhatsApp (Admin).
+  /// ROUTE: GET /whatsapp/conversations
+  static Future<void> listarConversasWhatsapp({
+    int limit = 30,
+    int offset = 0,
+    String? phone,
+    required void Function(List<Map<String, dynamic>> conversas) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.get<Map<String, dynamic>>(
+        '/whatsapp/conversations',
+        queryParameters: {
+          'limit': limit,
+          'offset': offset,
+          if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        },
+      );
+
+      final raw = response.data?['data'];
+      if (raw is List) {
+        final data = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        onSuccess(data);
+      } else {
+        onSuccess([]);
+      }
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
+
+  /// Lista mensagens de uma conversa do WhatsApp (Admin).
+  /// ROUTE: GET /whatsapp/conversations/:id/messages
+  static Future<void> listarMensagensWhatsapp({
+    required String conversationId,
+    int limit = 100,
+    int offset = 0,
+    required void Function(List<Map<String, dynamic>> mensagens) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    if (conversationId.isEmpty) {
+      onError('conversationId é obrigatório.');
+      return;
+    }
+
+    try {
+      final response = await dioClient.get<Map<String, dynamic>>(
+        '/whatsapp/conversations/$conversationId/messages',
+        queryParameters: {
+          'limit': limit,
+          'offset': offset,
+        },
+      );
+
+      final raw = response.data?['data'];
+      if (raw is List) {
+        final data = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        onSuccess(data);
+      } else {
+        onSuccess([]);
+      }
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
 }

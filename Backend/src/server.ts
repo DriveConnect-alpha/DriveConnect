@@ -10,6 +10,7 @@ import {
   confirmarRetirada,
   confirmarDevolucao,
   estenderReservaHandler,
+  manualConfirmarPagamento,
 } from './routes/reserva.routes.js';
 
 // Rotas de relatórios / dashboards
@@ -17,6 +18,7 @@ import {
   faturamentoHandler,
   ocupacaoHandler,
   operacaoHandler,
+  resumoHandler,
 } from './routes/relatorio.routes.js';
 
 // Rotas financeiras
@@ -35,6 +37,7 @@ import {
 // Rotas de reserva (consulta e cancelamento)
 import {
   listarTodasReservas,
+  listarMinhasReservas,
   detalharReserva,
   cancelarReservaHandler,
 } from './routes/reservaConsulta.routes.js';
@@ -63,11 +66,13 @@ import {
   login,
   registrarCliente,
   registrarGerente,
+  listarTodosUsuariosSistema,
   listarTodosClientes,
   buscarCliente,
   buscarMeuPerfil,
   editarCliente,
   editarMeuPerfil,
+  desativarMinhaContaCliente,
   trocarSenha,
   deletarUsuario,
 } from './routes/usuario.routes.js';
@@ -109,6 +114,8 @@ import {
   buscar,
   atualizar,
   deletar,
+  listarOpcionais,
+  listarReservasVeiculoHandler
 } from './routes/veiculo.routes.js';
 
 // Rotas de WhatsApp
@@ -177,6 +184,7 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   if (method === 'GET' && path === '/relatorios/faturamento') return faturamentoHandler(req, res);
   if (method === 'GET' && path === '/relatorios/ocupacao') return ocupacaoHandler(req, res);
   if (method === 'GET' && path === '/relatorios/operacao') return operacaoHandler(req, res);
+  if (method === 'GET' && path === '/relatorios/resumo') return resumoHandler(req, res);
 
   // ── Webhooks Públicos (Sem API Key) ───────────
   if (path === '/whatsapp/webhook') {
@@ -211,6 +219,7 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   if (method === 'POST' && path === '/usuarios/login') return login(req, res);
   if (method === 'POST' && path === '/usuarios/clientes') return registrarCliente(req, res);
   if (method === 'POST' && path === '/usuarios/gerentes') return registrarGerente(req, res);
+  if (method === 'GET' && path === '/usuarios') return listarTodosUsuariosSistema(req, res);
   if (method === 'GET' && path === '/usuarios/clientes') return listarTodosClientes(req, res);
 
   // ── Notificações (FCM) ───────────────────────
@@ -220,6 +229,7 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   // /clientes/me deve vir ANTES de /clientes/:id para não ser capturado pelo regex
   if (method === 'GET' && path === '/usuarios/clientes/me') return buscarMeuPerfil(req, res);
   if (method === 'PUT' && path === '/usuarios/clientes/me') return editarMeuPerfil(req, res);
+  if (method === 'DELETE' && path === '/usuarios/clientes/me') return desativarMinhaContaCliente(req, res);
 
   const matchCliente = path.match(/^\/usuarios\/clientes\/([^/]+)$/);
   if (matchCliente) {
@@ -289,6 +299,7 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
 
   // ── Reservas ─────────────────────────────────
   if (method === 'GET' && path === '/reservas/disponibilidade') return checarDisponibilidade(req, res);
+  if (method === 'GET' && path === '/reservas/minhas') return listarMinhasReservas(req, res);
   if (method === 'POST' && path === '/reservas') return registrarReserva(req, res);
   if (method === 'GET' && path === '/reservas') return listarTodasReservas(req, res);
 
@@ -297,6 +308,12 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   if (matchEstender && method === 'POST') {
     const reservaId = matchEstender[1];
     if (reservaId !== undefined) return estenderReservaHandler(req, res, reservaId);
+  }
+  
+  const matchConfirmarPagamento = path.match(/^\/reservas\/([^/]+)\/confirmar-pagamento$/);
+  if (matchConfirmarPagamento && method === 'POST') {
+    const reservaId = matchConfirmarPagamento[1];
+    if (reservaId !== undefined) return manualConfirmarPagamento(req, res, reservaId);
   }
 
   const matchRetirada = path.match(/^\/reservas\/([^/]+)\/retirada$/);
@@ -389,11 +406,11 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   // ── Veículos ──────────────────────────────────
   if (method === 'POST' && path === '/veiculos') return registrarVeiculo(req, res);
   if (method === 'GET' && path === '/veiculos') return listar(req, res);
+  if (method === 'GET' && path === '/opcionais') return listarOpcionais(req, res);
 
-  const matchImagem = path.match(/^\/veiculos\/([^/]+)\/imagens$/);
-  if (matchImagem && matchImagem[1] && method === 'POST') {
-    const { adicionarImagem } = await import('./routes/veiculo.routes.js');
-    return adicionarImagem(req, res, matchImagem[1]);
+  const matchReservasVeiculo = path.match(/^\/veiculos\/([^/]+)\/reservas$/);
+  if (matchReservasVeiculo && matchReservasVeiculo[1] && method === 'GET') {
+    return listarReservasVeiculoHandler(req, res, matchReservasVeiculo[1]);
   }
 
   const matchVeiculo = path.match(/^\/veiculos\/([^/]+)$/);

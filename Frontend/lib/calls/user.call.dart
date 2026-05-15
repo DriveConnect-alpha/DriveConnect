@@ -43,12 +43,20 @@ class UserCall {
       );
       
       final userData = response.data!;
+      final token = userData['token'] as String?;
       
-      // Automaticamente define a identidade do core após login com sucesso
+      if (token == null || token.isEmpty) {
+        onError('Resposta do servidor inválida: token ausente.');
+        return;
+      }
+      
+      // Configura identidade JWT no core após login com sucesso
       setIdentity(
+        token: token,
         usuarioId: userData['id'] as String,
         tipo: userData['tipo'] as String,
-        // filialId será populado pelo backend posteriormente se for gerente
+        perfilId: userData['perfilId'] as String?,
+        filialId: userData['filialId'] as String?,
       );
       
       onSuccess(userData);

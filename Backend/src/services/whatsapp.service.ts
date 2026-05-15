@@ -19,6 +19,8 @@ import {
   storeMessage,
   updateMessageStatus,
 } from './whatsappStorage.service.js';
+import { criarCliente } from './usuario.service.js';
+import crypto from 'crypto';
 
 type WhatsAppTextMessage = {
   from: string;
@@ -70,6 +72,19 @@ type Cached<T> = { value: T; expiresAt: number };
 const cache = new Map<string, Cached<any>>();
 
 type HistoryMessage = { role: 'user' | 'assistant'; content: string };
+
+type RegistrationDraft = { cpf: string | null; email: string | null; expiresAt: number };
+const REGISTRATION_TTL_MS = Number.parseInt(process.env.WHATSAPP_REGISTRATION_TTL_MS || '900000', 10); // 15 min
+const registrationDrafts = new Map<string, RegistrationDraft>();
+
+function cleanupRegistrationDrafts(): void {
+  const now = Date.now();
+  for (const [key, value] of registrationDrafts.entries()) {
+    if (now > value.expiresAt) registrationDrafts.delete(key);
+  }
+}
+
+setInterval(cleanupRegistrationDrafts, Math.max(30_000, Math.floor(REGISTRATION_TTL_MS / 2))).unref();
 
 function setCache<T>(key: string, value: T, ttlMs: number): void {
   cache.set(key, { value, expiresAt: Date.now() + ttlMs });
@@ -143,7 +158,7 @@ export async function processIncomingMessage(payload: any): Promise<void> {
   const value = changes?.value;
   const message = value?.messages?.[0];
   const statuses = Array.isArray(value?.statuses)
-    ? (value?.statuses as Array<{ id?: string; status?: string }> )
+    ? (value?.statuses as Array<{ id?: string; status?: string }>)
     : [];
 
   if (statuses.length > 0) {
@@ -196,6 +211,46 @@ export async function processIncomingMessage(payload: any): Promise<void> {
   }
 
   const history = await getConversationHistory(conversation.id, Number.parseInt(process.env.WHATSAPP_HISTORY_LIMIT || '12', 10));
+
+  // Cadastro automático: se o usuário enviar CPF e/ou email (mesmo sem mencionar "alugar")
+  // e ainda não existir cliente para esse telefone, tenta cadastrar/localizar.
+  const registrationResult = await tryHandleAutoRegistration({
+    messageText: text,
+    phone: from,
+    conversationId: conversation.id,
+    history,
+  });
+
+  if (registrationResult?.handled) {
+    const replyMessageId = await sendMessage(from, registrationResult.replyText);
+    await storeMessage({
+      conversationId: conversation.id,
+      direction: 'OUT',
+      waMessageId: replyMessageId,
+      text: registrationResult.replyText,
+      status: 'sent',
+    });
+    return;
+  }
+
+  // Verificar se há intenção de reserva e cliente não cadastrado
+  const reservationCheck = await tryHandleReservationIntent({
+    messageText: text,
+    phone: from,
+    conversationId: conversation.id,
+  });
+
+  if (reservationCheck?.handled) {
+    const replyMessageId = await sendMessage(from, reservationCheck.replyText);
+    await storeMessage({
+      conversationId: conversation.id,
+      direction: 'OUT',
+      waMessageId: replyMessageId,
+      text: reservationCheck.replyText,
+      status: 'sent',
+    });
+    return;
+  }
 
   const paymentResult = await tryHandlePaymentIntent({
     messageText: text,
@@ -260,11 +315,23 @@ export async function processIncomingMessage(payload: any): Promise<void> {
 }
 
 function extractDateRange(messageText: string): { startDate: string | null; endDate: string | null } {
-  const matches = (messageText || '').match(/\b(\d{1,2}\/\d{1,2}\/20\d{2}|20\d{2}-\d{2}-\d{2})\b/g);
-  if (!matches || matches.length === 0) return { startDate: null, endDate: null };
-  const startDate = parseDateToIso(matches[0]);
-  const endDate = parseDateToIso(matches[1] || matches[0]);
-  return { startDate, endDate };
+  const raw = messageText || '';
+
+  // 1) Datas numéricas (DD/MM/AAAA ou ISO)
+  const numericMatches = raw.match(/\b(\d{1,2}\/\d{1,2}\/20\d{2}|20\d{2}-\d{2}-\d{2})\b/g);
+  if (numericMatches && numericMatches.length > 0) {
+    const startDate = parseDateToIso(numericMatches[0]);
+    const endDate = parseDateToIso(numericMatches[1] || numericMatches[0]);
+    return { startDate, endDate };
+  }
+
+  // 2) Datas por extenso (pt-BR), ex:
+  // - "15 de maio de 2026"
+  // - "15 a 16 de maio de 2026"
+  const long = extractPtBrLongDates(raw);
+  if (long.startDate || long.endDate) return long;
+
+  return { startDate: null, endDate: null };
 }
 
 function parseDateToIso(text: string | null): string | null {
@@ -286,8 +353,152 @@ function parseDateToIso(text: string | null): string | null {
   return null;
 }
 
+function normalizeText(text: string): string {
+  return (text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function containsWord(haystack: string, needle: string): boolean {
+  if (!haystack || !needle) return false;
+  const n = escapeRegex(needle);
+  return new RegExp(`\\b${n}\\b`, 'i').test(haystack);
+}
+
+function extractPtBrLongDates(messageText: string): { startDate: string | null; endDate: string | null } {
+  const t = normalizeText(messageText);
+  if (!t) return { startDate: null, endDate: null };
+
+  const monthMap: Record<string, string> = {
+    janeiro: '01',
+    fevereiro: '02',
+    marco: '03',
+    abril: '04',
+    maio: '05',
+    junho: '06',
+    julho: '07',
+    agosto: '08',
+    setembro: '09',
+    outubro: '10',
+    novembro: '11',
+    dezembro: '12',
+  };
+
+  const toIso = (ddRaw: string, monthName: string, yyyyRaw: string): string | null => {
+    const dd = String(ddRaw).padStart(2, '0');
+    const mm = monthMap[monthName];
+    const yyyy = String(yyyyRaw);
+    if (!mm) return null;
+    if (!/^\d{2}$/.test(dd) || !/^\d{2}$/.test(mm) || !/^20\d{2}$/.test(yyyy)) return null;
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // Range compacto: "15 a 16 de maio de 2026"
+  const range = t.match(/\b(\d{1,2})\s*(?:a|ate|até|e|-|–|—)\s*(\d{1,2})\s*de\s*(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*de\s*(20\d{2})\b/);
+  if (range) {
+    const ddStart = range[1];
+    const ddEnd = range[2];
+    const monthName = range[3];
+    const yyyy = range[4];
+    if (!ddStart || !ddEnd || !monthName || !yyyy) return { startDate: null, endDate: null };
+
+    const startDate = toIso(ddStart, monthName, yyyy);
+    const endDate = toIso(ddEnd, monthName, yyyy);
+    return { startDate, endDate };
+  }
+
+  // Duas datas completas no texto: "15 de maio de 2026 ... 16 de maio de 2026"
+  const regex = /\b(\d{1,2})\s*(?:de\s*)?(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*(?:de\s*)?(20\d{2})\b/g;
+  const dates: string[] = [];
+  for (const m of t.matchAll(regex)) {
+    const iso = toIso(String(m[1]), String(m[2]), String(m[3]));
+    if (iso) dates.push(iso);
+    if (dates.length >= 2) break;
+  }
+  if (dates.length >= 1) {
+    const startDate = dates[0] ?? null;
+    const endDate = (dates[1] ?? dates[0]) ?? null;
+    return { startDate, endDate };
+  }
+
+  return { startDate: null, endDate: null };
+}
+
 function normalizePhone(phone: string): string {
   return (phone || '').replace(/\D/g, '');
+}
+
+/**
+ * Gera uma senha aleatória segura
+ */
+function generateSecurePassword(): string {
+  const length = 12;
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  let password = '';
+
+  // Garantir pelo menos um de cada tipo
+  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // maiúscula
+  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // minúscula
+  password += '0123456789'[Math.floor(Math.random() * 10)]; // número
+  password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // especial
+
+  // Preencher o resto aleatoriamente
+  for (let i = password.length; i < length; i++) {
+    password += chars[Math.floor(Math.random() * chars.length)];
+  }
+
+  // Embaralhar a senha
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+}
+
+/**
+ * Valida formato de email
+ */
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+/**
+ * Valida formato de CPF (apenas formato, não verifica se é real)
+ */
+function isValidCpfFormat(cpf: string): boolean {
+  const cleanCpf = cpf.replace(/\D/g, '');
+  return cleanCpf.length === 11 && /^\d{11}$/.test(cleanCpf);
+}
+
+function extractCpf(text: string): string | null {
+  const t = (text || '').trim();
+  const cpfPatterns = [
+    /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/, // 123.456.789-01
+    /\b\d{11}\b/, // 12345678901
+  ];
+  for (const pattern of cpfPatterns) {
+    const match = t.match(pattern);
+    if (match) return match[0].replace(/\D/g, '');
+  }
+  return null;
+}
+
+function extractEmail(text: string): string | null {
+  const t = (text || '').trim();
+  const emailMatch = t.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/i);
+  return emailMatch ? emailMatch[0] : null;
+}
+
+/**
+ * Extrai CPF e email de uma mensagem de texto
+ */
+function extractCpfAndEmail(text: string): { cpf: string | null; email: string | null } {
+  return { cpf: extractCpf(text), email: extractEmail(text) };
 }
 
 function looksLikeCardDataRequest(text: string): boolean {
@@ -323,6 +534,13 @@ function isPaymentIntent(text: string): boolean {
   const t = (text || '').toLowerCase();
   const intentWords = ['pagar', 'pagamento', 'link', 'checkout', 'finalizar', 'fechar'];
   return intentWords.some((w) => t.includes(w));
+}
+
+function isReservationIntent(text: string): boolean {
+  const t = (text || '').toLowerCase();
+  const intentWords = ['alugar', 'aluguel', 'locar', 'locação', 'reserva', 'reservar', 'quero', 'gostaria', 'interessado'];
+  const carWords = ['carro', 'veículo', 'veiculo', 'automóvel', 'automovel'];
+  return intentWords.some((w) => t.includes(w)) && carWords.some((c) => t.includes(c));
 }
 
 function isConfirmation(text: string): boolean {
@@ -383,7 +601,7 @@ async function detectModelo(messageText: string): Promise<{ id: number; descrica
 }
 
 async function detectFilialId(messageText: string): Promise<string | null> {
-  const t = (messageText || '').toLowerCase();
+  const t = normalizeText(messageText || '');
   const cached = getCache<Array<{ id: string; nome: string; cidade: string; uf: string }>>('filiais');
   const rows = cached ?? (await query(
     `SELECT id, nome, cidade, uf FROM filial WHERE deletado_em IS NULL AND ativo = TRUE ORDER BY nome`,
@@ -393,12 +611,20 @@ async function detectFilialId(messageText: string): Promise<string | null> {
   if (rows.length === 1) return String(rows[0].id);
 
   for (const row of rows) {
-    const nome = String(row.nome || '').toLowerCase();
-    const cidade = String(row.cidade || '').toLowerCase();
-    const uf = String(row.uf || '').toLowerCase();
-    if ((nome && t.includes(nome)) || (cidade && t.includes(cidade)) || (uf && t.includes(uf))) {
-      return String(row.id);
+    const nome = normalizeText(String(row.nome || ''));
+    const cidade = normalizeText(String(row.cidade || ''));
+    const uf = normalizeText(String(row.uf || ''));
+
+    if (nome && t.includes(nome)) return String(row.id);
+    if (cidade && t.includes(cidade)) return String(row.id);
+
+    // Match por "apelido" / token (ex: usuário escreve só "rio", cidade é "rio de janeiro")
+    if (cidade) {
+      const cityTokens = cidade.split(' ').filter((x) => x.length >= 3);
+      if (cityTokens.some((tok) => containsWord(t, tok))) return String(row.id);
     }
+
+    if (uf && containsWord(t, uf)) return String(row.id);
   }
   return null;
 }
@@ -429,6 +655,269 @@ async function findClienteByPhone(phone: string): Promise<{ id: string; nome: st
   }
 }
 
+async function findClienteByCpfOrEmail(params: { cpfDigits?: string | null; email?: string | null }): Promise<{ id: string; nome: string; email: string; telefone?: string | null } | null> {
+  const cpfDigits = params.cpfDigits ? params.cpfDigits.replace(/\D/g, '') : null;
+  const email = params.email ? String(params.email).trim() : null;
+  if (!cpfDigits && !email) return null;
+
+  try {
+    // CPF no banco é armazenado como 000.000.000-00, então comparamos pelos dígitos via regexp_replace.
+    const result = await query(
+      `SELECT c.id, c.nome_completo, u.email, c.telefone
+       FROM cliente c
+       JOIN usuario u ON u.id = c.usuario_id
+       WHERE ( $1::text IS NOT NULL AND regexp_replace(c.cpf, '\\D', '', 'g') = $1 )
+          OR ( $2::text IS NOT NULL AND lower(u.email) = lower($2) )
+       ORDER BY c.criado_em DESC
+       LIMIT 1`,
+      [cpfDigits, email],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return { id: row.id, nome: row.nome_completo, email: row.email, telefone: row.telefone ?? null };
+  } catch (err) {
+    console.error('[WhatsApp] Erro buscando cliente por CPF/email:', err);
+    return null;
+  }
+}
+
+async function updateClienteTelefoneIfNeeded(clienteId: string, phone: string): Promise<void> {
+  const normalized = normalizePhone(phone);
+  if (!clienteId || !normalized) return;
+  try {
+    await query(
+      `UPDATE cliente
+       SET telefone = $1
+       WHERE id = $2
+         AND (telefone IS NULL OR regexp_replace(telefone, '\\D', '', 'g') <> $1)`,
+      [normalized, clienteId],
+    );
+  } catch (err) {
+    console.error('[WhatsApp] Erro atualizando telefone do cliente:', err);
+  }
+}
+
+function historyAskedForCadastro(history: HistoryMessage[] | undefined): boolean {
+  if (!history || history.length === 0) return false;
+  const lastAssistant = [...history].reverse().find((m) => m.role === 'assistant')?.content?.toLowerCase() ?? '';
+  return (
+    lastAssistant.includes('cadastro') &&
+    lastAssistant.includes('cpf') &&
+    (lastAssistant.includes('e-mail') || lastAssistant.includes('email'))
+  );
+}
+
+function buildRecentUserContext(messageText: string, history: HistoryMessage[] | undefined, maxUserMessages = 4): string {
+  if (!history || history.length === 0) return messageText;
+  const recentUser = history.filter((m) => m.role === 'user').slice(-maxUserMessages).map((m) => m.content);
+  return [...recentUser, messageText].filter(Boolean).join(' ').trim() || messageText;
+}
+
+async function tryHandleAutoRegistration(params: {
+  messageText: string;
+  phone: string;
+  conversationId: string;
+  history?: HistoryMessage[];
+}): Promise<{ handled: boolean; replyText: string }> {
+  const { messageText, phone, history } = params;
+
+  const alreadyCliente = await findClienteByPhone(phone);
+  if (alreadyCliente) {
+    registrationDrafts.delete(phone);
+    return { handled: false, replyText: '' };
+  }
+
+  const cpfDigits = extractCpf(messageText);
+  const email = extractEmail(messageText);
+
+  const draft = registrationDrafts.get(phone);
+  const mergedCpf = cpfDigits ?? draft?.cpf ?? null;
+  const mergedEmail = email ?? draft?.email ?? null;
+
+  const shouldTrackDraft = Boolean(cpfDigits || email || historyAskedForCadastro(history));
+  if (shouldTrackDraft) {
+    registrationDrafts.set(phone, {
+      cpf: mergedCpf,
+      email: mergedEmail,
+      expiresAt: Date.now() + REGISTRATION_TTL_MS,
+    });
+  }
+
+  const hasBoth = Boolean(mergedCpf && mergedEmail);
+  const valid = Boolean(mergedCpf && mergedEmail && isValidCpfFormat(mergedCpf) && isValidEmail(mergedEmail));
+
+  // Só tenta cadastrar se:
+  // - ele forneceu CPF/email agora, OU
+  // - estamos no fluxo de cadastro (bot pediu antes) e já temos dados acumulados.
+  const shouldAttempt = valid && (Boolean(cpfDigits || email) || historyAskedForCadastro(history));
+  if (!shouldAttempt) return { handled: false, replyText: '' };
+
+  // Se já existir cliente com esse CPF/email, só vincula o telefone e segue.
+  const existing = await findClienteByCpfOrEmail({ cpfDigits: mergedCpf, email: mergedEmail });
+  if (existing) {
+    await updateClienteTelefoneIfNeeded(existing.id, phone);
+    registrationDrafts.delete(phone);
+
+    const contextText = buildRecentUserContext(messageText, history);
+    const { startDate, endDate } = extractDateRange(contextText);
+    const modelo = await detectModelo(contextText);
+    const filialId = await detectFilialId(contextText);
+
+    if (startDate && endDate && modelo && filialId) {
+      const inicio = new Date(startDate);
+      const fim = new Date(endDate);
+      const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, inicio, fim);
+      if (!veiculoId) {
+        return {
+          handled: true,
+          replyText: `Encontrei seu cadastro ✅\n\nNão encontrei disponibilidade para *${modelo.descricao}* nessas datas. Quer tentar outras datas ou outra categoria?`,
+        };
+      }
+      const valor = await calcularValorTotal(modelo.id, filialId, inicio, fim);
+      return {
+        handled: true,
+        replyText:
+          `Encontrei seu cadastro ✅\n\n` +
+          `Tenho disponibilidade para *${modelo.descricao}* de ${inicio.toLocaleDateString('pt-BR')} a ${fim.toLocaleDateString('pt-BR')}.\n` +
+          `Valor estimado: R$ ${Number(valor).toFixed(2)}.\n\n` +
+          `Quer que eu gere o link de pagamento? Responda *sim*.`,
+      };
+    }
+
+    return {
+      handled: true,
+      replyText: `Encontrei seu cadastro ✅\n\nAgora me informe o modelo do carro, a unidade (ex: Rio) e as datas (retirada e devolução).`,
+    };
+  }
+
+  try {
+    const nomeCliente = `Cliente WhatsApp ${phone.slice(-4)}`;
+    const senhaGerada = generateSecurePassword();
+
+    const resultadoCadastro = await criarCliente({
+      email: mergedEmail!,
+      senha: senhaGerada,
+      nomeCompleto: nomeCliente,
+      cpf: mergedCpf!,
+      telefone: phone,
+    });
+
+    console.log(`[WhatsApp] Cliente cadastrado automaticamente: ${resultadoCadastro.usuarioId}`);
+    registrationDrafts.delete(phone);
+
+    const contextText = buildRecentUserContext(messageText, history);
+    const { startDate, endDate } = extractDateRange(contextText);
+    const modelo = await detectModelo(contextText);
+    const filialId = await detectFilialId(contextText);
+
+    const baseCreds =
+      `✅ Cadastro realizado com sucesso!\n\n` +
+      `📧 Email: ${mergedEmail}\n` +
+      `🔑 Senha temporária: ${senhaGerada}\n\n` +
+      `⚠️ Guarde essas informações! Você pode alterar a senha no app ou site.\n\n`;
+
+    if (startDate && endDate && modelo && filialId) {
+      const inicio = new Date(startDate);
+      const fim = new Date(endDate);
+      const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, inicio, fim);
+      if (!veiculoId) {
+        return {
+          handled: true,
+          replyText: baseCreds + `Não encontrei disponibilidade para *${modelo.descricao}* nessas datas. Quer tentar outras datas ou outra categoria?`,
+        };
+      }
+      const valor = await calcularValorTotal(modelo.id, filialId, inicio, fim);
+      return {
+        handled: true,
+        replyText:
+          baseCreds +
+          `Tenho disponibilidade para *${modelo.descricao}* de ${inicio.toLocaleDateString('pt-BR')} a ${fim.toLocaleDateString('pt-BR')}.\n` +
+          `Valor estimado: R$ ${Number(valor).toFixed(2)}.\n\n` +
+          `Quer que eu gere o link de pagamento? Responda *sim*.`,
+      };
+    }
+
+    return {
+      handled: true,
+      replyText: baseCreds + `Agora posso te ajudar com sua reserva. Me informe o modelo do carro, unidade e datas (retirada e devolução).`,
+    };
+  } catch (error) {
+    console.error('[WhatsApp] Erro no cadastro automático:', error);
+    return {
+      handled: true,
+      replyText:
+        `Não consegui fazer seu cadastro automático.\n\n` +
+        `Envie assim (pode ser sem pontuação):\n` +
+        `cpf 00000000000\nemail nome@dominio.com`,
+    };
+  }
+}
+
+async function tryHandleReservationIntent(params: {
+  messageText: string;
+  phone: string;
+  conversationId: string;
+}): Promise<{ handled: boolean; replyText: string }> {
+  const { messageText, phone } = params;
+
+  // Verificar se há intenção de reserva/aluguel
+  if (!isReservationIntent(messageText)) {
+    return { handled: false, replyText: '' };
+  }
+
+  // Verificar se o cliente já está cadastrado
+  const cliente = await findClienteByPhone(phone);
+  if (cliente) {
+    // Cliente já cadastrado, deixar o fluxo normal continuar
+    return { handled: false, replyText: '' };
+  }
+
+  // Cliente não cadastrado - verificar se forneceu CPF e email na mensagem
+  const { cpf, email } = extractCpfAndEmail(messageText);
+
+  if (cpf && email && isValidCpfFormat(cpf) && isValidEmail(email)) {
+    // Tentar cadastrar o cliente automaticamente
+    try {
+      const nomeCliente = `Cliente WhatsApp ${phone.slice(-4)}`; // Nome temporário baseado no telefone
+      const senhaGerada = generateSecurePassword();
+
+      const resultadoCadastro = await criarCliente({
+        email,
+        senha: senhaGerada,
+        nomeCompleto: nomeCliente,
+        cpf,
+        telefone: phone,
+      });
+
+      console.log(`[WhatsApp] Cliente cadastrado automaticamente via reserva: ${resultadoCadastro.usuarioId}`);
+
+      // Enviar mensagem com as credenciais
+      const mensagemCredenciais = `✅ Cadastro realizado com sucesso!\n\n` +
+        `📧 Email: ${email}\n` +
+        `🔑 Senha temporária: ${senhaGerada}\n\n` +
+        `⚠️ Guarde essas informações! Você pode alterar a senha no app ou site.\n\n` +
+        `Agora posso te ajudar com sua reserva. Me informe o modelo do carro, unidade e datas (retirada e devolução).`;
+
+      return {
+        handled: true,
+        replyText: mensagemCredenciais,
+      };
+    } catch (error) {
+      console.error('[WhatsApp] Erro no cadastro automático via reserva:', error);
+      return {
+        handled: true,
+        replyText: `Olá! Vejo que você quer alugar um carro, mas preciso do seu cadastro primeiro. Me informe seu CPF e e‑mail para fazer o cadastro automático.`,
+      };
+    }
+  } else {
+    // Cliente não cadastrado e não forneceu dados suficientes
+    return {
+      handled: true,
+      replyText: `Olá! Vejo que você quer alugar um carro, mas preciso do seu cadastro primeiro. Me informe seu CPF e e‑mail para fazer o cadastro automático.`,
+    };
+  }
+}
+
 async function tryHandlePaymentIntent(params: {
   messageText: string;
   phone: string;
@@ -437,7 +926,10 @@ async function tryHandlePaymentIntent(params: {
 }): Promise<{ handled: boolean; replyText: string }> {
   const { messageText, phone, conversationId, history } = params;
 
-  const shouldHandle = isPaymentIntent(messageText) || (isConfirmation(messageText) && historyHasReservationContext(history));
+  let cliente = await findClienteByPhone(phone);
+  const shouldHandle = isPaymentIntent(messageText) ||
+    (isReservationIntent(messageText) && !!cliente) ||
+    (isConfirmation(messageText) && historyHasReservationContext(history));
   if (!shouldHandle) {
     return { handled: false, replyText: '' };
   }
@@ -470,15 +962,57 @@ async function tryHandlePaymentIntent(params: {
       replyText: 'Consigo gerar seu link de pagamento. Me envie: modelo do carro, unidade de retirada e datas (retirada e devolução).',
     };
   }
-
-  const cliente = await findClienteByPhone(phone);
   if (!cliente) {
-    const frontendUrl = (process.env.FRONTEND_URL || '').trim();
-    const cadastro = frontendUrl ? ` Você pode se cadastrar em ${frontendUrl}/cadastro.` : '';
-    return {
-      handled: true,
-      replyText: `Para gerar o link, preciso do seu cadastro.${cadastro} Se preferir, me informe seu CPF e e‑mail para localizar sua conta.`,
-    };
+    // Verificar se a mensagem contém CPF e email para cadastro automático
+    const { cpf, email } = extractCpfAndEmail(messageText);
+
+    if (cpf && email && isValidCpfFormat(cpf) && isValidEmail(email)) {
+      // Tentar cadastrar o cliente automaticamente
+      try {
+        const nomeCliente = `Cliente WhatsApp ${phone.slice(-4)}`; // Nome temporário baseado no telefone
+        const senhaGerada = generateSecurePassword();
+
+        const resultadoCadastro = await criarCliente({
+          email,
+          senha: senhaGerada,
+          nomeCompleto: nomeCliente,
+          cpf,
+          telefone: phone,
+        });
+
+        console.log(`[WhatsApp] Cliente cadastrado automaticamente: ${resultadoCadastro.usuarioId}`);
+
+        // Buscar o cliente recém-criado
+        cliente = await findClienteByPhone(phone);
+
+        if (cliente) {
+          // Enviar mensagem com as credenciais
+          const mensagemCredenciais = `✅ Cadastro realizado com sucesso!\n\n` +
+            `📧 Email: ${email}\n` +
+            `🔑 Senha temporária: ${senhaGerada}\n\n` +
+            `⚠️ Guarde essas informações! Você pode alterar a senha no app ou site.\n\n` +
+            `Agora posso gerar seu link de pagamento.`;
+
+          // Enviar mensagem separada com credenciais primeiro
+          await sendMessage(phone, mensagemCredenciais);
+
+          // Continuar com o fluxo normal
+        } else {
+          throw new Error('Falha ao buscar cliente recém-cadastrado');
+        }
+      } catch (error) {
+        console.error('[WhatsApp] Erro no cadastro automático:', error);
+        return {
+          handled: true,
+          replyText: `Não consegui fazer seu cadastro automático. Verifique se o CPF e email estão corretos.`,
+        };
+      }
+    } else {
+      return {
+        handled: true,
+        replyText: `Para gerar o link, preciso do seu cadastro. Se preferir, me informe seu CPF e e‑mail para localizar sua conta.`,
+      };
+    }
   }
 
   const inicio = new Date(startDate);

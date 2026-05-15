@@ -63,7 +63,7 @@ describe('Usuario Service', () => {
 
       const result = await autenticarUsuario(payload);
 
-      expect(result).toEqual({ id: 'u1', email: 'admin@email.com', tipo: 'ADMIN', perfilId: null });
+      expect(result).toEqual({ id: 'u1', email: 'admin@email.com', tipo: 'ADMIN', perfilId: null, filialId: null });
     });
 
     it('deve buscar o perfilId se for CLIENTE', async () => {
@@ -75,6 +75,7 @@ describe('Usuario Service', () => {
       const result = await autenticarUsuario(payload);
 
       expect(result.perfilId).toBe('cliente-123');
+      expect(result.filialId).toBeNull();
     });
   });
 

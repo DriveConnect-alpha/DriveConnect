@@ -6,6 +6,14 @@ import { query } from '../db/index.js';
 
 let firebaseApp: App | null = null;
 let firebaseDisabledLogged = false;
+let firebaseSendDisabledLogged = false;
+
+function maskToken(token: string): string {
+  if (!token) return '';
+  const t = String(token);
+  if (t.length <= 10) return `${t.slice(0, 2)}…${t.slice(-2)}`;
+  return `${t.slice(0, 4)}…${t.slice(-4)}`;
+}
 
 function getServiceAccount(): ServiceAccount | null {
   const jsonFromEnv = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
@@ -136,6 +144,40 @@ async function listTokensForUsuario(usuarioId: string): Promise<string[]> {
   return result.rows.map((row) => String(row.token)).filter(Boolean);
 }
 
+async function listTokensForAllManagers(): Promise<string[]> {
+  const result = await query(
+    `SELECT DISTINCT ft.token
+     FROM fcm_token ft
+     JOIN usuario u ON u.id = ft.usuario_id
+     LEFT JOIN gerente g ON g.usuario_id = u.id
+     WHERE u.deletado_em IS NULL
+       AND (
+         (u.tipo = 'GERENTE' AND g.deletado_em IS NULL)
+         OR u.tipo = 'ADMIN'
+       )`,
+  );
+  return result.rows.map((row) => String(row.token)).filter(Boolean);
+}
+
+async function resolveUsuarioIdFromClienteOrUsuarioId(id: string): Promise<string | null> {
+  if (!id) return null;
+
+  // 1) Se já for um usuário, retorna.
+  const user = await query(
+    `SELECT id FROM usuario WHERE id = $1 AND deletado_em IS NULL LIMIT 1`,
+    [id],
+  );
+  if (user.rows[0]?.id) return String(user.rows[0].id);
+
+  // 2) Se for cliente.id, resolve para cliente.usuario_id
+  const cliente = await query(
+    `SELECT usuario_id FROM cliente WHERE id = $1 AND deletado_em IS NULL LIMIT 1`,
+    [id],
+  );
+  const usuarioId = cliente.rows[0]?.usuario_id;
+  return usuarioId ? String(usuarioId) : null;
+}
+
 async function sendMulticastNotification(params: {
   tokens: string[];
   notification: { title: string; body: string };
@@ -145,7 +187,25 @@ async function sendMulticastNotification(params: {
   if (tokens.length === 0) return;
 
   const messaging = getMessagingClient();
-  if (!messaging) return;
+  if (!messaging) {
+    if (!firebaseSendDisabledLogged) {
+      console.warn('[FCM] Envio desabilitado (firebase-admin não configurado).');
+      firebaseSendDisabledLogged = true;
+    }
+    return;
+  }
+
+  const tipo = typeof (data as any)?.tipo === 'string' ? String((data as any).tipo) : '';
+  const reservaId = typeof (data as any)?.reservaId === 'string' ? String((data as any).reservaId) : '';
+  const filialId = typeof (data as any)?.filialId === 'string' ? String((data as any).filialId) : '';
+  const origem = typeof (data as any)?.origem === 'string' ? String((data as any).origem) : '';
+
+  console.log(
+    `[FCM] Enviando: title="${notification.title}" tipo="${tipo}" tokens=${tokens.length}` +
+      `${reservaId ? ` reservaId=${reservaId}` : ''}` +
+      `${filialId ? ` filialId=${filialId}` : ''}` +
+      `${origem ? ` origem=${origem}` : ''}`,
+  );
 
   const multicastMessage: MulticastMessage = {
     tokens,
@@ -159,11 +219,17 @@ async function sendMulticastNotification(params: {
 
   if (!response) return;
 
+  console.log(`[FCM] Resultado: success=${response.successCount} failure=${response.failureCount}`);
+
   if (response.failureCount > 0) {
     const invalidTokens: string[] = [];
     response.responses.forEach((resp, idx) => {
       if (resp.success) return;
-      const code = (resp.error as { code?: string } | undefined)?.code;
+      const err: any = resp.error as any;
+      const code = err?.code ? String(err.code) : 'unknown';
+      const msg = err?.message ? String(err.message) : 'unknown';
+      console.warn(`[FCM] Falha token=${maskToken(tokens[idx] ?? '')} code=${code} msg=${msg}`);
+
       if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
         const token = tokens[idx];
         if (token) invalidTokens.push(token);
@@ -171,6 +237,7 @@ async function sendMulticastNotification(params: {
     });
     if (invalidTokens.length > 0) {
       await deleteInvalidTokens(invalidTokens);
+      console.warn(`[FCM] Tokens inválidos removidos: ${invalidTokens.length}`);
     }
   }
 }
@@ -181,6 +248,7 @@ async function notifyManagers(params: {
   data: Record<string, unknown>;
 }): Promise<void> {
   const tokens = await listTokensForFilial(params.filialId);
+  console.log(`[FCM] Tokens gerentes/admin filialId=${params.filialId}: ${tokens.length}`);
   await sendMulticastNotification({
     tokens,
     notification: params.notification,
@@ -194,10 +262,85 @@ async function notifyUsuario(params: {
   data: Record<string, unknown>;
 }): Promise<void> {
   const tokens = await listTokensForUsuario(params.usuarioId);
+  console.log(`[FCM] Tokens usuário usuarioId=${params.usuarioId}: ${tokens.length}`);
   await sendMulticastNotification({
     tokens,
     notification: params.notification,
     data: params.data,
+  });
+}
+
+export async function notifyVeiculoStatusAlteradoAllManagers(params: {
+  veiculoId: string;
+  placa?: string;
+  statusAnterior?: string | null;
+  statusNovo: string;
+  filialId?: string | null;
+  filialNome?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+  modelo?: string | null;
+  origem?: string;
+  motivo?: string;
+}): Promise<void> {
+  const tokens = await listTokensForAllManagers();
+  console.log(`[FCM] Tokens todos gerentes/admin: ${tokens.length}`);
+
+  const local = [params.filialNome, params.cidade, params.uf].filter(Boolean).join(' / ');
+  const header = [params.placa, params.modelo].filter(Boolean).join(' - ');
+  const fromTo = params.statusAnterior ? `${params.statusAnterior} → ${params.statusNovo}` : params.statusNovo;
+  const bodyParts = [
+    header ? `${header}: ${fromTo}` : `Status do veículo: ${fromTo}`,
+    local ? `Unidade: ${local}` : null,
+    params.motivo ? `Motivo: ${params.motivo}` : null,
+  ].filter(Boolean);
+
+  await sendMulticastNotification({
+    tokens,
+    notification: {
+      title: 'Status do veículo atualizado',
+      body: bodyParts.join(' | '),
+    },
+    data: {
+      tipo: 'VEICULO_STATUS_ALTERADO',
+      veiculoId: params.veiculoId,
+      placa: params.placa,
+      statusAnterior: params.statusAnterior ?? null,
+      statusNovo: params.statusNovo,
+      filialId: params.filialId ?? null,
+      origem: params.origem ?? 'BACKEND',
+      motivo: params.motivo ?? null,
+    },
+  });
+}
+
+export async function notifyVeiculoStatusAlteradoBulkAllManagers(params: {
+  statusNovo: string;
+  quantidade: number;
+  placas?: string[];
+  origem?: string;
+  motivo?: string;
+}): Promise<void> {
+  const tokens = await listTokensForAllManagers();
+  console.log(`[FCM] Tokens todos gerentes/admin: ${tokens.length}`);
+
+  const placas = (params.placas || []).filter(Boolean);
+  const preview = placas.length ? ` Placas: ${placas.slice(0, 5).join(', ')}${placas.length > 5 ? '…' : ''}` : '';
+  const motivo = params.motivo ? ` Motivo: ${params.motivo}` : '';
+
+  await sendMulticastNotification({
+    tokens,
+    notification: {
+      title: 'Frota atualizada',
+      body: `${params.quantidade} veículo(s) agora estão como ${params.statusNovo}.${preview}${motivo}`.trim(),
+    },
+    data: {
+      tipo: 'VEICULO_STATUS_BULK',
+      statusNovo: params.statusNovo,
+      quantidade: params.quantidade,
+      origem: params.origem ?? 'BACKEND',
+      motivo: params.motivo ?? null,
+    },
   });
 }
 
@@ -251,6 +394,7 @@ export async function notifyReservaPendente(params: {
 
   const inicio = dataInicio ? dataInicio.toISOString() : null;
   const fim = dataFim ? dataFim.toISOString() : null;
+  const usuarioId = await resolveUsuarioIdFromClienteOrUsuarioId(clienteId);
 
   const managerParams: {
     reservaId: string;
@@ -269,8 +413,8 @@ export async function notifyReservaPendente(params: {
 
   await Promise.all([
     notifyNovoServicoPendente(managerParams),
-    notifyUsuario({
-      usuarioId: clienteId,
+    ...(usuarioId ? [notifyUsuario({
+      usuarioId,
       notification: {
         title: 'Reserva pendente',
         body: 'Seu pagamento está aguardando confirmação.',
@@ -286,7 +430,7 @@ export async function notifyReservaPendente(params: {
         dataFim: fim,
         status: 'PENDENTE_PAGAMENTO',
       },
-    }),
+    })] : []),
   ]);
 }
 
@@ -305,6 +449,7 @@ export async function notifyPagamentoConfirmado(params: {
 
   const inicio = dataInicio ? dataInicio.toISOString() : null;
   const fim = dataFim ? dataFim.toISOString() : null;
+  const usuarioId = await resolveUsuarioIdFromClienteOrUsuarioId(clienteId);
 
   await Promise.all([
     notifyManagers({
@@ -325,8 +470,8 @@ export async function notifyPagamentoConfirmado(params: {
         status: 'RESERVADA',
       },
     }),
-    notifyUsuario({
-      usuarioId: clienteId,
+    ...(usuarioId ? [notifyUsuario({
+      usuarioId,
       notification: {
         title: 'Pagamento confirmado',
         body: 'Sua reserva foi confirmada com sucesso.',
@@ -342,7 +487,7 @@ export async function notifyPagamentoConfirmado(params: {
         dataFim: fim,
         status: 'RESERVADA',
       },
-    }),
+    })] : []),
   ]);
 }
 
@@ -361,6 +506,7 @@ export async function notifyReservaCancelada(params: {
 
   const inicio = dataInicio ? dataInicio.toISOString() : null;
   const fim = dataFim ? dataFim.toISOString() : null;
+  const usuarioId = await resolveUsuarioIdFromClienteOrUsuarioId(clienteId);
 
   await Promise.all([
     notifyManagers({
@@ -381,8 +527,8 @@ export async function notifyReservaCancelada(params: {
         status: 'CANCELADA',
       },
     }),
-    notifyUsuario({
-      usuarioId: clienteId,
+    ...(usuarioId ? [notifyUsuario({
+      usuarioId,
       notification: {
         title: 'Reserva cancelada',
         body: 'Sua reserva foi cancelada.',
@@ -398,7 +544,7 @@ export async function notifyReservaCancelada(params: {
         dataFim: fim,
         status: 'CANCELADA',
       },
-    }),
+    })] : []),
   ]);
 }
 
@@ -417,6 +563,7 @@ export async function notifyReservaExpirada(params: {
 
   const inicio = dataInicio ? dataInicio.toISOString() : null;
   const fim = dataFim ? dataFim.toISOString() : null;
+  const usuarioId = await resolveUsuarioIdFromClienteOrUsuarioId(clienteId);
 
   await Promise.all([
     notifyManagers({
@@ -437,8 +584,8 @@ export async function notifyReservaExpirada(params: {
         status: 'EXPIRADA',
       },
     }),
-    notifyUsuario({
-      usuarioId: clienteId,
+    ...(usuarioId ? [notifyUsuario({
+      usuarioId,
       notification: {
         title: 'Reserva expirada',
         body: 'Seu pagamento não foi confirmado a tempo.',
@@ -454,6 +601,6 @@ export async function notifyReservaExpirada(params: {
         dataFim: fim,
         status: 'EXPIRADA',
       },
-    }),
+    })] : []),
   ]);
 }

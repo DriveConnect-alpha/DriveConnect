@@ -55,6 +55,27 @@ class GerenteCall {
     }
   }
 
+  /// Lista absolutamente TODOS os usuários do sistema.
+  /// ROUTE: GET /usuarios
+  /// AUTH: required (Admin)
+  static Future<void> listarUsuarios({
+    required void Function(List<Map<String, dynamic>> usuarios) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.get<List<dynamic>>(
+        '/usuarios',
+      );
+      
+      final data = (response.data ?? []).cast<Map<String, dynamic>>();
+      onSuccess(data);
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
+
   /// Lista todos os clientes do sistema.
   /// ROUTE: GET /usuarios/clientes
   /// AUTH: required (Gerente, Admin)
@@ -71,12 +92,14 @@ class GerenteCall {
     required void Function(String message) onError,
   }) async {
     try {
-      final response = await dioClient.get<List<dynamic>>(
-        '/usuarios/clientes',
-      );
-      
-      final data = (response.data ?? []).cast<Map<String, dynamic>>();
-      onSuccess(data);
+      final response = await dioClient.get('/usuarios/clientes');
+      final rawData = response.data;
+      if (rawData is List) {
+        final data = rawData.map((e) => e as Map<String, dynamic>).toList();
+        onSuccess(data);
+      } else {
+        onSuccess([]);
+      }
     } on DioException catch (e) {
       handleApiError(e, onError);
     } catch (e) {

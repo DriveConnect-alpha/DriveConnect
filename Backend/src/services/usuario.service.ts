@@ -21,6 +21,8 @@ export interface UsuarioAutenticado {
   email: string;
   tipo: TipoUsuario;
   perfilId: string | null;
+  /** Filial do gerente (null = global ou não-gerente). Usado no JWT para escopo de dados. */
+  filialId: string | null;
 }
 
 /**
@@ -39,21 +41,19 @@ export async function autenticarUsuario(payload: LoginPayload): Promise<UsuarioA
   const senhaCorreta = await verificarHash(row.senha, payload.senha);
   if (!senhaCorreta) throw new Error('Credenciais inválidas.');
 
-  const perfilId = await buscarPerfilId(row.id, row.tipo);
+  let perfilId: string | null = null;
+  let filialId: string | null = null;
 
-  return { id: row.id, email: row.email, tipo: row.tipo, perfilId };
-}
+  if (row.tipo === 'CLIENTE') {
+    const r = await query(`SELECT id FROM cliente WHERE usuario_id = $1`, [row.id]);
+    perfilId = r.rows[0]?.id ?? null;
+  } else if (row.tipo === 'GERENTE') {
+    const r = await query(`SELECT id, filial_id FROM gerente WHERE usuario_id = $1`, [row.id]);
+    perfilId = r.rows[0]?.id ?? null;
+    filialId = r.rows[0]?.filial_id ?? null;
+  }
 
-async function buscarPerfilId(usuarioId: string, tipo: TipoUsuario): Promise<string | null> {
-  if (tipo === 'CLIENTE') {
-    const r = await query(`SELECT id FROM cliente WHERE usuario_id = $1`, [usuarioId]);
-    return r.rows[0]?.id ?? null;
-  }
-  if (tipo === 'GERENTE') {
-    const r = await query(`SELECT id FROM gerente WHERE usuario_id = $1`, [usuarioId]);
-    return r.rows[0]?.id ?? null;
-  }
-  return null; // ADMIN não tem perfil separado
+  return { id: row.id, email: row.email, tipo: row.tipo, perfilId, filialId };
 }
 
 // ──────────────────────────────────────────────
@@ -67,6 +67,7 @@ interface CriarClienteParams {
   cpf: string;
   rg?: string;
   cnh?: string;
+  telefone?: string;
 }
 
 interface CriarGerenteParams {
@@ -84,7 +85,7 @@ export async function criarCliente(params: CriarClienteParams): Promise<{ usuari
   Usuario.validarEmail(params.email);
   Usuario.validarSenha(params.senha);
   Cliente.validarNome(params.nomeCompleto);
-  Cliente.validarCpf(params.cpf);
+  const cpfNormalizado = Cliente.normalizarCpf(params.cpf);
 
   const senhaHash = await gerarHash(params.senha);
   const client = await getClient();
@@ -99,8 +100,8 @@ export async function criarCliente(params: CriarClienteParams): Promise<{ usuari
     const usuarioId: string = usuarioRes.rows[0].id;
 
     const clienteRes = await client.query(
-      `INSERT INTO cliente (usuario_id, nome_completo, cpf, rg, cnh) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [usuarioId, params.nomeCompleto, params.cpf, params.rg ?? null, params.cnh ?? null],
+      `INSERT INTO cliente (usuario_id, nome_completo, cpf, rg, cnh, telefone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [usuarioId, params.nomeCompleto, cpfNormalizado, params.rg ?? null, params.cnh ?? null, params.telefone ?? null],
     );
     const clienteId: string = clienteRes.rows[0].id;
 
@@ -173,29 +174,51 @@ export async function buscarUsuarioPorId(id: string): Promise<Usuario | null> {
   });
 }
 
-/** Lista todos os clientes ativos com seus dados de perfil. */
-export async function listarClientes(): Promise<Cliente[]> {
+/** Lista todos os clientes ativos com seus dados de perfil e email. */
+export async function listarClientes(): Promise<any[]> {
   const r = await query(
-    `SELECT c.id, c.usuario_id, c.nome_completo, c.cpf, c.rg, c.cnh, c.criado_em, c.deletado_em
+    `SELECT 
+        c.id, 
+        c.usuario_id, 
+        c.nome_completo, 
+        c.cpf, 
+        c.rg, 
+        c.cnh, 
+        c.criado_em,
+        json_build_object(
+          'id', u.id,
+          'email', u.email,
+          'tipo', u.tipo,
+          'criado_em', u.criado_em,
+          'nome', c.nome_completo,
+          'perfilId', c.id
+        ) as usuario
      FROM cliente c
      JOIN usuario u ON u.id = c.usuario_id
      WHERE c.deletado_em IS NULL AND u.deletado_em IS NULL
      ORDER BY c.nome_completo`,
   );
+  console.log(`[listarClientes] Encontrados ${r.rows.length} clientes`);
+  if (r.rows.length > 0) console.log(`[listarClientes] Primeiro cliente:`, JSON.stringify(r.rows[0]));
+  return r.rows;
+}
 
-  return r.rows.map(
-    (row) =>
-      new Cliente({
-        id: row.id,
-        usuarioId: row.usuario_id,
-        nomeCompleto: row.nome_completo,
-        cpf: row.cpf,
-        rg: row.rg,
-        cnh: row.cnh,
-        criadoEm: row.criado_em,
-        deletadoEm: row.deletado_em,
-      }),
+/** Lista absolutamente todos os usuários do sistema (Admin, Gerente, Cliente). */
+export async function listarUsuariosSistema(): Promise<any[]> {
+  const r = await query(
+    `SELECT 
+        u.id, 
+        u.email, 
+        u.tipo, 
+        u.criado_em,
+        COALESCE(c.nome_completo, g.nome_completo, 'Administrador') as nome
+     FROM usuario u
+     LEFT JOIN cliente c ON c.usuario_id = u.id
+     LEFT JOIN gerente g ON g.usuario_id = u.id
+     WHERE u.deletado_em IS NULL
+     ORDER BY u.tipo, nome`,
   );
+  return r.rows;
 }
 
 /** Busca um cliente ativo por ID com seus dados de perfil. */

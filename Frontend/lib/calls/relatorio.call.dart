@@ -137,4 +137,23 @@ class RelatorioCall {
       onError(e.toString());
     }
   }
+  /// Busca um resumo geral para o dashboard do gerente.
+  /// ROUTE: GET /relatorios/resumo
+  /// AUTH: required (Gerente, Admin)
+  static Future<void> resumo({
+    required void Function(Map<String, dynamic> data) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.get<Map<String, dynamic>>(
+        '/relatorios/resumo',
+      );
+      
+      onSuccess(response.data!);
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
 }

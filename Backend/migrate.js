@@ -22,6 +22,26 @@ async function run() {
     } catch (e) {}
 
     try {
+        await pool.query(`ALTER TABLE veiculo ADD COLUMN IF NOT EXISTS preco_diaria DECIMAL(10,2) DEFAULT 0.00;`);
+        console.log('✅ Coluna preco_diaria adicionada na veiculo.');
+    } catch (e) {}
+
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS item (
+                id SERIAL PRIMARY KEY,
+                nome VARCHAR(100) UNIQUE NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS veiculo_item (
+                veiculo_id UUID REFERENCES veiculo(id) ON DELETE CASCADE,
+                item_id INT REFERENCES item(id) ON DELETE CASCADE,
+                PRIMARY KEY (veiculo_id, item_id)
+            );
+        `);
+        console.log('✅ Tabelas item e veiculo_item verificadas/criadas.');
+    } catch (e) {}
+
+    try {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS veiculo_imagem (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

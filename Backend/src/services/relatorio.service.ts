@@ -16,7 +16,7 @@ function buildFilialFilter(caller: Caller, filialParam?: string): { clause: stri
     return { clause: 'IS NOT NULL', param: null };
 }
 
-async function validarDataInicio(dataInicio: string, filialId: string | null): Promise<void> {
+async function validarDataInicio(dataInicio: string, filialId: string | null): Promise<string> {
     let querySql = 'SELECT MIN(criado_em) as min_data FROM filial';
     const params: any[] = [];
     
@@ -26,7 +26,7 @@ async function validarDataInicio(dataInicio: string, filialId: string | null): P
     }
     
     const res = await query(querySql, params);
-    if (!res.rows[0] || !res.rows[0].min_data) return;
+    if (!res.rows[0] || !res.rows[0].min_data) return dataInicio;
 
     const criadoEm = new Date(res.rows[0].min_data);
     // Zera horas para comparar apenas datas
@@ -35,14 +35,16 @@ async function validarDataInicio(dataInicio: string, filialId: string | null): P
     dataIn.setHours(0, 0, 0, 0);
 
     if (dataIn < criadoEm) {
-        throw new Error(`A data inicial informada não pode ser anterior à data de inauguração da filial (${criadoEm.toISOString().split('T')[0]}).`);
+        // Em vez de erro, retornamos a data de criação como início efetivo
+        return criadoEm.toISOString().split('T')[0] as string;
     }
+    return dataInicio;
 }
 
 export async function obterFaturamento(caller: Caller, dataInicio: string, dataFim: string, filialParam?: string) {
     const { param } = buildFilialFilter(caller, filialParam);
-    await validarDataInicio(dataInicio, param);
-    const valores: any[] = [dataInicio, dataFim];
+    const dataIniEfetiva = await validarDataInicio(dataInicio, param);
+    const valores: any[] = [dataIniEfetiva, dataFim];
     let whereFilial = '';
     
     if (param) {
@@ -75,7 +77,7 @@ export async function obterFaturamento(caller: Caller, dataInicio: string, dataF
 
 export async function obterOcupacao(caller: Caller, dataInicio: string, dataFim: string, filialParam?: string) {
     const { param } = buildFilialFilter(caller, filialParam);
-    await validarDataInicio(dataInicio, param);
+    const dataIniEfetiva = await validarDataInicio(dataInicio, param);
 
     let whereFilialTotal = '';
     let paramTotal: any[] = [];
@@ -96,7 +98,7 @@ export async function obterOcupacao(caller: Caller, dataInicio: string, dataFim:
     const manutencao = Number(resTotal.rows[0].manutencao || 0);
 
     let whereFilialAlugados = '';
-    let paramAlugados: any[] = [dataInicio, dataFim];
+    let paramAlugados: any[] = [dataIniEfetiva, dataFim];
     if (param) {
         whereFilialAlugados = `AND v.filial_id = $3`;
         paramAlugados.push(param);
@@ -133,9 +135,9 @@ export async function obterOcupacao(caller: Caller, dataInicio: string, dataFim:
 
 export async function obterOperacao(caller: Caller, dataInicio: string, dataFim: string, filialParam?: string) {
     const { param } = buildFilialFilter(caller, filialParam);
-    await validarDataInicio(dataInicio, param);
+    const dataIniEfetiva = await validarDataInicio(dataInicio, param);
 
-    const valores: any[] = [dataInicio, dataFim];
+    const valores: any[] = [dataIniEfetiva, dataFim];
     let whereFilialRetirada = '';
     let whereFilialDevolucao = '';
     
@@ -179,5 +181,57 @@ export async function obterOperacao(caller: Caller, dataInicio: string, dataFim:
         retiradas: Number(retiradasRes.rows[0].qtd),
         devolucoes: Number(devolucoesRes.rows[0].qtd),
         emAtraso: Number(atrasadosRes.rows[0].qtd)
+    };
+}
+export async function obterResumo(caller: Caller) {
+    const filialParam = (caller.tipo === 'GERENTE' && caller.filialId) ? caller.filialId : undefined;
+    
+    // 1. Reservas Ativas (ATIVA ou RESERVADA)
+    let sqlAtivas = `SELECT COUNT(*) as qtd FROM reserva WHERE status IN ('ATIVA', 'RESERVADA') AND deletado_em IS NULL`;
+    const paramsAtivas: any[] = [];
+    if (filialParam) {
+        sqlAtivas += ` AND filial_retirada_id = $1`;
+        paramsAtivas.push(filialParam);
+    }
+    const resAtivas = await query(sqlAtivas, paramsAtivas);
+
+    // 2. Veículos Disponíveis (Desconsidera os que estão com reserva vigente agora)
+    let sqlDisp = `
+        SELECT COUNT(*) as qtd FROM veiculo v
+        WHERE v.status = 'DISPONIVEL' 
+          AND v.deletado_em IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM reserva r 
+              WHERE r.veiculo_id = v.id 
+                AND r.status = 'RESERVADA' 
+                AND NOW() BETWEEN r.data_inicio AND r.data_fim
+                AND r.deletado_em IS NULL
+          )
+    `;
+    const paramsDisp: any[] = [];
+    if (filialParam) {
+        sqlDisp += ` AND v.filial_id = $1`;
+        paramsDisp.push(filialParam);
+    }
+    const resDisp = await query(sqlDisp, paramsDisp);
+
+    // 3. Faturamento Mensal (mês atual)
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0] as string;
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0] as string;
+    const resFat = await obterFaturamento(caller, startOfMonth, endOfMonth, filialParam);
+
+    // 4. Novos Clientes (mês atual)
+    const resCli = await query(`
+        SELECT COUNT(*) as qtd FROM cliente 
+        WHERE criado_em >= $1 AND criado_em <= $2 AND deletado_em IS NULL
+    `, [startOfMonth, endOfMonth]);
+
+    return {
+        active_reservations: Number(resAtivas.rows[0].qtd),
+        available_vehicles: Number(resDisp.rows[0].qtd),
+        monthly_revenue: resFat.faturamentoTotal,
+        new_clients: Number(resCli.rows[0].qtd),
+        revenue_history: [] // Pode ser implementado depois se necessário
     };
 }

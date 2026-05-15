@@ -1,4 +1,4 @@
-const CPF_REGEX = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
+const CPF_FORMATTED_REGEX = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
 
 export class Cliente {
   readonly id: string;
@@ -41,9 +41,21 @@ export class Cliente {
   }
 
   static validarCpf(cpf: string): void {
-    if (!cpf || !CPF_REGEX.test(cpf)) {
-      throw new Error('CPF deve estar no formato 000.000.000-00.');
-    }
+    const digits = (cpf ?? '').replace(/\D/g, '');
+    if (digits.length !== 11 || !/^\d{11}$/.test(digits)) throw new Error('CPF inválido.');
+  }
+
+  /**
+   * Normaliza CPF para o formato `000.000.000-00`.
+   * Aceita entrada com ou sem pontuação.
+   */
+  static normalizarCpf(cpf: string): string {
+    const digits = (cpf ?? '').replace(/\D/g, '');
+    if (digits.length !== 11 || !/^\d{11}$/.test(digits)) throw new Error('CPF inválido.');
+    const formatted = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+    // Garantia extra (evita regressão caso o formato mude)
+    if (!CPF_FORMATTED_REGEX.test(formatted)) throw new Error('CPF inválido.');
+    return formatted;
   }
 
   // ──────────────────────────────────────────────

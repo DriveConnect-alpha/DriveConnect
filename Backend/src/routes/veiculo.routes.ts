@@ -4,7 +4,9 @@ import {
     listarVeiculos,
     buscarVeiculoPorId,
     atualizarVeiculo,
-    deletarVeiculo
+    deletarVeiculo,
+    listarItens,
+    atualizarStatusVeiculoE_Notificar
 } from '../services/veiculo.service.js';
 import { processarUpload } from '../services/storage.service.js';
 import { requireCaller, requireTipo } from '../middlewares/auth.js';
@@ -34,9 +36,9 @@ async function tratarErro(res: ServerResponse, err: unknown): Promise<void> {
     const mensagem = err instanceof Error ? err.message : 'Erro interno.';
     const status = mensagem.includes('inválid') || mensagem.includes('obrigatório') ? 400
         : mensagem.includes('não encontrad') ? 404
-        : mensagem.includes('Não autorizado') || mensagem.includes('identidade ausente') ? 401
-        : mensagem.includes('Sem permissão') ? 403
-        : 500;
+            : mensagem.includes('Não autorizado') || mensagem.includes('identidade ausente') ? 401
+                : mensagem.includes('Sem permissão') ? 403
+                    : 500;
     responder(res, status, { erro: mensagem });
 }
 
@@ -60,7 +62,17 @@ export async function registrarVeiculo(req: IncomingMessage, res: ServerResponse
             campos = await lerCorpoJson(req);
         }
 
-        const { modelo_id, filial_id, placa, ano, cor, status, indice_principal } = campos;
+        const {
+            modelo_id,
+            filial_id,
+            placa,
+            ano,
+            cor,
+            status,
+            indice_principal,
+            preco_diaria,
+            itens_ids
+        } = campos;
 
         if (!modelo_id || !filial_id || !placa || !ano || !status) {
             responder(res, 400, { erro: 'Campos obrigatórios: modelo_id, filial_id, placa, ano, status.' });
@@ -80,7 +92,9 @@ export async function registrarVeiculo(req: IncomingMessage, res: ServerResponse
             ano: Number(ano),
             cor,
             status,
-            imagem_url: imagemPrincipal, // Capa oficial no registro
+            imagem_url: imagemPrincipal || null, // Capa oficial no registro
+            preco_diaria: preco_diaria ? Number(preco_diaria) : null,
+            itens_ids: Array.isArray(itens_ids) ? itens_ids : (itens_ids ? [itens_ids] : []),
         });
 
         // Salva todas as imagens na tabela de galeria
@@ -103,6 +117,9 @@ export async function registrarVeiculo(req: IncomingMessage, res: ServerResponse
 // ──────────────────────────────────────────────
 export async function listar(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN', 'CLIENTE');
+
         // Para simplificar a rota pura do Node sem urlSearchParams parser manual completo
         // Poderíamos parsear req.url para extrar filialId se fôssemos usar searchParams.
         // get filialId opcional
@@ -121,6 +138,9 @@ export async function listar(req: IncomingMessage, res: ServerResponse): Promise
 // ──────────────────────────────────────────────
 export async function buscar(req: IncomingMessage, res: ServerResponse, id: string): Promise<void> {
     try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN', 'CLIENTE');
+
         const veiculo = await buscarVeiculoPorId(id);
         if (!veiculo) {
             responder(res, 404, { erro: 'Veículo não encontrado.' });
@@ -162,13 +182,27 @@ export async function atualizar(req: IncomingMessage, res: ServerResponse, id: s
         if (ano) dadosParaAtualizar.ano = Number(ano);
         if (cor) dadosParaAtualizar.cor = cor;
         if (status) dadosParaAtualizar.status = status;
-        
+
         // Se enviou novas imagens no PUT, a primeira vira a capa por padrão nesta rota simplificada
         if (caminhosImagens.length > 0) {
             dadosParaAtualizar.imagem_url = caminhosImagens[0];
         }
 
-        const veiculoAtualizado = await atualizarVeiculo(id, dadosParaAtualizar);
+        // Se estiver alterando status, usamos o helper que notifica todos os gerentes/admin.
+        if (typeof dadosParaAtualizar.status === 'string' && dadosParaAtualizar.status) {
+            const novoStatus = String(dadosParaAtualizar.status);
+            delete dadosParaAtualizar.status;
+            if (Object.keys(dadosParaAtualizar).length > 0) {
+                await atualizarVeiculo(id, dadosParaAtualizar);
+            }
+            await atualizarStatusVeiculoE_Notificar({
+                veiculoId: id,
+                novoStatus,
+                origem: 'VEICULO_ROUTE',
+            });
+        }
+
+        const veiculoAtualizado = await buscarVeiculoPorId(id);
 
         if (!veiculoAtualizado) {
             responder(res, 404, { erro: 'Veículo não encontrado ou nenhum campo válido enviado.' });
@@ -208,7 +242,7 @@ export async function adicionarImagem(req: IncomingMessage, res: ServerResponse,
 
         const isPrincipal = campos.is_principal === 'true' || campos.is_principal === true;
         const { adicionarImagemVeiculo } = await import('../services/veiculo.service.js');
-        
+
         // Nesta rota, processamos apenas a primeira imagem para manter compatibilidade com o comportamento esperado
         const caminhoImagem = caminhosImagens[0];
         if (!caminhoImagem) {
@@ -237,6 +271,31 @@ export async function deletar(req: IncomingMessage, res: ServerResponse, id: str
             return;
         }
         responder(res, 200, { mensagem: 'Veículo deletado com sucesso.' });
+    } catch (err) {
+        await tratarErro(res, err);
+    }
+}
+
+export async function listarOpcionais(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN');
+
+        const itens = await listarItens();
+        responder(res, 200, itens);
+    } catch (err) {
+        await tratarErro(res, err);
+    }
+}
+
+export async function listarReservasVeiculoHandler(req: IncomingMessage, res: ServerResponse, id: string): Promise<void> {
+    try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN', 'CLIENTE');
+
+        const { listarReservasDoVeiculo } = await import('../services/veiculo.service.js');
+        const reservas = await listarReservasDoVeiculo(id);
+        responder(res, 200, reservas);
     } catch (err) {
         await tratarErro(res, err);
     }

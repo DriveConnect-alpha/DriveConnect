@@ -147,6 +147,8 @@ class FrotaCall {
     required String status,
     List<dynamic>? imagens,
     int indicePrincipal = 0,
+    double? precoDiaria,
+    List<String>? itensIds,
     required void Function(Map<String, dynamic> data) onSuccess,
     required void Function(String message) onError,
   }) async {
@@ -159,13 +161,16 @@ class FrotaCall {
         'cor': cor,
         'status': status,
         'indice_principal': indicePrincipal,
+        if (precoDiaria != null) 'preco_diaria': precoDiaria,
+        if (itensIds != null) 'itens_ids': itensIds,
       };
 
       if (imagens != null && imagens.isNotEmpty) {
         final List<MultipartFile> multipartFiles = [];
         for (var img in imagens) {
-          final path = (img is String) ? img : (img.path as String);
-          multipartFiles.add(await MultipartFile.fromFile(path));
+          final bytes = await img.readAsBytes();
+          final filename = img.name;
+          multipartFiles.add(MultipartFile.fromBytes(bytes, filename: filename));
         }
         map['imagem'] = multipartFiles;
       }
@@ -191,18 +196,37 @@ class FrotaCall {
     required void Function(String message) onError,
   }) async {
     try {
-      final response = await dioClient.get<List<dynamic>>(
+      final response = await dioClient.get(
         '/veiculos',
         queryParameters: {
           if (filialId != null) 'filialId': filialId,
         },
       );
-      final data = (response.data ?? []).cast<Map<String, dynamic>>();
+
+      // Handle different response formats
+      List<dynamic> rawData;
+      if (response.data is List) {
+        rawData = response.data as List;
+      } else if (response.data is Map && response.data['data'] is List) {
+        // In case the response is wrapped in a data object
+        rawData = response.data['data'] as List;
+      } else {
+        rawData = [];
+      }
+
+      final data = rawData.map((item) {
+        if (item is Map<String, dynamic>) {
+          return item;
+        } else {
+          throw Exception('Invalid vehicle data format: $item');
+        }
+      }).toList();
+
       onSuccess(data);
     } on DioException catch (e) {
       handleApiError(e, onError);
     } catch (e) {
-      onError(e.toString());
+      onError('Erro ao processar dados dos veículos: ${e.toString()}');
     }
   }
 
@@ -266,6 +290,41 @@ class FrotaCall {
     try {
       final response = await dioClient.delete<Map<String, dynamic>>('/veiculos/$id');
       onSuccess(response.data!['mensagem'] as String? ?? 'Veículo removido.');
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
+
+  /// Lista itens/opcionais disponíveis para veículos.
+  /// ROUTE: GET /opcionais
+  static Future<void> listarOpcionais({
+    required void Function(List<Map<String, dynamic>> itens) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.get<List<dynamic>>('/opcionais');
+      final data = (response.data ?? []).cast<Map<String, dynamic>>();
+      onSuccess(data);
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
+
+  /// Lista as reservas de um veículo para identificar datas ocupadas.
+  /// ROUTE: GET /veiculos/:id/reservas
+  static Future<void> listarReservas({
+    required String id,
+    required void Function(List<Map<String, dynamic>> reservas) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.get<List<dynamic>>('/veiculos/$id/reservas');
+      final data = (response.data ?? []).cast<Map<String, dynamic>>();
+      onSuccess(data);
     } on DioException catch (e) {
       handleApiError(e, onError);
     } catch (e) {

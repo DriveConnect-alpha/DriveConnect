@@ -1,5 +1,6 @@
 import type { IncomingMessage } from 'http';
 import type { TipoUsuario } from '../entities/Usuario.js';
+import jwt from 'jsonwebtoken';
 
 // ──────────────────────────────────────────────
 // Tipos
@@ -17,12 +18,57 @@ export interface AuthenticatedRequest extends IncomingMessage {
   caller?: Caller;
 }
 
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key';
+
+export interface JwtPayload {
+  id: string;
+  email: string;
+  tipo: TipoUsuario;
+  filialId?: string | null;
+  iat?: number;
+  exp?: number;
+}
+
 // ──────────────────────────────────────────────
-// Extração de identidade via headers
-// Produção: troque isso por verificação de JWT
+// Geração de JWT
+// ──────────────────────────────────────────────
+
+export function gerarToken(payload: { id: string; email: string; tipo: TipoUsuario; filialId?: string | null }): string {
+  return jwt.sign(
+    { id: payload.id, email: payload.email, tipo: payload.tipo, filialId: payload.filialId ?? null },
+    JWT_SECRET,
+    { expiresIn: '24h' },
+  );
+}
+
+// ──────────────────────────────────────────────
+// Extração de identidade via JWT (Authorization: Bearer <token>)
+// Fallback para headers x-usuario-id/x-tipo (compatibilidade)
 // ──────────────────────────────────────────────
 
 export function extractCaller(req: IncomingMessage): Caller | null {
+  // 1. Tenta extrair do JWT (Authorization header)
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+        const tiposValidos: TipoUsuario[] = ['CLIENTE', 'GERENTE', 'ADMIN'];
+        if (!tiposValidos.includes(decoded.tipo)) return null;
+
+        return {
+          usuarioId: decoded.id,
+          tipo: decoded.tipo,
+          filialId: decoded.filialId ?? null,
+        };
+      } catch {
+        return null; // Token inválido ou expirado
+      }
+    }
+  }
+
+  // 2. Fallback: headers legados (x-usuario-id, x-tipo)
   const usuarioId = req.headers['x-usuario-id'];
   const tipo      = req.headers['x-tipo'];
   const filialId  = req.headers['x-filial-id'];

@@ -1,0 +1,40 @@
+import '../../../../core/models/reserva.dart';
+import '../../../../core/models/cliente.dart';
+import '../../../../core/models/veiculo.dart';
+import '../../../../core/models/modelo.dart';
+import 'ireservation_manager_service.dart';
+
+class MockReservationManagerService implements IReservationManagerService {
+  @override
+  Future<List<Reserva>> getManagerReservations({String? clienteId}) async {
+    await Future.delayed(const Duration(seconds: 1));
+    return [
+      Reserva(
+        id: 'mock-1',
+        status: 'PENDENTE',
+        dataInicio: DateTime.now().add(const Duration(days: 2)),
+        dataFim: DateTime.now().add(const Duration(days: 5)),
+        cliente: Cliente(
+          id: 'c1',
+          nomeCompleto: 'João Silva',
+          cpf: '123.456.789-00',
+          usuarioId: 'u1',
+          criadoEm: DateTime.now(),
+        ),
+        veiculo: Veiculo(
+          id: 'v1',
+          placa: 'ABC-1234',
+          ano: 2022,
+          status: 'DISPONIVEL',
+          criadoEm: DateTime.now(),
+          modelo: Modelo(id: 1, nome: 'Onix', marca: 'Chevrolet'),
+        ),
+      ),
+    ];
+  }
+
+  @override
+  Future<void> updateReservationStatus(String id, String status) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+  }
+}

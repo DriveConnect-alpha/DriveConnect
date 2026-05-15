@@ -24,6 +24,7 @@ export async function iniciarPagamento(req: IncomingMessage, res: ServerResponse
     data_fim,
     cliente_id,
     plano_seguro_id,  // opcional: se omitido usa o plano básico da locadora
+    metodo_pagamento, // opcional: se 'DINHEIRO', pula InfinitePay
   } = corpo;
 
   if (!modelo_id || !filial_retirada_id || !data_inicio || !data_fim || !cliente_id) {
@@ -70,6 +71,7 @@ export async function iniciarPagamento(req: IncomingMessage, res: ServerResponse
     emailCliente: dadosCliente.rows[0].email,
     descricaoModelo: `${dadosModelo.rows[0].marca} ${dadosModelo.rows[0].nome}`,
     planoSeguroId: plano_seguro_id,
+    metodoPagamento: metodo_pagamento,
     origem: 'APP',
   });
 
@@ -133,6 +135,15 @@ export async function statusPagamento(req: IncomingMessage, res: ServerResponse,
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ erro: 'Reserva não encontrada.' }));
     return;
+  }
+
+  // Se o status já estiver confirmado e a notificação do WhatsApp ainda não tiver acontecido
+  // (por exemplo: webhook perdido), tenta notificar no caminho de polling também.
+  const status = String(resultado.rows[0]?.status || '');
+  if (status === 'RESERVADA') {
+    void notifyPaymentConfirmed(reservaId).catch((err) => {
+      console.error('[Pagamento] Falha ao notificar WhatsApp (polling):', err);
+    });
   }
 
   res.writeHead(200, { 'Content-Type': 'application/json' });

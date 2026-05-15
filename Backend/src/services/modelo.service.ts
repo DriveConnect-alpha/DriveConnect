@@ -8,7 +8,11 @@ import { Modelo, type ModeloInput, type ModeloSafe, type ModeloUpdateInput } fro
 async function _listarModelos(tipoCarroId?: number): Promise<ModeloSafe[]> {
     let sql = `
         SELECT m.id, m.nome, m.marca, m.tipo_carro_id,
-               tc.nome AS tipo_carro_nome
+                json_build_object(
+                    'id', tc.id,
+                    'nome', tc.nome,
+                    'preco_base_diaria', tc.preco_base_diaria
+                ) AS tipo_carro
         FROM modelo m
         LEFT JOIN tipo_carro tc ON tc.id = m.tipo_carro_id
     `;
@@ -30,7 +34,12 @@ async function _listarModelosDisponiveis(
     filialId?: string
 ): Promise<ModeloSafe[]> {
     let sql = `
-        SELECT DISTINCT m.id, m.nome, m.marca, m.tipo_carro_id, tc.nome AS tipo_carro_nome
+        SELECT DISTINCT m.id, m.nome, m.marca, m.tipo_carro_id,
+                json_build_object(
+                    'id', tc.id,
+                    'nome', tc.nome,
+                    'preco_base_diaria', tc.preco_base_diaria
+                ) AS tipo_carro
         FROM modelo m
         LEFT JOIN tipo_carro tc ON tc.id = m.tipo_carro_id
         JOIN veiculo v ON v.modelo_id = m.id
@@ -38,12 +47,12 @@ async function _listarModelosDisponiveis(
           AND v.deletado_em IS NULL
     `;
     const valores: unknown[] = [dataInicio, dataFim];
-    
+
     if (filialId) {
         sql += ` AND v.filial_id = $3`;
         valores.push(filialId);
     }
-    
+
     sql += `
         AND NOT EXISTS (
             SELECT 1 FROM reserva r
@@ -55,7 +64,7 @@ async function _listarModelosDisponiveis(
         )
         ORDER BY m.marca ASC, m.nome ASC
     `;
-    
+
     const resultado = await query(sql, valores);
     return resultado.rows;
 }
@@ -63,7 +72,11 @@ async function _listarModelosDisponiveis(
 async function _buscarModeloPorId(id: number): Promise<ModeloSafe | null> {
     const resultado = await query(
         `SELECT m.id, m.nome, m.marca, m.tipo_carro_id,
-                tc.nome AS tipo_carro_nome
+                json_build_object(
+                    'id', tc.id,
+                    'nome', tc.nome,
+                    'preco_base_diaria', tc.preco_base_diaria
+                ) AS tipo_carro
          FROM modelo m
          LEFT JOIN tipo_carro tc ON tc.id = m.tipo_carro_id
          WHERE m.id = $1`,

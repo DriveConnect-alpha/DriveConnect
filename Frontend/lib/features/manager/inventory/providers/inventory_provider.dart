@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/models/veiculo.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_exceptions.dart';
@@ -67,7 +68,7 @@ class InventoryProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> addVehicle(Veiculo veiculo, {List<dynamic>? images, double? precoDiaria, List<String>? itensIds}) async {
+  Future<bool> addVehicle(Veiculo veiculo, {List<XFile>? images, double? precoDiaria, List<String>? itensIds}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();

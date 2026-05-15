@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/models/veiculo.dart';
 import '../../../../calls/frota.call.dart';
 import 'iinventory_service.dart';
@@ -34,7 +35,7 @@ class InventoryService implements IInventoryService {
   }
 
   @override
-  Future<void> addVehicle(Veiculo veiculo, {List<dynamic>? images, double? precoDiaria, List<String>? itensIds}) async {
+  Future<void> addVehicle(Veiculo veiculo, {List<XFile>? images, double? precoDiaria, List<String>? itensIds}) async {
     final completer = Completer<void>();
 
     await FrotaCall.registrarVeiculo(

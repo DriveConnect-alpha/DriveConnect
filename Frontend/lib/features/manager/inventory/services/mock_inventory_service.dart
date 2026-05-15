@@ -1,3 +1,4 @@
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/models/veiculo.dart';
 import '../../../../core/models/modelo.dart';
 import 'iinventory_service.dart';
@@ -24,7 +25,7 @@ class MockInventoryService implements IInventoryService {
   }
 
   @override
-  Future<void> addVehicle(Veiculo veiculo, {List<dynamic>? images, double? precoDiaria, List<String>? itensIds}) async {
+  Future<void> addVehicle(Veiculo veiculo, {List<XFile>? images, double? precoDiaria, List<String>? itensIds}) async {
     await Future.delayed(const Duration(seconds: 1));
   }
 

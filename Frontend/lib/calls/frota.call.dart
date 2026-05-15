@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:image_picker/image_picker.dart';
 import 'api_core.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,7 +146,7 @@ class FrotaCall {
     required int ano,
     required String cor,
     required String status,
-    List<dynamic>? imagens,
+    List<XFile>? imagens,
     int indicePrincipal = 0,
     double? precoDiaria,
     List<String>? itensIds,
@@ -169,7 +170,7 @@ class FrotaCall {
         final List<MultipartFile> multipartFiles = [];
         for (var img in imagens) {
           final bytes = await img.readAsBytes();
-          final filename = img.name;
+          final filename = img.name.isNotEmpty ? img.name : img.path.split('/').last;
           multipartFiles.add(MultipartFile.fromBytes(bytes, filename: filename));
         }
         map['imagem'] = multipartFiles;

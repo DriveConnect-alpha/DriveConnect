@@ -202,3 +202,8 @@ scratch/
 
 # Firebase
 Backend/driveconnectfirebase.json
+Backend/driveconnectfirebaseadmin.json
+
+# Ignore uploaded files and sensitive artifacts
+Backend/uploads/
+Backend/uploads/**

@@ -121,7 +121,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                                      image: DecorationImage(
                                        image: veiculo.imagemUrl != null
-                                         ? NetworkImage('$apiBaseUrl/storage/carros/${veiculo.imagemUrl}')
+                                           ? NetworkImage(
+                                               '$apiBaseUrl/storage/carros/${veiculo.imagemUrl}',
+                                               headers: vehicleImageHeaders,
+                                             )
                                          : const NetworkImage('https://placehold.co/600x400/png?text=Sem+Imagem'),
                                        fit: BoxFit.cover,
                                      ),

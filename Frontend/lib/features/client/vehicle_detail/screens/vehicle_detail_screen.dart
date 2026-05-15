@@ -58,6 +58,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
               background: veiculo.imagemUrl != null
                   ? Image.network(
                       '$apiBaseUrl/storage/carros/${veiculo.imagemUrl}',
+                      headers: vehicleImageHeaders,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) => Image.network(
                         'https://placehold.co/800x600/png?text=${veiculo.modelo?.nome}',

@@ -146,8 +146,7 @@ class FrotaCall {
     required int ano,
     required String cor,
     required String status,
-    List<XFile>? imagens,
-    int indicePrincipal = 0,
+    XFile? imagem,
     double? precoDiaria,
     List<String>? itensIds,
     required void Function(Map<String, dynamic> data) onSuccess,
@@ -161,19 +160,14 @@ class FrotaCall {
         'ano': ano,
         'cor': cor,
         'status': status,
-        'indice_principal': indicePrincipal,
         if (precoDiaria != null) 'preco_diaria': precoDiaria,
         if (itensIds != null) 'itens_ids': itensIds,
       };
 
-      if (imagens != null && imagens.isNotEmpty) {
-        final List<MultipartFile> multipartFiles = [];
-        for (var img in imagens) {
-          final bytes = await img.readAsBytes();
-          final filename = img.name.isNotEmpty ? img.name : img.path.split('/').last;
-          multipartFiles.add(MultipartFile.fromBytes(bytes, filename: filename));
-        }
-        map['imagem'] = multipartFiles;
+      if (imagem != null) {
+        final bytes = await imagem.readAsBytes();
+        final filename = imagem.name.isNotEmpty ? imagem.name : imagem.path.split('/').last;
+        map['imagem'] = MultipartFile.fromBytes(bytes, filename: filename);
       }
 
       final response = await dioClient.post<Map<String, dynamic>>(

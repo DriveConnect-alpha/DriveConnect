@@ -68,12 +68,12 @@ class InventoryProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> addVehicle(Veiculo veiculo, {List<XFile>? images, double? precoDiaria, List<String>? itensIds}) async {
+  Future<bool> addVehicle(Veiculo veiculo, {XFile? image, double? precoDiaria, List<String>? itensIds}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
     try {
-      await _service.addVehicle(veiculo, images: images, precoDiaria: precoDiaria, itensIds: itensIds);
+      await _service.addVehicle(veiculo, image: image, precoDiaria: precoDiaria, itensIds: itensIds);
       await fetchInventory();
       return true;
     } catch (e) {

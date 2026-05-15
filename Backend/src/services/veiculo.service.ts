@@ -167,6 +167,15 @@ export async function adicionarImagemVeiculo(veiculoId: string, filename: string
     `, [veiculoId, filename, isPrincipal]);
 }
 
+export async function substituirImagemVeiculo(veiculoId: string, filename: string): Promise<void> {
+    await query(`DELETE FROM veiculo_imagem WHERE veiculo_id = $1`, [veiculoId]);
+    await query(
+        `INSERT INTO veiculo_imagem (veiculo_id, filename, is_principal)
+         VALUES ($1, $2, TRUE)`,
+        [veiculoId, filename],
+    );
+}
+
 export async function atualizarVeiculo(id: string, dados: Partial<Veiculo>): Promise<Veiculo | null> {
     const setClauses: string[] = [];
     const values: any[] = [];

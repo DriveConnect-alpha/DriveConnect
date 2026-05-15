@@ -35,7 +35,7 @@ class InventoryService implements IInventoryService {
   }
 
   @override
-  Future<void> addVehicle(Veiculo veiculo, {List<XFile>? images, double? precoDiaria, List<String>? itensIds}) async {
+  Future<void> addVehicle(Veiculo veiculo, {XFile? image, double? precoDiaria, List<String>? itensIds}) async {
     final completer = Completer<void>();
 
     await FrotaCall.registrarVeiculo(
@@ -45,7 +45,7 @@ class InventoryService implements IInventoryService {
       ano: veiculo.ano,
       cor: veiculo.cor ?? 'Não especificada',
       status: veiculo.status,
-      imagens: images,
+      imagem: image,
       precoDiaria: precoDiaria,
       itensIds: itensIds,
       onSuccess: (_) => completer.complete(),

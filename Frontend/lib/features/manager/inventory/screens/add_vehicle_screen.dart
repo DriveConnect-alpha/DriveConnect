@@ -38,7 +38,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
 
   bool _isLoadingData = true;
 
-  final List<XFile> _selectedImages = [];
+  XFile? _selectedImage;
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -93,18 +93,18 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImages() async {
-    final List<XFile> images = await _picker.pickMultiImage();
-    if (images.isNotEmpty) {
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
       setState(() {
-        _selectedImages.addAll(images);
+        _selectedImage = image;
       });
     }
   }
 
-  void _removeImage(int index) {
+  void _removeImage() {
     setState(() {
-      _selectedImages.removeAt(index);
+      _selectedImage = null;
     });
   }
 
@@ -131,7 +131,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
 
       final success = await provider.addVehicle(
         novoVeiculo,
-        images: _selectedImages,
+        image: _selectedImage,
         precoDiaria: _precoController.text.isNotEmpty ? double.parse(_precoController.text) : null,
         itensIds: _selectedOpcionaisIds,
       );
@@ -388,49 +388,43 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                 }).toList(),
               ),
               const SizedBox(height: 24),
-              const Text('Imagens do Veículo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text('Imagem do Veículo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 8),
-              if (_selectedImages.isNotEmpty)
+              if (_selectedImage != null)
                 SizedBox(
                   height: 100,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _selectedImages.length,
-                    itemBuilder: (context, index) {
-                      return Stack(
-                        children: [
-                          Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              image: DecorationImage(
-                                image: kIsWeb 
-                                  ? NetworkImage(_selectedImages[index].path)
-                                  : FileImage(File(_selectedImages[index].path)) as ImageProvider,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
+                  child: Stack(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          image: DecorationImage(
+                            image: kIsWeb
+                                ? NetworkImage(_selectedImage!.path)
+                                : FileImage(File(_selectedImage!.path)) as ImageProvider,
+                            fit: BoxFit.cover,
                           ),
-                          Positioned(
-                            top: 0,
-                            right: 8,
-                            child: IconButton(
-                              icon: const Icon(Symbols.close, color: Colors.red),
-                              onPressed: () => _removeImage(index),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
+                        ),
+                      ),
+                      Positioned(
+                        top: 0,
+                        right: 8,
+                        child: IconButton(
+                          icon: const Icon(Symbols.close, color: Colors.red),
+                          onPressed: _removeImage,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: _pickImages,
+                onPressed: _pickImage,
                 icon: const Icon(Symbols.add_a_photo),
-                label: const Text('Selecionar Imagens'),
+                label: Text(_selectedImage == null ? 'Selecionar Imagem' : 'Trocar Imagem'),
               ),
               const SizedBox(height: 32),
               if (provider.error != null)

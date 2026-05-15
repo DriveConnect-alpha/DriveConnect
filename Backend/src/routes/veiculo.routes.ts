@@ -44,7 +44,7 @@ async function tratarErro(res: ServerResponse, err: unknown): Promise<void> {
 
 // ──────────────────────────────────────────────
 // POST /veiculos
-// Body (multipart/form-data): modelo_id, filial_id, placa, ano, cor, status, imagem (file)
+// Body (multipart/form-data): modelo_id, filial_id, placa, ano, cor, status, imagem (file único)
 // ──────────────────────────────────────────────
 export async function registrarVeiculo(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
@@ -69,7 +69,6 @@ export async function registrarVeiculo(req: IncomingMessage, res: ServerResponse
             ano,
             cor,
             status,
-            indice_principal,
             preco_diaria,
             itens_ids
         } = campos;
@@ -79,11 +78,7 @@ export async function registrarVeiculo(req: IncomingMessage, res: ServerResponse
             return;
         }
 
-        // Determina qual imagem será a principal (capa)
-        const idxPrincipal = Number(indice_principal || 0);
-        const imagemPrincipal: string | null = caminhosImagens.length > 0
-            ? (caminhosImagens[idxPrincipal] || caminhosImagens[0] || null)
-            : null;
+        const imagemPrincipal: string | null = caminhosImagens.length > 0 ? (caminhosImagens[0] ?? null) : null;
 
         const novoVeiculo = await criarVeiculo({
             modelo_id: Number(modelo_id),
@@ -97,13 +92,9 @@ export async function registrarVeiculo(req: IncomingMessage, res: ServerResponse
             itens_ids: Array.isArray(itens_ids) ? itens_ids : (itens_ids ? [itens_ids] : []),
         });
 
-        // Salva todas as imagens na tabela de galeria
-        const { adicionarImagemVeiculo } = await import('../services/veiculo.service.js');
-        for (let i = 0; i < caminhosImagens.length; i++) {
-            const caminho = caminhosImagens[i];
-            if (!caminho) continue;
-            const isPrincipal = i === idxPrincipal || (caminhosImagens.length === 1);
-            await adicionarImagemVeiculo(novoVeiculo.id!, caminho, isPrincipal);
+        if (imagemPrincipal) {
+            const { substituirImagemVeiculo } = await import('../services/veiculo.service.js');
+            await substituirImagemVeiculo(novoVeiculo.id!, imagemPrincipal);
         }
 
         responder(res, 201, novoVeiculo);
@@ -134,7 +125,7 @@ export async function listar(req: IncomingMessage, res: ServerResponse): Promise
 }
 
 // ──────────────────────────────────────────────
-// GET /veiculos/:id
+// GET /veiculos/:id3
 // ──────────────────────────────────────────────
 export async function buscar(req: IncomingMessage, res: ServerResponse, id: string): Promise<void> {
     try {
@@ -188,6 +179,10 @@ export async function atualizar(req: IncomingMessage, res: ServerResponse, id: s
             dadosParaAtualizar.imagem_url = caminhosImagens[0];
         }
 
+        if (Object.keys(dadosParaAtualizar).length > 0) {
+            await atualizarVeiculo(id, dadosParaAtualizar);
+        }
+
         // Se estiver alterando status, usamos o helper que notifica todos os gerentes/admin.
         if (typeof dadosParaAtualizar.status === 'string' && dadosParaAtualizar.status) {
             const novoStatus = String(dadosParaAtualizar.status);
@@ -209,11 +204,9 @@ export async function atualizar(req: IncomingMessage, res: ServerResponse, id: s
             return;
         }
 
-        // Se houver novas imagens, adiciona na galeria (sem marcar como principal obrigatoriamente, 
-        // a menos que seja a única ou explicitado - aqui mantemos simples para o PUT)
-        const { adicionarImagemVeiculo } = await import('../services/veiculo.service.js');
-        for (const img of caminhosImagens) {
-            await adicionarImagemVeiculo(id, img, false);
+        if (caminhosImagens.length > 0) {
+            const { substituirImagemVeiculo } = await import('../services/veiculo.service.js');
+            await substituirImagemVeiculo(id, caminhosImagens[0]!);
         }
 
         responder(res, 200, veiculoAtualizado);
@@ -240,8 +233,7 @@ export async function adicionarImagem(req: IncomingMessage, res: ServerResponse,
             return;
         }
 
-        const isPrincipal = campos.is_principal === 'true' || campos.is_principal === true;
-        const { adicionarImagemVeiculo } = await import('../services/veiculo.service.js');
+        const { substituirImagemVeiculo, atualizarVeiculo } = await import('../services/veiculo.service.js');
 
         // Nesta rota, processamos apenas a primeira imagem para manter compatibilidade com o comportamento esperado
         const caminhoImagem = caminhosImagens[0];
@@ -249,7 +241,8 @@ export async function adicionarImagem(req: IncomingMessage, res: ServerResponse,
             responder(res, 400, { erro: 'Imagem inválida.' });
             return;
         }
-        await adicionarImagemVeiculo(id, caminhoImagem, isPrincipal);
+        await substituirImagemVeiculo(id, caminhoImagem);
+        await atualizarVeiculo(id, { imagem_url: caminhoImagem });
 
         responder(res, 201, { mensagem: 'Imagem adicionada com sucesso.', filename: caminhoImagem });
     } catch (err) {

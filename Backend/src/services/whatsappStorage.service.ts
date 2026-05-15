@@ -20,6 +20,7 @@ export type WhatsappConversationSummary = {
   createdAt: Date;
   lastMessageText: string | null;
   lastMessageDirection: WhatsappMessageDirection | null;
+  paused: boolean;
 };
 
 export async function ensureConversation(phone: string): Promise<{ id: string } | null> {
@@ -227,6 +228,7 @@ export async function listConversations(params?: {
     createdAt: row.created_at,
     lastMessageText: row.last_message_text ?? null,
     lastMessageDirection: row.last_message_direction ?? null,
+    paused: row.status === 'PAUSED',
   }));
 }
 
@@ -256,4 +258,37 @@ export async function listConversationMessages(params: {
     status: row.status,
     createdAt: row.created_at,
   }));
+}
+
+export async function pauseConversation(conversationId: string): Promise<boolean> {
+  if (!conversationId) return false;
+  const result = await query(
+    `UPDATE whatsapp_conversation SET status = $1 WHERE id = $2 RETURNING id`,
+    ['PAUSED', conversationId],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function resumeConversation(conversationId: string): Promise<boolean> {
+  if (!conversationId) return false;
+  const result = await query(
+    `UPDATE whatsapp_conversation SET status = $1 WHERE id = $2 RETURNING id`,
+    ['OPEN', conversationId],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function sendManagerMessage(params: {
+  conversationId: string;
+  phone: string;
+  text: string;
+  waMessageId?: string | null;
+}): Promise<StoredMessage | null> {
+  return storeMessage({
+    conversationId: params.conversationId,
+    direction: 'OUT',
+    waMessageId: params.waMessageId || null,
+    text: params.text,
+    status: 'sent',
+  });
 }

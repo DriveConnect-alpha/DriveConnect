@@ -299,11 +299,28 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
   bool _isLoading = true;
   String? _error;
   List<WhatsAppMessage> _messages = const [];
+  bool _isActionLoading = false;
+  final ScrollController _messagesScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadMessages();
+  }
+
+  @override
+  void dispose() {
+    _messagesScrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToLatest() {
+    if (!_messagesScrollController.hasClients) return;
+
+    final target = _messagesScrollController.position.maxScrollExtent;
+    if (target <= 0) return;
+
+    _messagesScrollController.jumpTo(target);
   }
 
   Future<void> _loadMessages() async {
@@ -339,8 +356,146 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
         setState(() {
           _isLoading = false;
         });
+        if (_messages.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _scrollToLatest();
+            }
+          });
+        }
       }
     }
+  }
+
+  Future<void> _togglePauseResume() async {
+    setState(() => _isActionLoading = true);
+
+    final isCurrent = widget.conversation.paused;
+    final action = isCurrent ? 'retomar' : 'pausar';
+
+    if (isCurrent) {
+      await GerenteCall.resumeAttendance(
+        conversationId: widget.conversation.id,
+        onSuccess: (data) {
+          if (mounted) {
+            setState(() => _isActionLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Atendimento retomado.')),
+            );
+            widget.conversation.paused = false;
+            Navigator.of(context).pop();
+          }
+        },
+        onError: (msg) {
+          if (mounted) {
+            setState(() => _isActionLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Erro ao retomar: $msg')),
+            );
+          }
+        },
+      );
+    } else {
+      await GerenteCall.pauseAttendance(
+        conversationId: widget.conversation.id,
+        onSuccess: (data) {
+          if (mounted) {
+            setState(() => _isActionLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Atendimento pausado. O bot não responderá.')),
+            );
+            widget.conversation.paused = true;
+            Navigator.of(context).pop();
+          }
+        },
+        onError: (msg) {
+          if (mounted) {
+            setState(() => _isActionLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Erro ao pausar: $msg')),
+            );
+          }
+        },
+      );
+    }
+  }
+
+  void _showSendMessageDialog() {
+    final textController = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Enviar Mensagem'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              TextField(
+                controller: textController,
+                decoration: const InputDecoration(
+                  hintText: 'Digite a mensagem...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                enabled: !isSubmitting,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: isSubmitting ? null : () => _sendMessage(textController, ctx),
+              child: isSubmitting
+                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Enviar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendMessage(TextEditingController controller, BuildContext dialogContext) async {
+    final text = controller.text.trim();
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Digite uma mensagem.')),
+      );
+      return;
+    }
+
+    // Update dialog state
+    if (mounted) {
+      (dialogContext as Element).markNeedsBuild();
+    }
+
+    await GerenteCall.sendManagerMessage(
+      conversationId: widget.conversation.id,
+      text: text,
+      phone: widget.conversation.phone,
+      onSuccess: (data) {
+        if (mounted) {
+          Navigator.of(dialogContext).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Mensagem enviada com sucesso.')),
+          );
+          _loadMessages(); // Reload messages to show the new one
+        }
+      },
+      onError: (msg) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao enviar: $msg')),
+          );
+        }
+      },
+    );
   }
 
   String _formatTime(DateTime date) {
@@ -352,6 +507,8 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
+    final conversation = widget.conversation;
+    
     return SafeArea(
       child: SizedBox(
         height: media.size.height * 0.86,
@@ -359,11 +516,31 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
           children: [
             ListTile(
               leading: const Icon(Symbols.chat),
-              title: Text('Atendimento: ${widget.conversation.phone}'),
-              subtitle: Text('Status: ${widget.conversation.status}'),
+              title: Text('Atendimento: ${conversation.phone}'),
+              subtitle: Text('Status: ${conversation.status}${conversation.paused ? ' (PAUSADO)' : ''}'),
               trailing: IconButton(
                 icon: const Icon(Symbols.close),
                 onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+            const Divider(height: 1),
+            // Action buttons
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                children: [
+                  FilledButton.icon(
+                    onPressed: _isActionLoading ? null : _togglePauseResume,
+                    icon: Icon(conversation.paused ? Symbols.play_arrow : Symbols.pause),
+                    label: Text(conversation.paused ? 'Retomar' : 'Pausar'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _isActionLoading ? null : _showSendMessageDialog,
+                    icon: const Icon(Symbols.send),
+                    label: const Text('Enviar Mensagem'),
+                  ),
+                ],
               ),
             ),
             const Divider(height: 1),
@@ -391,6 +568,7 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
             else
               Expanded(
                 child: ListView.builder(
+                  controller: _messagesScrollController,
                   padding: const EdgeInsets.all(16),
                   itemCount: _messages.length,
                   itemBuilder: (context, index) {

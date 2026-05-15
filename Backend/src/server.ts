@@ -124,6 +124,9 @@ import {
   listAdminConversations,
   receiveWebhook as receiveWebhookWhatsApp,
   verifyWebhook as verifyWebhookWhatsApp,
+  pauseAttendance,
+  resumeAttendance,
+  sendMessageAsManager,
 } from './routes/whatsapp.routes.js';
 // Rotas de notificações (FCM)
 import { registrarTokenFcm, removerTokenFcm } from './routes/notification.routes.js';
@@ -238,6 +241,24 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   if (matchWhatsAppMessages && method === 'GET') {
     const conversationId = matchWhatsAppMessages[1];
     if (conversationId !== undefined) return listAdminConversationMessages(req, res, conversationId);
+  }
+
+  const matchWhatsAppPause = path.match(/^\/whatsapp\/conversations\/([^/]+)\/pause$/);
+  if (matchWhatsAppPause && method === 'PATCH') {
+    const conversationId = matchWhatsAppPause[1];
+    if (conversationId !== undefined) return pauseAttendance(req, res, conversationId);
+  }
+
+  const matchWhatsAppResume = path.match(/^\/whatsapp\/conversations\/([^/]+)\/resume$/);
+  if (matchWhatsAppResume && method === 'PATCH') {
+    const conversationId = matchWhatsAppResume[1];
+    if (conversationId !== undefined) return resumeAttendance(req, res, conversationId);
+  }
+
+  const matchWhatsAppSendMessage = path.match(/^\/whatsapp\/conversations\/([^/]+)\/send-message$/);
+  if (matchWhatsAppSendMessage && method === 'POST') {
+    const conversationId = matchWhatsAppSendMessage[1];
+    if (conversationId !== undefined) return sendMessageAsManager(req, res, conversationId);
   }
 
   // /clientes/me deve vir ANTES de /clientes/:id para não ser capturado pelo regex

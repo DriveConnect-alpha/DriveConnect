@@ -6,6 +6,7 @@ class WhatsAppConversation {
   final DateTime createdAt;
   final String? lastMessageText;
   final String? lastMessageDirection;
+  final bool paused;
 
   const WhatsAppConversation({
     required this.id,
@@ -15,6 +16,7 @@ class WhatsAppConversation {
     required this.createdAt,
     this.lastMessageText,
     this.lastMessageDirection,
+    this.paused = false,
   });
 
   factory WhatsAppConversation.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,7 @@ class WhatsAppConversation {
       createdAt: parseDate(json['createdAt'] ?? json['created_at']),
       lastMessageText: (json['lastMessageText'] ?? json['last_message_text'])?.toString(),
       lastMessageDirection: (json['lastMessageDirection'] ?? json['last_message_direction'])?.toString(),
+      paused: json['paused'] == true,
     );
   }
 }

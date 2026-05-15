@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import * as crypto from 'crypto';
-import { processIncomingMessage } from '../services/whatsapp.service.js';
-import { listConversationMessages, listConversations } from '../services/whatsappStorage.service.js';
+import { processIncomingMessage, sendMessage } from '../services/whatsapp.service.js';
+import { listConversationMessages, listConversations, pauseConversation, resumeConversation, sendManagerMessage } from '../services/whatsappStorage.service.js';
 import { checkRole } from '../utils/auth.js';
 
 type CorpoLido = { raw: Buffer; json: Record<string, any> };
@@ -199,7 +199,7 @@ export async function listAdminConversations(req: IncomingMessage, res: ServerRe
     const rows = await listConversations({
       limit,
       offset,
-      phone: phone || undefined,
+      ...(phone ? { phone } : {}),
     });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -256,5 +256,136 @@ export async function listAdminConversationMessages(req: IncomingMessage, res: S
     console.error('[WhatsApp] Erro ao listar mensagens da conversa:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ erro: 'Erro ao listar mensagens da conversa.' }));
+  }
+}
+
+// ──────────────────────────────────────────────
+// PATCH /whatsapp/conversations/:id/pause
+// Pausar atendimento (gerente)
+// ──────────────────────────────────────────────
+export async function pauseAttendance(req: IncomingMessage, res: ServerResponse, conversationId: string) {
+  const currentUser = checkRole(req, res, ['ADMIN', 'GERENTE']);
+  if (!currentUser) return;
+
+  if (!conversationId) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ erro: 'conversationId é obrigatório.' }));
+    return;
+  }
+
+  try {
+    const success = await pauseConversation(conversationId);
+    if (!success) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ erro: 'Conversa não encontrada.' }));
+      return;
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ mensagem: 'Bot pausado. Cliente ainda pode enviar mensagens, mas o bot não responderá.' }));
+  } catch (error) {
+    console.error('[WhatsApp] Erro ao pausar conversa:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ erro: 'Erro ao pausar atendimento.' }));
+  }
+}
+
+// ──────────────────────────────────────────────
+// PATCH /whatsapp/conversations/:id/resume
+// Retomar atendimento (gerente)
+// ──────────────────────────────────────────────
+export async function resumeAttendance(req: IncomingMessage, res: ServerResponse, conversationId: string) {
+  const currentUser = checkRole(req, res, ['ADMIN', 'GERENTE']);
+  if (!currentUser) return;
+
+  if (!conversationId) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ erro: 'conversationId é obrigatório.' }));
+    return;
+  }
+
+  try {
+    const success = await resumeConversation(conversationId);
+    if (!success) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ erro: 'Conversa não encontrada.' }));
+      return;
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ mensagem: 'Bot retomado. Agora o bot responderá as mensagens.' }));
+  } catch (error) {
+    console.error('[WhatsApp] Erro ao retomar conversa:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ erro: 'Erro ao retomar atendimento.' }));
+  }
+}
+
+function lerCorpoJson(req: IncomingMessage): Promise<Record<string, any>> {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => (body += chunk));
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(body || '{}'));
+      } catch {
+        reject(new Error('JSON inválido no corpo da requisição.'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+// ──────────────────────────────────────────────
+// POST /whatsapp/conversations/:id/send-message
+// Enviar mensagem como gerente
+// ──────────────────────────────────────────────
+export async function sendMessageAsManager(req: IncomingMessage, res: ServerResponse, conversationId: string) {
+  const currentUser = checkRole(req, res, ['ADMIN', 'GERENTE']);
+  if (!currentUser) return;
+
+  if (!conversationId) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ erro: 'conversationId é obrigatório.' }));
+    return;
+  }
+
+  try {
+    const body = await lerCorpoJson(req);
+    const text = (body.text || '').trim();
+    const phone = (body.phone || '').trim();
+
+    if (!text) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ erro: 'Texto da mensagem é obrigatório.' }));
+      return;
+    }
+
+    if (!phone) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ erro: 'Telefone é obrigatório.' }));
+      return;
+    }
+
+    // Enviar via WhatsApp
+    const messageId = await sendMessage(phone, text);
+    
+    // Registrar na conversa
+    await sendManagerMessage({
+      conversationId,
+      phone,
+      text,
+      waMessageId: messageId || null,
+    });
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      mensagem: 'Mensagem enviada com sucesso.',
+      messageId,
+    }));
+  } catch (error) {
+    console.error('[WhatsApp] Erro ao enviar mensagem do gerente:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ erro: 'Erro ao enviar mensagem.' }));
   }
 }

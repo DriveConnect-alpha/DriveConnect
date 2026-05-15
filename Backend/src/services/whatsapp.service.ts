@@ -18,6 +18,9 @@ import {
   markWhatsappReservaNotified,
   storeMessage,
   updateMessageStatus,
+  pauseConversation,
+  resumeConversation,
+  sendManagerMessage,
 } from './whatsappStorage.service.js';
 import { criarCliente } from './usuario.service.js';
 import crypto from 'crypto';
@@ -185,6 +188,24 @@ export async function processIncomingMessage(payload: any): Promise<void> {
   const conversation = await ensureConversation(from);
   if (!conversation?.id) {
     console.error('[WhatsApp Service] Não foi possível abrir conversa para', from);
+    return;
+  }
+
+  // Verificar se conversa está pausada pelo gerente
+  const convCheck = await query(
+    'SELECT status FROM whatsapp_conversation WHERE id = $1',
+    [conversation.id],
+  );
+  if (convCheck.rows[0]?.status === 'PAUSED') {
+    // Marca como recebida mas não responde
+    await storeMessage({
+      conversationId: conversation.id,
+      direction: 'IN',
+      waMessageId: message.id,
+      text,
+      rawPayload: message,
+      status: 'received',
+    });
     return;
   }
 

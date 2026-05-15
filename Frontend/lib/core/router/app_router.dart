@@ -24,6 +24,7 @@ import '../../features/manager/insurance/screens/insurance_screen.dart';
 import '../../features/manager/settings/screens/manager_settings_screen.dart';
 import '../../features/admin/screens/admin_users_screen.dart';
 import '../../features/admin/screens/admin_create_manager_screen.dart';
+import '../../features/admin/screens/admin_whatsapp_conversations_screen.dart';
 import '../models/veiculo.dart';
 
 class AppRouter {
@@ -117,6 +118,10 @@ class AppRouter {
           GoRoute(
             path: 'admin/create-manager',
             builder: (context, state) => const AdminCreateManagerScreen(),
+          ),
+          GoRoute(
+            path: 'admin/atendimentos',
+            builder: (context, state) => const AdminWhatsAppConversationsScreen(),
           ),
         ],
       ),

@@ -220,4 +220,158 @@ class GerenteCall {
       onError(e.toString());
     }
   }
+
+  /// Lista conversas registradas do WhatsApp (Admin).
+  /// ROUTE: GET /whatsapp/conversations
+  static Future<void> listarConversasWhatsapp({
+    int limit = 30,
+    int offset = 0,
+    String? phone,
+    required void Function(List<Map<String, dynamic>> conversas) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.get<Map<String, dynamic>>(
+        '/whatsapp/conversations',
+        queryParameters: {
+          'limit': limit,
+          'offset': offset,
+          if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        },
+      );
+
+      final raw = response.data?['data'];
+      if (raw is List) {
+        final data = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        onSuccess(data);
+      } else {
+        onSuccess([]);
+      }
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
+
+  /// Lista mensagens de uma conversa do WhatsApp (Admin).
+  /// ROUTE: GET /whatsapp/conversations/:id/messages
+  static Future<void> listarMensagensWhatsapp({
+    required String conversationId,
+    int limit = 100,
+    int offset = 0,
+    required void Function(List<Map<String, dynamic>> mensagens) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    if (conversationId.isEmpty) {
+      onError('conversationId é obrigatório.');
+      return;
+    }
+
+    try {
+      final response = await dioClient.get<Map<String, dynamic>>(
+        '/whatsapp/conversations/$conversationId/messages',
+        queryParameters: {
+          'limit': limit,
+          'offset': offset,
+        },
+      );
+
+      final raw = response.data?['data'];
+      if (raw is List) {
+        final data = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        onSuccess(data);
+      } else {
+        onSuccess([]);
+      }
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
+
+  /// Pausa uma conversa do WhatsApp (o bot deixa de responder).
+  /// ROUTE: PATCH /whatsapp/conversations/:id/pause
+  /// AUTH: required (Admin or Gerente)
+  static Future<void> pauseAttendance({
+    required String conversationId,
+    required void Function(Map<String, dynamic> data) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    if (conversationId.isEmpty) {
+      onError('conversationId é obrigatório.');
+      return;
+    }
+
+    try {
+      final response = await dioClient.patch<Map<String, dynamic>>(
+        '/whatsapp/conversations/$conversationId/pause',
+      );
+
+      onSuccess(response.data ?? {});
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
+
+  /// Retoma uma conversa pausada do WhatsApp (o bot volta a responder).
+  /// ROUTE: PATCH /whatsapp/conversations/:id/resume
+  /// AUTH: required (Admin or Gerente)
+  static Future<void> resumeAttendance({
+    required String conversationId,
+    required void Function(Map<String, dynamic> data) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    if (conversationId.isEmpty) {
+      onError('conversationId é obrigatório.');
+      return;
+    }
+
+    try {
+      final response = await dioClient.patch<Map<String, dynamic>>(
+        '/whatsapp/conversations/$conversationId/resume',
+      );
+
+      onSuccess(response.data ?? {});
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
+
+  /// Envia uma mensagem como gerente em uma conversa do WhatsApp.
+  /// ROUTE: POST /whatsapp/conversations/:id/send-message
+  /// AUTH: required (Admin or Gerente)
+  static Future<void> sendManagerMessage({
+    required String conversationId,
+    required String text,
+    required String phone,
+    required void Function(Map<String, dynamic> data) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    if (conversationId.isEmpty || text.isEmpty || phone.isEmpty) {
+      onError('conversationId, text e phone são obrigatórios.');
+      return;
+    }
+
+    try {
+      final response = await dioClient.post<Map<String, dynamic>>(
+        '/whatsapp/conversations/$conversationId/send-message',
+        data: {
+          'text': text,
+          'phone': phone,
+        },
+      );
+
+      onSuccess(response.data ?? {});
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
 }

@@ -72,11 +72,15 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
   }
 
   Future<void> _openConversation(WhatsAppConversation conversation) async {
-    showModalBottomSheet<void>(
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => _ConversationMessagesSheet(conversation: conversation),
     );
+
+    if (mounted) {
+      await _loadConversations();
+    }
   }
 
   String _formatDate(DateTime? date) {
@@ -371,7 +375,6 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
     setState(() => _isActionLoading = true);
 
     final isCurrent = widget.conversation.paused;
-    final action = isCurrent ? 'retomar' : 'pausar';
 
     if (isCurrent) {
       await GerenteCall.resumeAttendance(
@@ -382,7 +385,6 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Atendimento retomado.')),
             );
-            widget.conversation.paused = false;
             Navigator.of(context).pop();
           }
         },
@@ -404,7 +406,6 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Atendimento pausado. O bot não responderá.')),
             );
-            widget.conversation.paused = true;
             Navigator.of(context).pop();
           }
         },

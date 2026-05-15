@@ -29,6 +29,12 @@ String get _actualBaseUrl {
 /// Returns the dynamic base URL configured for the current environment.
 String get apiBaseUrl => _actualBaseUrl;
 
+/// Headers used by image widgets when loading protected vehicle images.
+Map<String, String> get vehicleImageHeaders {
+  final apiKey = _apiKey ?? dotenv.env['API_KEY'];
+  return apiKey != null ? {'x-api-key': apiKey} : const {};
+}
+
 // ── Identity store (in-memory) ────────────────────────────────────────────────
 String? _jwtToken;
 String? _usuarioId;

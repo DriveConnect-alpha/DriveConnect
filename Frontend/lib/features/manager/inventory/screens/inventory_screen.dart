@@ -54,6 +54,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           borderRadius: BorderRadius.circular(4),
                           child: Image.network(
                             '$apiBaseUrl/storage/carros/${veiculo.imagemUrl}',
+                            headers: vehicleImageHeaders,
                             width: 60,
                             height: 60,
                             fit: BoxFit.cover,

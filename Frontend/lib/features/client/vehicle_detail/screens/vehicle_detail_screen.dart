@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../../calls/api_core.dart';
 import '../../../../core/models/veiculo.dart';
 import '../../../../core/widgets/dc_button.dart';
 import '../../../../core/widgets/dc_card.dart';
@@ -54,10 +55,20 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
             expandedHeight: 300,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
-              background: Image.network(
-                'https://placehold.co/800x600/png?text=${veiculo.modelo?.nome}',
-                fit: BoxFit.cover,
-              ),
+              background: veiculo.imagemUrl != null
+                  ? Image.network(
+                      '$apiBaseUrl/storage/carros/${veiculo.imagemUrl}',
+                      headers: vehicleImageHeaders,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Image.network(
+                        'https://placehold.co/800x600/png?text=${veiculo.modelo?.nome}',
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Image.network(
+                      'https://placehold.co/800x600/png?text=${veiculo.modelo?.nome}',
+                      fit: BoxFit.cover,
+                    ),
             ),
             actions: [
               IconButton(

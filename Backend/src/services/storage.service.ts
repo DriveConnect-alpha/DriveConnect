@@ -5,6 +5,16 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'carros');
+const EXTENSOES_IMAGEM_VALIDAS = new Set([
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
+    '.gif',
+    '.bmp',
+    '.heic',
+    '.heif',
+]);
 
 // Verifica se o diretório existe, caso contrário cria
 if (!fs.existsSync(UPLOAD_DIR)) {
@@ -12,17 +22,26 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 }
 
 export async function processarUpload(req: IncomingMessage): Promise<{ campos: Record<string, any>, caminhosImagens: string[], caminhoImagem: string | null }> {
+    const ehImagemValida = (part: any): boolean => {
+        const mimetype = String(part?.mimetype ?? '').toLowerCase();
+        if (mimetype.includes('image/')) {
+            return true;
+        }
+
+        const originalFilename = String(part?.originalFilename ?? '').toLowerCase();
+        const extensao = path.extname(originalFilename);
+        return EXTENSOES_IMAGEM_VALIDAS.has(extensao);
+    };
+
     const form = formidable({
         uploadDir: UPLOAD_DIR,
         keepExtensions: true,
         maxFileSize: 5 * 1024 * 1024, // 5MB (compatível com testes e uso padrão)
-        multiples: true, // Habilita múltiplos arquivos
+        multiples: false, // Veículo aceita apenas uma imagem
         filename: (name: string, ext: string, part: any) => {
             return `${uuidv4()}${ext}`;
         },
-        filter: (part: any) => {
-            return part.mimetype?.includes('image/') ?? false;
-        }
+        filter: (part: any) => ehImagemValida(part)
     });
 
     return new Promise((resolve, reject) => {
@@ -37,19 +56,33 @@ export async function processarUpload(req: IncomingMessage): Promise<{ campos: R
                 campos[key] = Array.isArray(val) ? val[0] : val;
             }
 
-            const caminhosImagens: string[] = [];
-            if (files.imagem) {
-                const fileArray = Array.isArray(files.imagem) ? files.imagem : [files.imagem];
+            const arquivosEncontrados: string[] = [];
+            const todasEntradas = Object.values(files ?? {});
+
+            for (const entrada of todasEntradas) {
+                const fileArray = Array.isArray(entrada) ? entrada : [entrada];
                 for (const file of fileArray) {
-                    if (file) {
-                        caminhosImagens.push(file.newFilename);
+                    if (file?.newFilename) {
+                        arquivosEncontrados.push(file.newFilename);
                     }
                 }
             }
 
-            const caminhoImagem: string | null = caminhosImagens.length > 0
-                ? (caminhosImagens[0] ?? null)
+            if (arquivosEncontrados.length > 1) {
+                for (const filename of arquivosEncontrados) {
+                    try {
+                        fs.unlinkSync(path.join(UPLOAD_DIR, filename));
+                    } catch {
+                        // noop
+                    }
+                }
+                return reject(new Error('Apenas uma imagem é permitida por veículo.'));
+            }
+
+            const caminhoImagem: string | null = arquivosEncontrados.length > 0
+                ? (arquivosEncontrados[0] ?? null)
                 : null;
+            const caminhosImagens = caminhoImagem ? [caminhoImagem] : [];
             resolve({ campos, caminhosImagens, caminhoImagem });
         });
     });

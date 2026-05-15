@@ -58,6 +58,20 @@ describe('Storage Service', () => {
       });
     });
 
+    it('deve processar imagem quando o campo vier como imagem[]', async () => {
+      mockParse.mockImplementationOnce((req: any, cb: Function) => {
+        cb(null, { nome: ['Uno'] }, { 'imagem[]': [{ newFilename: 'uuid-456.jpg' }] });
+      });
+
+      const resultado = await processarUpload(mockReq);
+
+      expect(resultado).toEqual({
+        campos: { nome: 'Uno' },
+        caminhoImagem: 'uuid-456.jpg',
+        caminhosImagens: ['uuid-456.jpg']
+      });
+    });
+
     it('deve processar sem imagem caso não seja enviada', async () => {
       mockParse.mockImplementationOnce((req: any, cb: Function) => {
         cb(null, { modelo: ['Civic'] }, {});
@@ -72,6 +86,14 @@ describe('Storage Service', () => {
       });
     });
 
+    it('deve rejeitar quando mais de uma imagem for enviada', async () => {
+      mockParse.mockImplementationOnce((req: any, cb: Function) => {
+        cb(null, {}, { imagem: [{ newFilename: 'a.jpg' }, { newFilename: 'b.jpg' }] });
+      });
+
+      await expect(processarUpload(mockReq)).rejects.toThrow('Apenas uma imagem é permitida por veículo.');
+    });
+
     it('deve configurar corretamente o formidable', async () => {
       mockParse.mockImplementationOnce((req: any, cb: Function) => {
         cb(null, {}, {});
@@ -84,15 +106,17 @@ describe('Storage Service', () => {
       expect(formCallArgs.uploadDir).toBe(UPLOAD_DIR);
       expect(formCallArgs.keepExtensions).toBe(true);
       expect(formCallArgs.maxFileSize).toBe(5 * 1024 * 1024);
+      expect(formCallArgs.multiples).toBe(false);
       
       // Valida o filename (deve gerar um hash + extensão)
       const novoNome = formCallArgs.filename('nome-original', '.jpg', {});
       expect(novoNome).toMatch(/.+\.jpg$/);
 
-      // Valida o filter (aceita só image/)
+      // Valida o filter (aceita MIME image/ e extensões comuns)
       expect(formCallArgs.filter({ mimetype: 'image/png' })).toBe(true);
       expect(formCallArgs.filter({ mimetype: 'application/pdf' })).toBe(false);
-      expect(formCallArgs.filter({ mimetype: undefined })).toBe(false);
+      expect(formCallArgs.filter({ mimetype: undefined, originalFilename: 'foto.jpeg' })).toBe(true);
+      expect(formCallArgs.filter({ mimetype: undefined, originalFilename: 'documento.pdf' })).toBe(false);
     });
   });
 

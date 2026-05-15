@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import '../../../../calls/api_core.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../explore/providers/explore_provider.dart';
 import '../../../../core/widgets/dc_card.dart';
@@ -264,10 +265,18 @@ class _HomeScreenState extends State<HomeScreen> {
             decoration: BoxDecoration(
               color: Colors.grey[200],
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              image: const DecorationImage(
-                image: NetworkImage('https://placehold.co/600x400/png?text=Veiculo'),
-                fit: BoxFit.cover,
-              ),
+              image: veiculo.imagemUrl != null
+                  ? DecorationImage(
+                      image: NetworkImage(
+                        '$apiBaseUrl/storage/carros/${veiculo.imagemUrl}',
+                        headers: vehicleImageHeaders,
+                      ),
+                      fit: BoxFit.cover,
+                    )
+                  : const DecorationImage(
+                      image: NetworkImage('https://placehold.co/600x400/png?text=Veiculo'),
+                      fit: BoxFit.cover,
+                    ),
             ),
           ),
           Padding(

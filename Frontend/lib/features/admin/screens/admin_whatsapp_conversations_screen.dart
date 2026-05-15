@@ -304,17 +304,25 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
   String? _error;
   List<WhatsAppMessage> _messages = const [];
   bool _isActionLoading = false;
+  bool _isLoadingMore = false;
+  bool _hasMoreMessages = true;
+  int _currentOffset = 0;
+  static const int _pageSize = 50; // Carregar 50 mensagens por página
   final ScrollController _messagesScrollController = ScrollController();
+  final TextEditingController _messageInputController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadMessages();
+    _messagesScrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _messagesScrollController.removeListener(_onScroll);
     _messagesScrollController.dispose();
+    _messageInputController.dispose();
     super.dispose();
   }
 
@@ -327,17 +335,27 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
     _messagesScrollController.jumpTo(target);
   }
 
-  Future<void> _loadMessages() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  void _onScroll() {
+    // Se scrollou para bem perto do topo e tem mais mensagens
+    if (_messagesScrollController.position.pixels <= 100 &&
+        !_isLoadingMore &&
+        _hasMoreMessages &&
+        !_isLoading) {
+      _loadMoreMessages();
+    }
+  }
+
+  Future<void> _loadMoreMessages() async {
+    if (_isLoadingMore || !_hasMoreMessages) return;
+
+    setState(() => _isLoadingMore = true);
 
     final completer = Completer<List<Map<String, dynamic>>>();
 
     await GerenteCall.listarMensagensWhatsapp(
       conversationId: widget.conversation.id,
-      limit: 200,
+      limit: _pageSize,
+      offset: _currentOffset + _pageSize,
       onSuccess: completer.complete,
       onError: (msg) => completer.completeError(Exception(msg)),
     );
@@ -345,10 +363,82 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
     try {
       final raw = await completer.future;
       if (!mounted) return;
+
+      if (raw.isEmpty) {
+        // Nenhuma mensagem nova = chegou ao fim
+        setState(() {
+          _hasMoreMessages = false;
+          _isLoadingMore = false;
+        });
+        return;
+      }
+
+      final newMessages = raw.map(WhatsAppMessage.fromJson).toList()
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+      setState(() {
+        // Adicionar no início (mensagens mais antigas)
+        _messages = [...newMessages, ..._messages];
+        _currentOffset += _pageSize;
+        _isLoadingMore = false;
+
+        // Se carregou menos que o esperado = fim das mensagens
+        if (raw.length < _pageSize) {
+          _hasMoreMessages = false;
+        }
+      });
+
+      // Manter scroll position após carregar mais
+      if (_messagesScrollController.hasClients) {
+        final newHeight = _messagesScrollController.position.maxScrollExtent -
+            _messagesScrollController.position.viewportDimension;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_messagesScrollController.hasClients && mounted) {
+            _messagesScrollController.jumpTo(newHeight * 0.5);
+          }
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingMore = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao carregar mensagens antigas: $e')),
+      );
+    }
+  }
+
+  Future<void> _loadMessages() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _currentOffset = 0;
+      _hasMoreMessages = true;
+    });
+
+    final completer = Completer<List<Map<String, dynamic>>>();
+
+    await GerenteCall.listarMensagensWhatsapp(
+      conversationId: widget.conversation.id,
+      limit: _pageSize,
+      offset: 0,
+      onSuccess: completer.complete,
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    try {
+      final raw = await completer.future;
+      if (!mounted) return;
+
       final sorted = raw.map(WhatsAppMessage.fromJson).toList()
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
       setState(() {
         _messages = sorted;
+        _currentOffset = _pageSize;
+        // Se carregou menos que o esperado = não há mais mensagens
+        _hasMoreMessages = raw.length >= _pageSize;
       });
     } catch (e) {
       if (!mounted) return;
@@ -499,10 +589,73 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
     );
   }
 
+  Future<void> _sendMessageFromInput() async {
+    final text = _messageInputController.text.trim();
+    if (text.isEmpty) {
+      return;
+    }
+
+    setState(() => _isActionLoading = true);
+
+    await GerenteCall.sendManagerMessage(
+      conversationId: widget.conversation.id,
+      text: text,
+      phone: widget.conversation.phone,
+      onSuccess: (data) {
+        if (mounted) {
+          _messageInputController.clear();
+          setState(() => _isActionLoading = false);
+          _loadMessages();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Mensagem enviada com sucesso.')),
+          );
+        }
+      },
+      onError: (msg) {
+        if (mounted) {
+          setState(() => _isActionLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao enviar: $msg')),
+          );
+        }
+      },
+    );
+  }
+
   String _formatTime(DateTime date) {
     final local = date.toLocal();
     String two(int n) => n.toString().padLeft(2, '0');
-    return '${two(local.day)}/${two(local.month)} ${two(local.hour)}:${two(local.minute)}';
+    return '${two(local.hour)}:${two(local.minute)}';
+  }
+
+  String _formatDateSeparator(DateTime date) {
+    final local = date.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final messageDate = DateTime(local.year, local.month, local.day);
+
+    if (messageDate.isAtSameMomentAs(today)) {
+      return 'Hoje';
+    } else if (messageDate.isAtSameMomentAs(yesterday)) {
+      return 'Ontem';
+    } else {
+      String two(int n) => n.toString().padLeft(2, '0');
+      return '${two(local.day)}/${two(local.month)}/${local.year}';
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'sent':
+        return Symbols.done;
+      case 'delivered':
+        return Symbols.done_all;
+      case 'read':
+        return Symbols.done_all;
+      default:
+        return Symbols.schedule;
+    }
   }
 
   @override
@@ -570,44 +723,241 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
               Expanded(
                 child: ListView.builder(
                   controller: _messagesScrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _messages.length,
+                  padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
+                  itemCount: _messages.length + (_hasMoreMessages ? 1 : 0),
                   itemBuilder: (context, index) {
-                    final message = _messages[index];
-                    final isIncoming = message.direction == 'IN';
-                    final align = isIncoming ? Alignment.centerLeft : Alignment.centerRight;
-                    final color = isIncoming
-                        ? Theme.of(context).colorScheme.surfaceContainerHighest
-                        : Theme.of(context).colorScheme.primaryContainer;
+                    // Indicador de carregar mais no topo
+                    if (index == 0 && _hasMoreMessages) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: _isLoadingMore
+                              ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : InkWell(
+                                  onTap: _loadMoreMessages,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: Theme.of(context).colorScheme.outline,
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      'Carregar mensagens mais antigas',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.primary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      );
+                    }
 
-                    return Align(
-                      alignment: align,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 420),
-                        child: Card(
-                          color: color,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                    // Índice ajustado se tem botão de carregar mais
+                    final messageIndex =
+                        _hasMoreMessages ? index - 1 : index;
+                    if (messageIndex < 0) return const SizedBox();
+
+                    final message = _messages[messageIndex];
+                    final isIncoming = message.direction == 'IN';
+                    
+                    // Verificar se deve mostrar separador de data
+                    bool showDateSeparator = false;
+                    if (index == 0) {
+                      showDateSeparator = true;
+                    } else {
+                      final prevDate = DateTime(
+                        _messages[index - 1].createdAt.year,
+                        _messages[index - 1].createdAt.month,
+                        _messages[index - 1].createdAt.day,
+                      );
+                      final currentDate = DateTime(
+                        message.createdAt.year,
+                        message.createdAt.month,
+                        message.createdAt.day,
+                      );
+                      showDateSeparator = !prevDate.isAtSameMomentAs(currentDate);
+                    }
+
+                    return Column(
+                      children: [
+                        if (showDateSeparator)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Text(
+                              _formatDateSeparator(message.createdAt),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.outline,
+                              ),
+                            ),
+                          ),
+                        Align(
+                          alignment: isIncoming ? Alignment.centerLeft : Alignment.centerRight,
+                          child: Container(
+                            margin: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            constraints: const BoxConstraints(maxWidth: 350),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: isIncoming ? MainAxisAlignment.start : MainAxisAlignment.end,
                               children: [
-                                Text(
-                                  message.text.isNotEmpty ? message.text : '(mensagem sem texto)',
+                                if (isIncoming)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: CircleAvatar(
+                                      radius: 16,
+                                      child: Text(
+                                        message.direction == 'IN' ? 'C' : 'B',
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                  ),
+                                Flexible(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: isIncoming
+                                          ? Theme.of(context).colorScheme.surfaceContainerHighest
+                                          : Theme.of(context).colorScheme.primary,
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: const Radius.circular(18),
+                                        topRight: const Radius.circular(18),
+                                        bottomLeft: Radius.circular(isIncoming ? 4 : 18),
+                                        bottomRight: Radius.circular(isIncoming ? 18 : 4),
+                                      ),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 10,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          message.text.isNotEmpty
+                                              ? message.text
+                                              : '(mensagem sem texto)',
+                                          style: TextStyle(
+                                            color: isIncoming
+                                                ? Theme.of(context).colorScheme.onSurface
+                                                : Theme.of(context).colorScheme.onPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              _formatTime(message.createdAt),
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: isIncoming
+                                                    ? Theme.of(context).colorScheme.outline
+                                                    : Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
+                                              ),
+                                            ),
+                                            if (!isIncoming) ...[
+                                              const SizedBox(width: 4),
+                                              Icon(
+                                                _getStatusIcon(message.status),
+                                                size: 14,
+                                                color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  '${isIncoming ? 'Cliente' : 'Bot'} • ${_formatTime(message.createdAt)} • ${message.status}',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
+                                if (!isIncoming)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                                      child: Icon(
+                                        Symbols.smart_toy,
+                                        size: 18,
+                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
                         ),
-                      ),
+                      ],
                     );
                   },
                 ),
               ),
+            // Input field - WhatsApp style
+            Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                  ),
+                ),
+              ),
+              padding: const EdgeInsets.all(8),
+              child: SafeArea(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _messageInputController,
+                                decoration: const InputDecoration(
+                                  hintText: 'Mensagem...',
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                maxLines: null,
+                                minLines: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      child: IconButton(
+                        icon: Icon(
+                          Symbols.send,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                          size: 20,
+                        ),
+                        onPressed: _isActionLoading ? null : _sendMessageFromInput,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),

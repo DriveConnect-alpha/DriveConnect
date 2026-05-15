@@ -5,6 +5,16 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'carros');
+const EXTENSOES_IMAGEM_VALIDAS = new Set([
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
+    '.gif',
+    '.bmp',
+    '.heic',
+    '.heif',
+]);
 
 // Verifica se o diretório existe, caso contrário cria
 if (!fs.existsSync(UPLOAD_DIR)) {
@@ -12,6 +22,17 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 }
 
 export async function processarUpload(req: IncomingMessage): Promise<{ campos: Record<string, any>, caminhosImagens: string[], caminhoImagem: string | null }> {
+    const ehImagemValida = (part: any): boolean => {
+        const mimetype = String(part?.mimetype ?? '').toLowerCase();
+        if (mimetype.includes('image/')) {
+            return true;
+        }
+
+        const originalFilename = String(part?.originalFilename ?? '').toLowerCase();
+        const extensao = path.extname(originalFilename);
+        return EXTENSOES_IMAGEM_VALIDAS.has(extensao);
+    };
+
     const form = formidable({
         uploadDir: UPLOAD_DIR,
         keepExtensions: true,
@@ -20,9 +41,7 @@ export async function processarUpload(req: IncomingMessage): Promise<{ campos: R
         filename: (name: string, ext: string, part: any) => {
             return `${uuidv4()}${ext}`;
         },
-        filter: (part: any) => {
-            return part.mimetype?.includes('image/') ?? false;
-        }
+        filter: (part: any) => ehImagemValida(part)
     });
 
     return new Promise((resolve, reject) => {

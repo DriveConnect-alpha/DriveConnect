@@ -89,10 +89,11 @@ describe('Storage Service', () => {
       const novoNome = formCallArgs.filename('nome-original', '.jpg', {});
       expect(novoNome).toMatch(/.+\.jpg$/);
 
-      // Valida o filter (aceita só image/)
+      // Valida o filter (aceita MIME image/ e extensões comuns)
       expect(formCallArgs.filter({ mimetype: 'image/png' })).toBe(true);
       expect(formCallArgs.filter({ mimetype: 'application/pdf' })).toBe(false);
-      expect(formCallArgs.filter({ mimetype: undefined })).toBe(false);
+      expect(formCallArgs.filter({ mimetype: undefined, originalFilename: 'foto.jpeg' })).toBe(true);
+      expect(formCallArgs.filter({ mimetype: undefined, originalFilename: 'documento.pdf' })).toBe(false);
     });
   });
 

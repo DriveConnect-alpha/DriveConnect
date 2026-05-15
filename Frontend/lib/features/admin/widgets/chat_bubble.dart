@@ -39,29 +39,40 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final outgoingGradient = isOutgoing
+        ? LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colorScheme.primary,
+              Color.lerp(colorScheme.primary, colorScheme.primaryContainer, 0.22)!,
+            ],
+          )
+        : null;
+
     return Align(
       alignment: isOutgoing ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: EdgeInsets.symmetric(
-          horizontal: 8,
-          vertical: 4,
-        ),
-        constraints: const BoxConstraints(maxWidth: 350),
+        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        constraints: const BoxConstraints(maxWidth: 420),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: isOutgoing ? MainAxisAlignment.end : MainAxisAlignment.start,
           children: [
             if (!isOutgoing)
               Padding(
-                padding: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.only(right: 10),
                 child: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Theme.of(context).colorScheme.tertiary,
+                  radius: 17,
+                  backgroundColor: colorScheme.tertiaryContainer,
                   child: Text(
-                    'C',
+                    senderLabel.isNotEmpty ? senderLabel[0].toUpperCase() : 'C',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Theme.of(context).colorScheme.onTertiary,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onTertiaryContainer,
                     ),
                   ),
                 ),
@@ -69,37 +80,45 @@ class ChatBubble extends StatelessWidget {
             Flexible(
               child: Container(
                 decoration: BoxDecoration(
-                  color: isOutgoing
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.surfaceContainerHighest,
+                  gradient: outgoingGradient,
+                  color: isOutgoing ? null : colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(18),
-                    topRight: const Radius.circular(18),
-                    bottomLeft: Radius.circular(isOutgoing ? 18 : 4),
-                    bottomRight: Radius.circular(isOutgoing ? 4 : 18),
+                    topLeft: const Radius.circular(20),
+                    topRight: const Radius.circular(20),
+                    bottomLeft: Radius.circular(isOutgoing ? 20 : 6),
+                    bottomRight: Radius.circular(isOutgoing ? 6 : 20),
                   ),
+                  border: isOutgoing ? null : Border.all(color: colorScheme.outlineVariant.withOpacity(0.7)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (senderLabel.isNotEmpty) ...[
+                      Text(
+                        senderLabel,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                          color: isOutgoing ? colorScheme.onPrimary.withOpacity(0.82) : colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
                     Text(
                       text.isNotEmpty ? text : '(mensagem sem texto)',
                       style: TextStyle(
-                        color: isOutgoing
-                            ? Theme.of(context).colorScheme.onPrimary
-                            : Theme.of(context).colorScheme.onSurface,
+                        color: isOutgoing ? colorScheme.onPrimary : colorScheme.onSurface,
                         fontSize: 15,
+                        height: 1.35,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -110,9 +129,8 @@ class ChatBubble extends StatelessWidget {
                           _formatTime(timestamp),
                           style: TextStyle(
                             fontSize: 12,
-                            color: isOutgoing
-                                ? Theme.of(context).colorScheme.onPrimary.withOpacity(0.7)
-                                : Theme.of(context).colorScheme.outline,
+                            fontWeight: FontWeight.w500,
+                            color: isOutgoing ? colorScheme.onPrimary.withOpacity(0.78) : colorScheme.outline,
                           ),
                         ),
                         if (isOutgoing) ...[
@@ -120,7 +138,7 @@ class ChatBubble extends StatelessWidget {
                           Icon(
                             _getStatusIcon(status),
                             size: 14,
-                            color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
+                            color: colorScheme.onPrimary.withOpacity(0.78),
                           ),
                         ],
                       ],
@@ -131,14 +149,14 @@ class ChatBubble extends StatelessWidget {
             ),
             if (isOutgoing)
               Padding(
-                padding: const EdgeInsets.only(left: 8),
+                padding: const EdgeInsets.only(left: 10),
                 child: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  radius: 17,
+                  backgroundColor: colorScheme.primaryContainer,
                   child: Icon(
                     Symbols.smart_toy,
-                    size: 18,
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    size: 19,
+                    color: colorScheme.onPrimaryContainer,
                   ),
                 ),
               ),
@@ -174,13 +192,15 @@ class DateSeparator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         children: [
           Expanded(
             child: Divider(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+              color: colorScheme.outline.withOpacity(0.24),
             ),
           ),
           Padding(
@@ -188,13 +208,14 @@ class DateSeparator extends StatelessWidget {
             child: Text(
               _formatDate(date),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
+                    color: colorScheme.outline,
+                    fontWeight: FontWeight.w600,
                   ),
             ),
           ),
           Expanded(
             child: Divider(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+              color: colorScheme.outline.withOpacity(0.24),
             ),
           ),
         ],
@@ -263,34 +284,39 @@ class _ChatInputFieldState extends State<ChatInputField> {
                         controller: widget.controller,
                         focusNode: _focusNode,
                         decoration: const InputDecoration(
+                          final colorScheme = Theme.of(context).colorScheme;
+
                           hintText: 'Mensagem...',
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.symmetric(vertical: 12),
                         ),
-                        maxLines: null,
+                                  color: colorScheme.outline.withOpacity(0.16),
                         minLines: 1,
                         textInputAction: TextInputAction.send,
+                              color: colorScheme.surface,
                         onSubmitted: (_) {
-                          if (!widget.isLoading) {
+                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                             widget.onSendPressed();
                           }
                         },
                       ),
                     ),
                   ],
-                ),
-              ),
+                                        color: colorScheme.surfaceContainerHighest,
+                                        borderRadius: BorderRadius.circular(28),
+                                        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
             ),
-            const SizedBox(width: 8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 14),
             CircleAvatar(
               radius: 20,
               backgroundColor: Theme.of(context).colorScheme.primary,
               child: widget.isLoading
                   ? SizedBox(
-                      width: 24,
-                      height: 24,
+                                              decoration: InputDecoration(
+                                                hintText: 'Escreva uma resposta...',
                       child: CircularProgressIndicator(
-                        strokeWidth: 2,
+                                                hintStyle: TextStyle(color: colorScheme.outline),
+                                                contentPadding: const EdgeInsets.symmetric(vertical: 13),
                         valueColor: AlwaysStoppedAnimation(
                           Theme.of(context).colorScheme.onPrimary,
                         ),
@@ -300,14 +326,17 @@ class _ChatInputFieldState extends State<ChatInputField> {
                       icon: Icon(
                         Symbols.send,
                         color: Theme.of(context).colorScheme.onPrimary,
-                        size: 20,
-                      ),
-                      onPressed: widget.onSendPressed,
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+                                  const SizedBox(width: 10),
+                                  FilledButton(
+                                    onPressed: widget.isLoading ? null : widget.onSendPressed,
+                                    style: FilledButton.styleFrom(
+                                      shape: const CircleBorder(),
+                                      padding: const EdgeInsets.all(14),
+                                    ),
+                                    child: widget.isLoading
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          )
+                                        : const Icon(Symbols.send, size: 18),

@@ -7,6 +7,7 @@ import '../../../calls/gerente.call.dart';
 import '../../manager/widgets/manager_scaffold.dart';
 import '../models/whatsapp_conversation.dart';
 import '../models/whatsapp_message.dart';
+import '../widgets/chat_bubble.dart';
 
 class AdminWhatsAppConversationsScreen extends StatefulWidget {
   const AdminWhatsAppConversationsScreen({super.key});
@@ -124,167 +125,449 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredConversations();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final openCount = _conversations.where((conversation) => conversation.status.toUpperCase() == 'OPEN').length;
+    final pausedCount = _conversations.where((conversation) => conversation.paused).length;
+    final incomingCount = _conversations.where((conversation) => (conversation.lastMessageDirection ?? '').toUpperCase() == 'IN').length;
 
     return ManagerScaffold(
       title: 'Atendimentos',
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _phoneFilterController,
-                        decoration: const InputDecoration(
-                          labelText: 'Filtrar por telefone',
-                          hintText: 'Ex.: 5511999999999',
-                          prefixIcon: Icon(Symbols.search),
-                          border: OutlineInputBorder(),
+      child: Container(
+        color: colorScheme.surface,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          colorScheme.primary,
+                          Color.lerp(colorScheme.primary, colorScheme.primaryContainer, 0.28)!,
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: colorScheme.primary.withOpacity(0.18),
+                          blurRadius: 24,
+                          offset: const Offset(0, 12),
                         ),
-                        onSubmitted: (_) => _loadConversations(),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.16),
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: const Icon(Symbols.forum, color: Colors.white),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Atendimentos WhatsApp',
+                                    style: theme.textTheme.titleLarge?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Acompanhe conversas, pausas e respostas em um único lugar.',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: Colors.white.withOpacity(0.9),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            _SummaryChip(label: 'Total', value: _conversations.length.toString(), icon: Symbols.chat),
+                            _SummaryChip(label: 'Abertos', value: openCount.toString(), icon: Symbols.mark_chat_unread),
+                            _SummaryChip(label: 'Pausados', value: pausedCount.toString(), icon: Symbols.pause_circle),
+                            _SummaryChip(label: 'Clientes', value: incomingCount.toString(), icon: Symbols.person),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Card(
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _phoneFilterController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Filtrar por telefone',
+                                    hintText: 'Ex.: 5511999999999',
+                                    prefixIcon: const Icon(Symbols.search),
+                                    filled: true,
+                                    fillColor: theme.colorScheme.surfaceContainerHighest,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                  onSubmitted: (_) => _loadConversations(),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              FilledButton.icon(
+                                onPressed: _isLoading ? null : _loadConversations,
+                                icon: const Icon(Symbols.search),
+                                label: const Text('Buscar'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _FilterDropdown<String>(
+                                value: _statusFilter,
+                                label: 'Status',
+                                items: const [
+                                  DropdownMenuItem(value: 'ALL', child: Text('Todos')),
+                                  DropdownMenuItem(value: 'OPEN', child: Text('Abertos')),
+                                  DropdownMenuItem(value: 'CLOSED', child: Text('Fechados')),
+                                ],
+                                onChanged: (value) {
+                                  if (value == null) return;
+                                  setState(() => _statusFilter = value);
+                                },
+                              ),
+                              _FilterDropdown<String>(
+                                value: _directionFilter,
+                                label: 'Última mensagem',
+                                items: const [
+                                  DropdownMenuItem(value: 'ALL', child: Text('Todas')),
+                                  DropdownMenuItem(value: 'IN', child: Text('Cliente')),
+                                  DropdownMenuItem(value: 'OUT', child: Text('Bot')),
+                                ],
+                                onChanged: (value) {
+                                  if (value == null) return;
+                                  setState(() => _directionFilter = value);
+                                },
+                              ),
+                              _FilterDropdown<String>(
+                                value: _periodFilter,
+                                label: 'Período',
+                                items: const [
+                                  DropdownMenuItem(value: 'ALL', child: Text('Todos')),
+                                  DropdownMenuItem(value: 'TODAY', child: Text('Hoje')),
+                                  DropdownMenuItem(value: '7D', child: Text('7 dias')),
+                                  DropdownMenuItem(value: '30D', child: Text('30 dias')),
+                                ],
+                                onChanged: (value) {
+                                  if (value == null) return;
+                                  setState(() => _periodFilter = value);
+                                },
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _statusFilter = 'ALL';
+                                    _directionFilter = 'ALL';
+                                    _periodFilter = 'ALL';
+                                    _phoneFilterController.clear();
+                                  });
+                                  _loadConversations();
+                                },
+                                icon: const Icon(Symbols.filter_alt_off),
+                                label: const Text('Limpar filtros'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: _isLoading ? null : _loadConversations,
-                      icon: const Icon(Symbols.search),
-                      label: const Text('Buscar'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+                  ),
+                ],
+              ),
+            ),
+            if (_isLoading)
+              const Expanded(child: Center(child: CircularProgressIndicator()))
+            else if (_error != null)
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      DropdownButton<String>(
-                        value: _statusFilter,
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() => _statusFilter = value);
-                        },
-                        items: const [
-                          DropdownMenuItem(value: 'ALL', child: Text('Status: Todos')),
-                          DropdownMenuItem(value: 'OPEN', child: Text('Status: Abertos')),
-                          DropdownMenuItem(value: 'CLOSED', child: Text('Status: Fechados')),
-                        ],
+                      Icon(Symbols.warning, size: 42, color: theme.colorScheme.error),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Erro ao carregar atendimentos',
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                       ),
-                      const SizedBox(width: 12),
-                      DropdownButton<String>(
-                        value: _directionFilter,
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() => _directionFilter = value);
-                        },
-                        items: const [
-                          DropdownMenuItem(value: 'ALL', child: Text('Última msg: Todas')),
-                          DropdownMenuItem(value: 'IN', child: Text('Última msg: Cliente')),
-                          DropdownMenuItem(value: 'OUT', child: Text('Última msg: Bot')),
-                        ],
+                      const SizedBox(height: 6),
+                      Text(
+                        _error ?? 'Falha inesperada',
+                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(width: 12),
-                      DropdownButton<String>(
-                        value: _periodFilter,
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() => _periodFilter = value);
-                        },
-                        items: const [
-                          DropdownMenuItem(value: 'ALL', child: Text('Período: Todos')),
-                          DropdownMenuItem(value: 'TODAY', child: Text('Período: Hoje')),
-                          DropdownMenuItem(value: '7D', child: Text('Período: 7 dias')),
-                          DropdownMenuItem(value: '30D', child: Text('Período: 30 dias')),
-                        ],
-                      ),
-                      const SizedBox(width: 12),
+                      const SizedBox(height: 12),
                       OutlinedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _statusFilter = 'ALL';
-                            _directionFilter = 'ALL';
-                            _periodFilter = 'ALL';
-                            _phoneFilterController.clear();
-                          });
-                          _loadConversations();
-                        },
-                        icon: const Icon(Symbols.filter_alt_off),
-                        label: const Text('Limpar filtros'),
+                        onPressed: _loadConversations,
+                        icon: const Icon(Symbols.refresh),
+                        label: const Text('Tentar novamente'),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          if (_isLoading)
-            const Expanded(child: Center(child: CircularProgressIndicator()))
-          else if (_error != null)
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Erro ao carregar atendimentos: $_error', textAlign: TextAlign.center),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: _loadConversations,
-                      icon: const Icon(Symbols.refresh),
-                      label: const Text('Tentar novamente'),
-                    ),
-                  ],
+              )
+            else if (filtered.isEmpty)
+              const Expanded(
+                child: Center(
+                  child: Text('Nenhum atendimento encontrado com os filtros atuais.'),
                 ),
-              ),
-            )
-          else if (filtered.isEmpty)
-            const Expanded(
-              child: Center(
-                child: Text('Nenhum atendimento encontrado com os filtros atuais.'),
-              ),
-            )
-          else
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _loadConversations,
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final conversation = filtered[index];
-                    final isIncoming = conversation.lastMessageDirection == 'IN';
-                    return Card(
-                      child: ListTile(
-                        onTap: () => _openConversation(conversation),
-                        leading: CircleAvatar(
-                          child: Icon(isIncoming ? Symbols.call_received : Symbols.smart_toy),
-                        ),
-                        title: Text(conversation.phone),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 4),
-                            Text(
-                              conversation.lastMessageText?.trim().isNotEmpty == true
-                                  ? conversation.lastMessageText!
-                                  : 'Sem mensagem de texto',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+              )
+            else
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _loadConversations,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final conversation = filtered[index];
+                      final isIncoming = conversation.lastMessageDirection == 'IN';
+                      final messagePreview = conversation.lastMessageText?.trim().isNotEmpty == true
+                          ? conversation.lastMessageText!.trim()
+                          : 'Sem mensagem de texto';
+
+                      return Card(
+                        elevation: 0,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () => _openConversation(conversation),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Stack(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 24,
+                                      backgroundColor: isIncoming
+                                          ? colorScheme.secondaryContainer
+                                          : colorScheme.primaryContainer,
+                                      child: Icon(
+                                        isIncoming ? Symbols.call_received : Symbols.smart_toy,
+                                        color: isIncoming
+                                            ? colorScheme.onSecondaryContainer
+                                            : colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                    Positioned(
+                                      right: 0,
+                                      bottom: 0,
+                                      child: Container(
+                                        width: 12,
+                                        height: 12,
+                                        decoration: BoxDecoration(
+                                          color: conversation.paused ? colorScheme.tertiary : colorScheme.primary,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: colorScheme.surface, width: 2),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              conversation.phone,
+                                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                            ),
+                                          ),
+                                          _StatusPill(
+                                            label: conversation.paused ? 'Pausado' : conversation.status,
+                                            color: conversation.paused ? colorScheme.tertiary : colorScheme.primary,
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        messagePreview,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        children: [
+                                          Icon(Symbols.schedule, size: 16, color: colorScheme.outline),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Última atividade: ${_formatDate(conversation.lastMessageAt)}',
+                                            style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.outline),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(Symbols.chevron_right, color: colorScheme.outline),
+                              ],
                             ),
-                            const SizedBox(height: 6),
-                            Text('Última atividade: ${_formatDate(conversation.lastMessageAt)}'),
-                          ],
+                          ),
                         ),
-                        trailing: const Icon(Symbols.chevron_right),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _SummaryChip({required this.label, required this.value, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: colorScheme.onPrimary),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: colorScheme.onPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                label,
+                style: TextStyle(
+                  color: colorScheme.onPrimary.withOpacity(0.84),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _StatusPill({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterDropdown<T> extends StatelessWidget {
+  final T value;
+  final String label;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+
+  const _FilterDropdown({required this.value, required this.label, required this.items, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return SizedBox(
+      width: 180,
+      child: DropdownButtonFormField<T>(
+        value: value,
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          labelText: label,
+          filled: true,
+          fillColor: colorScheme.surfaceContainerHighest,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        ),
+        items: items,
       ),
     );
   }
@@ -662,301 +945,213 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final conversation = widget.conversation;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     
     return SafeArea(
-      child: SizedBox(
-        height: media.size.height * 0.86,
+      child: Container(
+        height: media.size.height * 0.88,
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
         child: Column(
           children: [
-            ListTile(
-              leading: const Icon(Symbols.chat),
-              title: Text('Atendimento: ${conversation.phone}'),
-              subtitle: Text('Status: ${conversation.status}${conversation.paused ? ' (PAUSADO)' : ''}'),
-              trailing: IconButton(
-                icon: const Icon(Symbols.close),
-                onPressed: () => Navigator.of(context).pop(),
+            const SizedBox(height: 10),
+            Container(
+              width: 48,
+              height: 5,
+              decoration: BoxDecoration(
+                color: colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(999),
               ),
             ),
-            const Divider(height: 1),
-            // Action buttons
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: Row(
-                children: [
-                  FilledButton.icon(
-                    onPressed: _isActionLoading ? null : _togglePauseResume,
-                    icon: Icon(conversation.paused ? Symbols.play_arrow : Symbols.pause),
-                    label: Text(conversation.paused ? 'Retomar' : 'Pausar'),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      colorScheme.primary,
+                      Color.lerp(colorScheme.primary, colorScheme.primaryContainer, 0.26)!,
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: _isActionLoading ? null : _showSendMessageDialog,
-                    icon: const Icon(Symbols.send),
-                    label: const Text('Enviar Mensagem'),
-                  ),
-                ],
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: Colors.white.withOpacity(0.16),
+                          child: const Icon(Symbols.chat, color: Colors.white),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                conversation.phone,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${conversation.status}${conversation.paused ? ' • PAUSADO' : ''}',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white.withOpacity(0.9),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Symbols.close, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _StatusPill(label: conversation.paused ? 'Pausado' : 'Ativo', color: Colors.white),
+                        _StatusPill(label: 'Mensagens ${_messages.length}', color: Colors.white),
+                        _StatusPill(label: conversation.lastMessageDirection == 'IN' ? 'Última do cliente' : 'Última do bot', color: Colors.white),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _isActionLoading ? null : _togglePauseResume,
+                            icon: Icon(conversation.paused ? Symbols.play_arrow : Symbols.pause),
+                            label: Text(conversation.paused ? 'Retomar' : 'Pausar'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: _isActionLoading ? null : _showSendMessageDialog,
+                            icon: const Icon(Symbols.send),
+                            label: const Text('Enviar'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-            const Divider(height: 1),
             if (_isLoading)
               const Expanded(child: Center(child: CircularProgressIndicator()))
             else if (_error != null)
               Expanded(
                 child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Erro ao carregar mensagens: $_error', textAlign: TextAlign.center),
-                      const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                        onPressed: _loadMessages,
-                        icon: const Icon(Symbols.refresh),
-                        label: const Text('Tentar novamente'),
-                      ),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Symbols.warning, size: 42, color: colorScheme.error),
+                        const SizedBox(height: 12),
+                        Text('Erro ao carregar mensagens', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 6),
+                        Text('$_error', textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: _loadMessages,
+                          icon: const Icon(Symbols.refresh),
+                          label: const Text('Tentar novamente'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               )
-            else if (_messages.isEmpty)
-              const Expanded(child: Center(child: Text('Sem mensagens nesta conversa.')))
             else
               Expanded(
-                child: ListView.builder(
-                  controller: _messagesScrollController,
-                  padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
-                  itemCount: _messages.length + (_hasMoreMessages ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    // Indicador de carregar mais no topo
-                    if (index == 0 && _hasMoreMessages) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Center(
-                          child: _isLoadingMore
-                              ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : InkWell(
-                                  onTap: _loadMoreMessages,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: Theme.of(context).colorScheme.outline,
-                                      ),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      'Carregar mensagens mais antigas',
-                                      style: TextStyle(
-                                        color: Theme.of(context).colorScheme.primary,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                        ),
-                      );
-                    }
-
-                    // Índice ajustado se tem botão de carregar mais
-                    final messageIndex =
-                        _hasMoreMessages ? index - 1 : index;
-                    if (messageIndex < 0) return const SizedBox();
-
-                    final message = _messages[messageIndex];
-                    final isIncoming = message.direction == 'IN';
-                    
-                    // Verificar se deve mostrar separador de data
-                    bool showDateSeparator = false;
-                    if (index == 0) {
-                      showDateSeparator = true;
-                    } else {
-                      final prevDate = DateTime(
-                        _messages[index - 1].createdAt.year,
-                        _messages[index - 1].createdAt.month,
-                        _messages[index - 1].createdAt.day,
-                      );
-                      final currentDate = DateTime(
-                        message.createdAt.year,
-                        message.createdAt.month,
-                        message.createdAt.day,
-                      );
-                      showDateSeparator = !prevDate.isAtSameMomentAs(currentDate);
-                    }
-
-                    return Column(
-                      children: [
-                        if (showDateSeparator)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Text(
-                              _formatDateSeparator(message.createdAt),
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context).colorScheme.outline,
-                              ),
-                            ),
-                          ),
-                        Align(
-                          alignment: isIncoming ? Alignment.centerLeft : Alignment.centerRight,
-                          child: Container(
-                            margin: EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            constraints: const BoxConstraints(maxWidth: 350),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: isIncoming ? MainAxisAlignment.start : MainAxisAlignment.end,
-                              children: [
-                                if (isIncoming)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: CircleAvatar(
-                                      radius: 16,
-                                      child: Text(
-                                        message.direction == 'IN' ? 'C' : 'B',
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                    ),
-                                  ),
-                                Flexible(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: isIncoming
-                                          ? Theme.of(context).colorScheme.surfaceContainerHighest
-                                          : Theme.of(context).colorScheme.primary,
-                                      borderRadius: BorderRadius.only(
-                                        topLeft: const Radius.circular(18),
-                                        topRight: const Radius.circular(18),
-                                        bottomLeft: Radius.circular(isIncoming ? 4 : 18),
-                                        bottomRight: Radius.circular(isIncoming ? 18 : 4),
-                                      ),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 10,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          message.text.isNotEmpty
-                                              ? message.text
-                                              : '(mensagem sem texto)',
-                                          style: TextStyle(
-                                            color: isIncoming
-                                                ? Theme.of(context).colorScheme.onSurface
-                                                : Theme.of(context).colorScheme.onPrimary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              _formatTime(message.createdAt),
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: isIncoming
-                                                    ? Theme.of(context).colorScheme.outline
-                                                    : Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
-                                              ),
-                                            ),
-                                            if (!isIncoming) ...[
-                                              const SizedBox(width: 4),
-                                              Icon(
-                                                _getStatusIcon(message.status),
-                                                size: 14,
-                                                color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                if (!isIncoming)
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 8),
-                                    child: CircleAvatar(
-                                      radius: 16,
-                                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                      child: Icon(
-                                        Symbols.smart_toy,
-                                        size: 18,
-                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            // Input field - WhatsApp style
-            Container(
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
                   ),
-                ),
-              ),
-              padding: const EdgeInsets.all(8),
-              child: SafeArea(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _messageInputController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Mensagem...',
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  child: _messages.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Symbols.chat_bubble, size: 42, color: colorScheme.outline),
+                              const SizedBox(height: 12),
+                              Text('Sem mensagens nesta conversa.', style: theme.textTheme.titleMedium),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: _messagesScrollController,
+                          reverse: true,
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                          itemCount: _messages.length + (_hasMoreMessages ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (_hasMoreMessages && index == _messages.length) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                child: Center(
+                                  child: _isLoadingMore
+                                      ? const SizedBox(
+                                          height: 24,
+                                          width: 24,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : OutlinedButton.icon(
+                                          onPressed: _loadMoreMessages,
+                                          icon: const Icon(Symbols.expand_less),
+                                          label: const Text('Carregar mensagens antigas'),
+                                        ),
                                 ),
-                                maxLines: null,
-                                minLines: 1,
-                              ),
-                            ),
-                          ],
+                              );
+                            }
+
+                            final message = _messages[_messages.length - 1 - index];
+                            final messagePosition = _messages.length - 1 - index;
+                            final previousMessage = messagePosition > 0 ? _messages[messagePosition - 1] : null;
+                            final shouldShowSeparator = previousMessage == null ||
+                                previousMessage.createdAt.year != message.createdAt.year ||
+                                previousMessage.createdAt.month != message.createdAt.month ||
+                                previousMessage.createdAt.day != message.createdAt.day;
+
+                            return Column(
+                              children: [
+                                if (shouldShowSeparator) DateSeparator(date: message.createdAt),
+                                ChatBubble(
+                                  text: message.text,
+                                  timestamp: message.createdAt,
+                                  isOutgoing: message.direction != 'IN',
+                                  status: message.status,
+                                  senderLabel: message.direction == 'IN' ? 'Cliente' : 'Atendimento',
+                                ),
+                              ],
+                            );
+                          },
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      child: IconButton(
-                        icon: Icon(
-                          Symbols.send,
-                          color: Theme.of(context).colorScheme.onPrimary,
-                          size: 20,
-                        ),
-                        onPressed: _isActionLoading ? null : _sendMessageFromInput,
-                      ),
-                    ),
-                  ],
                 ),
               ),
+            ChatInputField(
+              controller: _messageInputController,
+              onSendPressed: _sendMessageFromInput,
+              isLoading: _isActionLoading,
             ),
           ],
         ),

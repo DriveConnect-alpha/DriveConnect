@@ -794,84 +794,6 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
     }
   }
 
-  void _showSendMessageDialog() {
-    final textController = TextEditingController();
-    bool isSubmitting = false;
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Enviar Mensagem'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              TextField(
-                controller: textController,
-                decoration: const InputDecoration(
-                  hintText: 'Digite a mensagem...',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-                enabled: !isSubmitting,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: isSubmitting ? null : () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: isSubmitting ? null : () => _sendMessage(textController, ctx),
-              child: isSubmitting
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Enviar'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _sendMessage(TextEditingController controller, BuildContext dialogContext) async {
-    final text = controller.text.trim();
-    if (text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Digite uma mensagem.')),
-      );
-      return;
-    }
-
-    // Update dialog state
-    if (mounted) {
-      (dialogContext as Element).markNeedsBuild();
-    }
-
-    await GerenteCall.sendManagerMessage(
-      conversationId: widget.conversation.id,
-      text: text,
-      phone: widget.conversation.phone,
-      onSuccess: (data) {
-        if (mounted) {
-          Navigator.of(dialogContext).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Mensagem enviada com sucesso.')),
-          );
-          _loadMessages(); // Reload messages to show the new one
-        }
-      },
-      onError: (msg) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao enviar: $msg')),
-          );
-        }
-      },
-    );
-  }
-
   Future<void> _sendMessageFromInput() async {
     final text = _messageInputController.text.trim();
     if (text.isEmpty) {
@@ -889,6 +811,12 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
           _messageInputController.clear();
           setState(() => _isActionLoading = false);
           _loadMessages();
+          // Scroll para o final após enviar mensagem
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _scrollToLatest();
+            }
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Mensagem enviada com sucesso.')),
           );
@@ -948,112 +876,109 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     
-    return SafeArea(
-      child: Container(
-        height: media.size.height * 0.88,
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.88,
+      minChildSize: 0.5,
+      maxChildSize: 0.96,
+      builder: (context, scrollController) => Scaffold(
+        resizeToAvoidBottomInset: true,
+        backgroundColor: colorScheme.surface,
+        body: Column(
           children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 48,
-              height: 5,
-              decoration: BoxDecoration(
-                color: colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      colorScheme.primary,
-                      Color.lerp(colorScheme.primary, colorScheme.primaryContainer, 0.26)!,
-                    ],
+            SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 48,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 22,
-                          backgroundColor: Colors.white.withOpacity(0.16),
-                          child: const Icon(Symbols.chat, color: Colors.white),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            colorScheme.primary,
+                            Color.lerp(colorScheme.primary, colorScheme.primaryContainer, 0.26)!,
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
                             children: [
-                              Text(
-                                conversation.phone,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
+                              CircleAvatar(
+                                radius: 22,
+                                backgroundColor: Colors.white.withOpacity(0.16),
+                                child: const Icon(Symbols.chat, color: Colors.white),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      conversation.phone,
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${conversation.status}${conversation.paused ? ' • PAUSADO' : ''}',
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: Colors.white.withOpacity(0.9),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${conversation.status}${conversation.paused ? ' • PAUSADO' : ''}',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white.withOpacity(0.9),
-                                ),
+                              IconButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                icon: const Icon(Symbols.close, color: Colors.white),
                               ),
                             ],
                           ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Symbols.close, color: Colors.white),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _StatusPill(label: conversation.paused ? 'Pausado' : 'Ativo', color: Colors.white),
-                        _StatusPill(label: 'Mensagens ${_messages.length}', color: Colors.white),
-                        _StatusPill(label: conversation.lastMessageDirection == 'IN' ? 'Última do cliente' : 'Última do bot', color: Colors.white),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: _isActionLoading ? null : _togglePauseResume,
-                            icon: Icon(conversation.paused ? Symbols.play_arrow : Symbols.pause),
-                            label: Text(conversation.paused ? 'Retomar' : 'Pausar'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: colorScheme.primary,
+                          const SizedBox(height: 16),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              _StatusPill(label: conversation.paused ? 'Pausado' : 'Ativo', color: Colors.white),
+                              _StatusPill(label: 'Mensagens ${_messages.length}', color: Colors.white),
+                              _StatusPill(label: conversation.lastMessageDirection == 'IN' ? 'Última do cliente' : 'Última do bot', color: Colors.white),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: _isActionLoading ? null : _togglePauseResume,
+                              icon: Icon(conversation.paused ? Symbols.play_arrow : Symbols.pause),
+                              label: Text(conversation.paused ? 'Retomar' : 'Pausar'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: colorScheme.primary,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            onPressed: _isActionLoading ? null : _showSendMessageDialog,
-                            icon: const Icon(Symbols.send),
-                            label: const Text('Enviar'),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             if (_isLoading)
@@ -1100,9 +1025,9 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
                           ),
                         )
                       : ListView.builder(
-                          controller: _messagesScrollController,
+                          controller: scrollController,
                           reverse: true,
-                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                          padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
                           itemCount: _messages.length + (_hasMoreMessages ? 1 : 0),
                           itemBuilder: (context, index) {
                             if (_hasMoreMessages && index == _messages.length) {

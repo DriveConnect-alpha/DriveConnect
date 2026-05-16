@@ -48,22 +48,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        colorScheme.primary,
-                        Color.lerp(colorScheme.primary, colorScheme.primaryContainer, 0.25)!,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(28),
+                    color: colorScheme.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.65)),
                     boxShadow: [
                       BoxShadow(
-                        color: colorScheme.primary.withOpacity(0.18),
-                        blurRadius: 24,
-                        offset: const Offset(0, 12),
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
@@ -74,12 +68,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(11),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.14),
-                              borderRadius: BorderRadius.circular(18),
+                              color: colorScheme.primaryContainer.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                            child: const Icon(Symbols.dashboard, color: Colors.white, size: 28),
+                            child: Icon(Symbols.dashboard, color: colorScheme.onPrimaryContainer, size: 24),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
@@ -89,15 +83,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 Text(
                                   'Olá, $greetingName!',
                                   style: theme.textTheme.headlineSmall?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
+                                    color: colorScheme.onSurface,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
                                   'Resumo operacional em tempo real para acompanhar reservas, frota e atendimento.',
                                   style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: Colors.white.withOpacity(0.9),
+                                    color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ],
@@ -111,23 +105,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.12),
+                            color: colorScheme.secondaryContainer.withOpacity(0.55),
                             borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: Colors.white.withOpacity(0.16)),
+                            border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.55)),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Symbols.admin_panel_settings, color: Colors.white),
+                              Icon(Symbols.admin_panel_settings, color: colorScheme.onSecondaryContainer),
                               const SizedBox(width: 10),
-                              const Expanded(
+                              Expanded(
                                 child: Text(
                                   'Você está na visão de administrador.',
-                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSecondaryContainer,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                               TextButton(
                                 onPressed: () => context.go('/manager/admin/users'),
-                                style: TextButton.styleFrom(foregroundColor: Colors.white),
+                                style: TextButton.styleFrom(foregroundColor: colorScheme.onSecondaryContainer),
                                 child: const Text('Abrir painel'),
                               ),
                             ],
@@ -140,11 +137,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 18),
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final crossAxisCount = constraints.maxWidth > 1100
-                        ? 4
-                        : constraints.maxWidth > 700
-                            ? 2
-                            : 1;
+                    final crossAxisCount = 2;
+                    final aspectRatio = constraints.maxWidth < 420 ? 1.05 : 1.35;
 
                     return GridView.count(
                       shrinkWrap: true,
@@ -152,7 +146,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       crossAxisCount: crossAxisCount,
                       mainAxisSpacing: 16,
                       crossAxisSpacing: 16,
-                      childAspectRatio: constraints.maxWidth > 700 ? 1.7 : 2.1,
+                      childAspectRatio: aspectRatio,
                       children: [
                         _buildStatCard(
                           context,
@@ -253,12 +247,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Container(
                 padding: const EdgeInsets.all(11),
                 decoration: BoxDecoration(
-                  color: accent.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(16),
+                  color: accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: accent, size: 24),
+                child: Icon(icon, color: accent, size: 22),
               ),
-              Icon(Symbols.trending_up, color: colorScheme.tertiary, size: 20),
             ],
           ),
           Column(
@@ -267,7 +260,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text(
                 value,
                 style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: colorScheme.onSurface,
                 ),
               ),
@@ -305,25 +298,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
           border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.7)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(11),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(16),
+                  color: colorScheme.primaryContainer.withOpacity(0.75),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, size: 28, color: colorScheme.onPrimaryContainer),
+                child: Icon(icon, size: 24, color: colorScheme.onPrimaryContainer),
               ),
               const Spacer(),
               Text(

@@ -259,55 +259,84 @@ class _ChatInputFieldState extends State<ChatInputField> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         border: Border(
-          top: BorderSide(color: colorScheme.outline.withOpacity(0.16)),
+          top: BorderSide(color: colorScheme.outline.withOpacity(0.12)),
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: SafeArea(
+        top: false,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: TextField(
-                  controller: widget.controller,
-                  focusNode: _focusNode,
-                  decoration: InputDecoration(
-                    hintText: 'Escreva uma resposta...',
-                    hintStyle: TextStyle(color: colorScheme.outline),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 13),
+              child: TextField(
+                controller: widget.controller,
+                focusNode: _focusNode,
+                decoration: InputDecoration(
+                  hintText: 'Escreva uma resposta...',
+                  hintStyle: TextStyle(color: colorScheme.outline.withOpacity(0.7)),
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerLow,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide(
+                      color: colorScheme.outline.withOpacity(0.2),
+                    ),
                   ),
-                  minLines: 1,
-                  maxLines: null,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) {
-                    if (!widget.isLoading) {
-                      widget.onSendPressed();
-                    }
-                  },
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide(
+                      color: colorScheme.outline.withOpacity(0.15),
+                      width: 1.2,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide(
+                      color: colorScheme.primary.withOpacity(0.5),
+                      width: 1.5,
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  isDense: true,
                 ),
+                minLines: 1,
+                maxLines: 4,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) {
+                  if (!widget.isLoading) {
+                    widget.onSendPressed();
+                  }
+                },
               ),
             ),
             const SizedBox(width: 10),
-            FilledButton(
-              onPressed: widget.isLoading ? null : widget.onSendPressed,
-              style: FilledButton.styleFrom(
-                shape: const CircleBorder(),
-                padding: const EdgeInsets.all(14),
+            Container(
+              height: 40,
+              width: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colorScheme.primary,
               ),
-              child: widget.isLoading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Symbols.send, size: 18),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: widget.isLoading ? null : widget.onSendPressed,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Center(
+                    child: widget.isLoading
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: colorScheme.onPrimary,
+                            ),
+                          )
+                        : Icon(Symbols.send, size: 18, color: colorScheme.onPrimary),
+                  ),
+                ),
+              ),
             ),
           ],
         ),

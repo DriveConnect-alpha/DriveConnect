@@ -42,40 +42,66 @@ class FcmService {
     // Foreground messages → show in-app banner
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
+    // Message opened from background/terminated (notification tapped)
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
+
     // Tenta flush de remoções pendentes (offline logout anterior)
     await _flushPendingRemoval();
+  }
+
+  // ─── Message opened from background/terminated (notification tapped) ────────
+
+  void _handleMessageOpenedApp(RemoteMessage message) {
+    debugPrint('[FCM] Notificação aberta do background: ${message.notification?.title}');
+    _showNotificationBanner(message);
   }
 
   // ─── Foreground notification banner ───────────────────────────────────────
 
   void _handleForegroundMessage(RemoteMessage message) {
     debugPrint('[FCM] Mensagem foreground: ${message.notification?.title}');
+    _showNotificationBanner(message);
+  }
 
-    final notification = message.notification;
-    if (notification == null) return;
+  void _showNotificationBanner(RemoteMessage message) {
+    try {
+      final notification = message.notification;
+      if (notification == null) return;
 
-    final context = AppRouter.rootNavigatorKey.currentContext;
-    if (context == null) return;
+      final navState = AppRouter.rootNavigatorKey.currentState;
+      final context = navState?.context;
+      if (context == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _showNotificationBanner(message));
+        return;
+      }
 
-    final theme = Theme.of(context);
-    final overlay = Overlay.of(context, rootOverlay: true);
+      final theme = Theme.of(context);
+      final overlay = navState?.overlay;
+      if (overlay == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _showNotificationBanner(message));
+        return;
+      }
 
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (context) => _InAppNotificationBanner(
-        title: notification.title ?? 'Notificação',
-        body: notification.body ?? '',
-        theme: theme,
-        onDismiss: () => entry.remove(),
-      ),
-    );
+      late OverlayEntry entry;
+      entry = OverlayEntry(
+        builder: (context) => _InAppNotificationBanner(
+          title: notification.title ?? 'Notificação',
+          body: notification.body ?? '',
+          theme: theme,
+          onDismiss: () => entry.remove(),
+        ),
+      );
 
-    overlay.insert(entry);
+      overlay.insert(entry);
 
-    // Auto-dismiss after 4 seconds
-    Future.delayed(const Duration(seconds: 4), () {
-      if (entry.mounted) entry.remove();
-    });
+      // Auto-dismiss after 4 seconds
+      Future.delayed(const Duration(seconds: 4), () {
+        if (entry.mounted) entry.remove();
+      });
+    } catch (e, st) {
+      debugPrint('[FCM] Erro ao mostrar banner in-app: $e');
+      debugPrint('$st');
+    }
   }
 
   // ─── Token registration ───────────────────────────────────────────────────

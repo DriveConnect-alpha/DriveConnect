@@ -138,6 +138,8 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
         ],
       ),
     );
+  }
+
   Widget _buildEmptyState(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(

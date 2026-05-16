@@ -42,22 +42,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final greetingName = authProvider.user?.email.split('@')[0] ?? 'Gerente';
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerLowest,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.65)),
+                    color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
@@ -68,14 +67,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(11),
+                            padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: colorScheme.primaryContainer.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(16),
+                              color: colorScheme.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Icon(Symbols.dashboard, color: colorScheme.onPrimaryContainer, size: 24),
+                            child: Icon(Symbols.dashboard, color: colorScheme.primary, size: 22),
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,14 +83,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'Olá, $greetingName!',
                                   style: theme.textTheme.headlineSmall?.copyWith(
                                     color: colorScheme.onSurface,
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 Text(
-                                  'Resumo operacional em tempo real para acompanhar reservas, frota e atendimento.',
+                                  'Sua visão geral operacional em tempo real',
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w400,
                                   ),
                                 ),
                               ],
@@ -100,32 +100,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ],
                       ),
                       if (authProvider.isAdmin) ...[
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 16),
                         Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.all(14),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
-                            color: colorScheme.secondaryContainer.withOpacity(0.55),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.55)),
+                            color: colorScheme.secondary.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             children: [
-                              Icon(Symbols.admin_panel_settings, color: colorScheme.onSecondaryContainer),
+                              Icon(Symbols.admin_panel_settings, color: colorScheme.secondary, size: 18),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  'Você está na visão de administrador.',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: colorScheme.onSecondaryContainer,
-                                    fontWeight: FontWeight.w600,
+                                  'Modo administrador ativo',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.secondary,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
                               TextButton(
                                 onPressed: () => context.go('/manager/admin/users'),
-                                style: TextButton.styleFrom(foregroundColor: colorScheme.onSecondaryContainer),
-                                child: const Text('Abrir painel'),
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(0, 0),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  'Abrir',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.secondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -134,18 +143,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 20),
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final crossAxisCount = 2;
-                    final aspectRatio = constraints.maxWidth < 420 ? 1.05 : 1.35;
+                    final aspectRatio = constraints.maxWidth < 420 ? 1.0 : 1.3;
 
                     return GridView.count(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       crossAxisCount: crossAxisCount,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 14,
+                      crossAxisSpacing: 14,
                       childAspectRatio: aspectRatio,
                       children: [
                         _buildStatCard(
@@ -184,14 +193,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     );
                   },
                 ),
-                const SizedBox(height: 28),
-                Row(
-                  children: [
-                    Text(
-                      'Ações rápidas',
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                  ],
+                const SizedBox(height: 24),
+                Text(
+                  'Ações rápidas',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 LayoutBuilder(
@@ -202,8 +210,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       crossAxisCount: crossAxisCount,
-                      mainAxisSpacing: 14,
-                      crossAxisSpacing: 14,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
                       childAspectRatio: constraints.maxWidth > 700 ? 1.35 : 1.1,
                       children: [
                         _buildActionCard(context, 'Reservas', Symbols.list_alt, '/manager/reservations'),
@@ -245,12 +253,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(11),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: accent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(14),
+                  color: accent.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: accent, size: 22),
+                child: Icon(icon, color: accent, size: 20),
               ),
             ],
           ),
@@ -260,7 +268,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text(
                 value,
                 style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                   color: colorScheme.onSurface,
                 ),
               ),
@@ -269,13 +277,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 title,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
                 footer,
-                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.outline),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.outline.withOpacity(0.8),
+                  fontWeight: FontWeight.w400,
+                ),
               ),
             ],
           ),
@@ -290,17 +301,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return InkWell(
       onTap: () => context.go(route),
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           color: colorScheme.surface,
-          border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.7)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 1),
             ),
           ],
         ),
@@ -311,25 +321,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(11),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withOpacity(0.75),
-                  borderRadius: BorderRadius.circular(14),
+                  color: colorScheme.primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, size: 24, color: colorScheme.onPrimaryContainer),
+                child: Icon(icon, size: 22, color: colorScheme.primary),
               ),
               const Spacer(),
               Text(
                 title,
                 style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                   color: colorScheme.onSurface,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 'Abrir módulo',
-                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.outline),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.outline.withOpacity(0.7),
+                  fontWeight: FontWeight.w400,
+                ),
               ),
             ],
           ),

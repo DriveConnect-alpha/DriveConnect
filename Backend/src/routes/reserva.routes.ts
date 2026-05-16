@@ -94,7 +94,16 @@ export async function registrarReserva(req: IncomingMessage, res: ServerResponse
       cliente_id
     } = corpo;
 
+    console.log('[Reserva] Iniciando criação de reserva:', {
+      caller: { id: caller.usuarioId, tipo: caller.tipo },
+      veiculo_id,
+      cliente_id,
+      data_inicio,
+      data_fim
+    });
+
     if (!veiculo_id || !filial_retirada_id || !filial_devolucao_id || !data_inicio || !data_fim) {
+      console.warn('[Reserva] Parâmetros obrigatórios ausentes no corpo:', corpo);
       responder(res, 400, { erro: 'Parâmetros obrigatórios ausentes.' });
       return;
     }
@@ -166,8 +175,10 @@ export async function registrarReserva(req: IncomingMessage, res: ServerResponse
       origem: caller.tipo === 'CLIENTE' ? 'APP' : 'GERENTE_APP',
     });
 
+    console.log('[Reserva] Reserva criada com sucesso:', reserva.reservaId);
     responder(res, 201, reserva);
   } catch (err) {
+    console.error('[Reserva] Erro catastrófico ao registrar reserva:', err);
     const { status, mensagem } = mapearErro(err);
     responder(res, status, { erro: mensagem });
   }

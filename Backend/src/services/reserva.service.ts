@@ -183,6 +183,13 @@ export async function criarReservaPendente(
   const valorSeguro = calcularValorSeguro(planoFinal.percentual, params.valorAluguel);
   const valorTotal = params.valorAluguel + valorSeguro;
 
+  console.log('[ReservaService] Criando reserva pendente:', {
+    clienteId: params.clienteId,
+    veiculoId: params.veiculoId,
+    valorTotal,
+    metodo: params.metodoPagamento,
+  });
+
   // Cria a reserva com seguro incluído
   const sqlInsert = `
     INSERT INTO reserva (

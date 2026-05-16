@@ -82,7 +82,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                     crossAxisCount: 2,
                     mainAxisSpacing: 8,
                     crossAxisSpacing: 8,
-                    childAspectRatio: 1.8,
+                    childAspectRatio: 2.8,
                     children: [
                       _StatChip(label: 'Total', value: total.toString(), icon: Symbols.list),
                       _StatChip(label: 'Ativas', value: ativas.toString(), icon: Symbols.check_circle),
@@ -243,35 +243,37 @@ class _StatChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: Colors.white),
-          const SizedBox(width: 6),
+          Icon(icon, size: 18, color: colorScheme.onPrimary),
+          const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
+                value,
+                style: TextStyle(
+                  color: colorScheme.onPrimary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
                 ),
               ),
               Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
+                label,
+                style: TextStyle(
+                  color: colorScheme.onPrimary.withOpacity(0.84),
+                  fontSize: 12,
                 ),
               ),
             ],

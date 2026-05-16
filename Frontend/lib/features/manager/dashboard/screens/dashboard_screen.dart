@@ -159,7 +159,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       title: 'Novos clientes',
                       value: stats?.newClients.toString() ?? '-',
                       icon: Symbols.person_add,
-                      accent: const Color(0xFF8B5CF6),
+                      accent: const Color(0xFFDB2777),
                       footer: 'Entradas recentes',
                     ),
                   ],
@@ -217,9 +217,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final colorScheme = theme.colorScheme;
 
     return DCCard(
-      padding: const EdgeInsets.all(16),
-      elevation: 6.0,
+      padding: const EdgeInsets.all(4),
+      elevation: 2.0,
       child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
@@ -229,49 +230,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Center(
               child: Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: accent.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-              child: Icon(icon, color: accent, size: 20),
+                child: Icon(icon, color: accent, size: 20),
+              ),
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Text(
-                value,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: colorScheme.onSurface,
+            const SizedBox(height: 4),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  value,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                footer,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant.withOpacity(0.85),
-                  fontWeight: FontWeight.w400,
+                const SizedBox(height: 2),
+                Text(
+                  footer,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant.withOpacity(0.85),
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ),
       ),
     );

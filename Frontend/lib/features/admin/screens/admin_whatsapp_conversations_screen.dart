@@ -159,7 +159,7 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
                   crossAxisCount: 2,
                   mainAxisSpacing: 8,
                   crossAxisSpacing: 8,
-                  childAspectRatio: 1.8,
+                  childAspectRatio: 2.8,
                   children: [
                     _SummaryChip(label: 'Total', value: _conversations.length.toString(), icon: Symbols.chat),
                     _SummaryChip(label: 'Pausados', value: pausedCount.toString(), icon: Symbols.pause_circle),
@@ -173,96 +173,56 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
               child: Card(
                 elevation: 0,
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   child: Column(
                     children: [
                       Row(
                         children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _phoneFilterController,
-                                  decoration: InputDecoration(
-                                    labelText: 'Filtrar por telefone',
-                                    hintText: 'Ex.: 5511999999999',
-                                    prefixIcon: const Icon(Symbols.search),
-                                    filled: true,
-                                    fillColor: theme.colorScheme.surfaceContainerHighest,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                  ),
-                                  onSubmitted: (_) => _loadConversations(),
+                          Expanded(
+                            child: TextField(
+                              controller: _phoneFilterController,
+                              style: const TextStyle(fontSize: 14),
+                              decoration: InputDecoration(
+                                labelText: 'Telefone',
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                prefixIcon: const Icon(Symbols.search, size: 20),
+                                filled: true,
+                                fillColor: theme.colorScheme.surfaceContainerHighest,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
                                 ),
                               ),
-                              const SizedBox(width: 10),
-                              FilledButton.icon(
-                                onPressed: _isLoading ? null : _loadConversations,
-                                icon: const Icon(Symbols.search),
-                                label: const Text('Buscar'),
-                              ),
-                            ],
+                              onSubmitted: (_) => _loadConversations(),
+                            ),
                           ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 12,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              _FilterDropdown<String>(
-                                value: _statusFilter,
-                                label: 'Status',
-                                items: const [
-                                  DropdownMenuItem(value: 'ALL', child: Text('Todos')),
-                                  DropdownMenuItem(value: 'OPEN', child: Text('Abertos')),
-                                  DropdownMenuItem(value: 'CLOSED', child: Text('Fechados')),
-                                ],
-                                onChanged: (value) {
-                                  if (value == null) return;
-                                  setState(() => _statusFilter = value);
-                                },
-                              ),
-                              _FilterDropdown<String>(
-                                value: _directionFilter,
-                                label: 'Última mensagem',
-                                items: const [
-                                  DropdownMenuItem(value: 'ALL', child: Text('Todas')),
-                                  DropdownMenuItem(value: 'IN', child: Text('Cliente')),
-                                  DropdownMenuItem(value: 'OUT', child: Text('Bot')),
-                                ],
-                                onChanged: (value) {
-                                  if (value == null) return;
-                                  setState(() => _directionFilter = value);
-                                },
-                              ),
-                              _FilterDropdown<String>(
-                                value: _periodFilter,
-                                label: 'Período',
-                                items: const [
-                                  DropdownMenuItem(value: 'ALL', child: Text('Todos')),
-                                  DropdownMenuItem(value: 'TODAY', child: Text('Hoje')),
-                                  DropdownMenuItem(value: '7D', child: Text('7 dias')),
-                                  DropdownMenuItem(value: '30D', child: Text('30 dias')),
-                                ],
-                                onChanged: (value) {
-                                  if (value == null) return;
-                                  setState(() => _periodFilter = value);
-                                },
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _statusFilter = 'ALL';
-                                    _directionFilter = 'ALL';
-                                    _periodFilter = 'ALL';
-                                    _phoneFilterController.clear();
-                                  });
-                                  _loadConversations();
-                                },
-                                icon: const Icon(Symbols.filter_alt_off),
-                                label: const Text('Limpar filtros'),
-                              ),
-                            ],
+                          const SizedBox(width: 8),
+                          FilledButton(
+                            onPressed: _isLoading ? null : _loadConversations,
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              minimumSize: const Size(0, 40),
+                            ),
+                            child: const Text('Buscar'),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _statusFilter = 'ALL';
+                                _directionFilter = 'ALL';
+                                _periodFilter = 'ALL';
+                                _phoneFilterController.clear();
+                              });
+                              _loadConversations();
+                            },
+                            icon: const Icon(Symbols.filter_alt_off, size: 18),
+                            tooltip: 'Limpar filtros',
+                            style: IconButton.styleFrom(
+                              backgroundColor: colorScheme.surfaceVariant,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
                           ),
                         ],
                       ),
@@ -374,7 +334,11 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
                                             ),
                                           ),
                                           _StatusPill(
-                                            label: conversation.paused ? 'Pausado' : conversation.status,
+                                            label: conversation.paused 
+                                                ? 'Pausado' 
+                                                : (conversation.status.toUpperCase() == 'OPEN' 
+                                                    ? 'IA Ativa' 
+                                                    : (conversation.status.toUpperCase() == 'CLOSED' ? 'Finalizado' : conversation.status)),
                                             color: conversation.paused ? colorScheme.tertiary : colorScheme.primary,
                                           ),
                                         ],
@@ -433,7 +397,7 @@ class _SummaryChip extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.14),
         borderRadius: BorderRadius.circular(16),
@@ -496,38 +460,7 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
-class _FilterDropdown<T> extends StatelessWidget {
-  final T value;
-  final String label;
-  final List<DropdownMenuItem<T>> items;
-  final ValueChanged<T?> onChanged;
 
-  const _FilterDropdown({required this.value, required this.label, required this.items, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return SizedBox(
-      width: 180,
-      child: DropdownButtonFormField<T>(
-        value: value,
-        onChanged: onChanged,
-        decoration: InputDecoration(
-          labelText: label,
-          filled: true,
-          fillColor: colorScheme.surfaceContainerHighest,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        ),
-        items: items,
-      ),
-    );
-  }
-}
 
 class _ConversationMessagesSheet extends StatefulWidget {
   final WhatsAppConversation conversation;

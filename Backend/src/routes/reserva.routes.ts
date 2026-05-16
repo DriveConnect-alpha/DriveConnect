@@ -113,14 +113,24 @@ export async function registrarReserva(req: IncomingMessage, res: ServerResponse
     let paramsCliente: any[];
 
     if (caller.tipo === 'CLIENTE') {
-      queryCliente = 'SELECT id, nome_completo, email, telefone FROM cliente WHERE usuario_id = $1';
+      queryCliente = `
+        SELECT c.id, c.nome_completo, u.email, c.telefone 
+        FROM cliente c
+        JOIN usuario u ON u.id = c.usuario_id
+        WHERE c.usuario_id = $1
+      `;
       paramsCliente = [caller.usuarioId];
     } else {
       if (!cliente_id) {
         responder(res, 400, { erro: 'cliente_id é obrigatório para reservas criadas por gerentes.' });
         return;
       }
-      queryCliente = 'SELECT id, nome_completo, email, telefone FROM cliente WHERE id = $1';
+      queryCliente = `
+        SELECT c.id, c.nome_completo, u.email, c.telefone 
+        FROM cliente c
+        JOIN usuario u ON u.id = c.usuario_id
+        WHERE c.id = $1
+      `;
       paramsCliente = [cliente_id];
 
       // Se for gerente, validar se a filial de retirada pertence a ele (opcional)

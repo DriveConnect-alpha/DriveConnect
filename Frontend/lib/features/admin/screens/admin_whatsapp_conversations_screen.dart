@@ -266,9 +266,9 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
                           ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
             if (_isLoading)

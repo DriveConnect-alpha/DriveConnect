@@ -31,9 +31,10 @@ function mapearErro(err: unknown): { status: number; mensagem: string } {
   const mensagem = err instanceof Error ? err.message : 'Erro interno.';
   const status = mensagem.includes('inválid') || mensagem.includes('obrigatório') || mensagem.includes('ausente') ? 400
     : mensagem.includes('não encontrad') ? 404
-      : mensagem.includes('Não autorizado') ? 401
-        : mensagem.includes('Sem permissão') ? 403
-          : 500;
+      : mensagem.includes('disponível') || mensagem.includes('conflito') ? 409
+        : mensagem.includes('Não autorizado') ? 401
+          : mensagem.includes('Sem permissão') ? 403
+            : 500;
   return { status, mensagem };
 }
 
@@ -98,28 +99,32 @@ export async function registrarReserva(req: IncomingMessage, res: ServerResponse
       return;
     }
 
-    // Define qual ID de cliente usar
-    let finalClienteId: string;
+    // Busca dados complementares do cliente
+    let queryCliente: string;
+    let paramsCliente: any[];
+
     if (caller.tipo === 'CLIENTE') {
-      finalClienteId = caller.usuarioId;
+      queryCliente = 'SELECT id, nome_completo, email, telefone FROM cliente WHERE usuario_id = $1';
+      paramsCliente = [caller.usuarioId];
     } else {
       if (!cliente_id) {
-        responder(res, 400, { erro: 'cliente_id é obrigatório para gerentes.' });
+        responder(res, 400, { erro: 'cliente_id é obrigatório para reservas criadas por gerentes.' });
         return;
       }
-      finalClienteId = cliente_id;
+      queryCliente = 'SELECT id, nome_completo, email, telefone FROM cliente WHERE id = $1';
+      paramsCliente = [cliente_id];
 
-      // Se for gerente, validar se a filial pertence a ele (opcional dependendo da regra de negócio)
+      // Se for gerente, validar se a filial de retirada pertence a ele (opcional)
       if (caller.tipo === 'GERENTE' && caller.filialId && caller.filialId !== filial_retirada_id) {
         responder(res, 403, { erro: 'Gerente só pode criar reserva para sua própria filial.' });
         return;
       }
     }
 
-    // Busca dados complementares do cliente e veículo
-    const clienteResult = await query('SELECT nome_completo, email, telefone FROM cliente WHERE id = $1', [finalClienteId]);
+    const clienteResult = await query(queryCliente, paramsCliente);
     if (!clienteResult.rows[0]) throw new Error('Cliente não encontrado.');
     const cliente = clienteResult.rows[0];
+    const finalClienteId = cliente.id;
 
     const veiculoResult = await query(`
       SELECT v.modelo_id, m.nome || ' ' || m.marca AS descricao_modelo

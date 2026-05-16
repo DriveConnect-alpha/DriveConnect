@@ -23,6 +23,8 @@ export interface UsuarioAutenticado {
   perfilId: string | null;
   /** Filial do gerente (null = global ou não-gerente). Usado no JWT para escopo de dados. */
   filialId: string | null;
+  imagemUrl: string | null;
+  preferencias: any;
 }
 
 /**
@@ -31,7 +33,7 @@ export interface UsuarioAutenticado {
  */
 export async function autenticarUsuario(payload: LoginPayload): Promise<UsuarioAutenticado> {
   const resultado = await query(
-    `SELECT id, email, senha, tipo FROM usuario WHERE email = $1 AND deletado_em IS NULL`,
+    `SELECT id, email, senha, tipo, imagem_url, preferencias FROM usuario WHERE email = $1 AND deletado_em IS NULL`,
     [payload.email],
   );
 
@@ -53,7 +55,15 @@ export async function autenticarUsuario(payload: LoginPayload): Promise<UsuarioA
     filialId = r.rows[0]?.filial_id ?? null;
   }
 
-  return { id: row.id, email: row.email, tipo: row.tipo, perfilId, filialId };
+  return {
+    id: row.id,
+    email: row.email,
+    tipo: row.tipo,
+    perfilId,
+    filialId,
+    imagemUrl: row.imagem_url,
+    preferencias: row.preferencias
+  };
 }
 
 // ──────────────────────────────────────────────
@@ -158,7 +168,7 @@ export async function criarGerente(params: CriarGerenteParams): Promise<{ usuari
 /** Busca um usuário ativo por ID, sem expor o hash de senha. */
 export async function buscarUsuarioPorId(id: string): Promise<Usuario | null> {
   const r = await query(
-    `SELECT id, email, tipo, criado_em, deletado_em FROM usuario WHERE id = $1`,
+    `SELECT id, email, tipo, imagem_url, preferencias, criado_em, deletado_em FROM usuario WHERE id = $1`,
     [id],
   );
 
@@ -169,9 +179,27 @@ export async function buscarUsuarioPorId(id: string): Promise<Usuario | null> {
     id: row.id,
     email: row.email,
     tipo: row.tipo,
+    imagemUrl: row.imagem_url,
+    preferencias: row.preferencias,
     criadoEm: row.criado_em,
     deletadoEm: row.deletado_em,
   });
+}
+
+/** Atualiza a foto de perfil do usuário. */
+export async function atualizarFotoPerfil(usuarioId: string, imagemUrl: string): Promise<void> {
+  await query(
+    `UPDATE usuario SET imagem_url = $1 WHERE id = $2 AND deletado_em IS NULL`,
+    [imagemUrl, usuarioId]
+  );
+}
+
+/** Atualiza as preferências do usuário (tema e notificações). */
+export async function atualizarPreferenciasUsuario(usuarioId: string, preferencias: any): Promise<void> {
+  await query(
+    `UPDATE usuario SET preferencias = $1 WHERE id = $2 AND deletado_em IS NULL`,
+    [JSON.stringify(preferencias), usuarioId]
+  );
 }
 
 /** Lista todos os clientes ativos com seus dados de perfil e email. */
@@ -289,8 +317,8 @@ export async function atualizarMeuPerfilCliente(
   let idx = 1;
 
   if (params.nomeCompleto !== undefined) { campos.push(`nome_completo = $${idx++}`); valores.push(params.nomeCompleto); }
-  if (params.rg           !== undefined) { campos.push(`rg = $${idx++}`);            valores.push(params.rg); }
-  if (params.cnh          !== undefined) { campos.push(`cnh = $${idx++}`);           valores.push(params.cnh); }
+  if (params.rg !== undefined) { campos.push(`rg = $${idx++}`); valores.push(params.rg); }
+  if (params.cnh !== undefined) { campos.push(`cnh = $${idx++}`); valores.push(params.cnh); }
 
   if (campos.length === 0) return null;
 
@@ -325,8 +353,8 @@ export async function atualizarCliente(
   let idx = 1;
 
   if (params.nomeCompleto !== undefined) { campos.push(`nome_completo = $${idx++}`); valores.push(params.nomeCompleto); }
-  if (params.rg !== undefined)           { campos.push(`rg = $${idx++}`);            valores.push(params.rg); }
-  if (params.cnh !== undefined)          { campos.push(`cnh = $${idx++}`);           valores.push(params.cnh); }
+  if (params.rg !== undefined) { campos.push(`rg = $${idx++}`); valores.push(params.rg); }
+  if (params.cnh !== undefined) { campos.push(`cnh = $${idx++}`); valores.push(params.cnh); }
 
   if (campos.length === 0) return null;
 

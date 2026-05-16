@@ -13,5 +13,17 @@ abstract class IAuthService {
     required String nomeCompleto,
     required String email,
   });
+  Future<void> changePassword({
+    required String id,
+    required String newPassword,
+  });
+  Future<String> updateProfilePhoto({
+    required String id,
+    required dynamic imageFile,
+  });
+  Future<void> updatePreferences({
+    required String id,
+    required Map<String, dynamic> preferences,
+  });
   Future<void> deleteAccount(String id);
 }

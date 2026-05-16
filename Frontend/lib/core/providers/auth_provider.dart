@@ -144,6 +144,83 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> changePassword(String newPassword) async {
+    if (_user == null) return;
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _authService.changePassword(id: _user!.id, newPassword: newPassword);
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateProfilePhoto(dynamic imageFile) async {
+    if (_user == null) return;
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final newPhotoUrl = await _authService.updateProfilePhoto(id: _user!.id, imageFile: imageFile);
+      
+      // Atualiza o objeto do usuário localmente
+      _user = Usuario(
+        id: _user!.id,
+        email: _user!.email,
+        nome: _user!.nome,
+        tipo: _user!.tipo,
+        perfilId: _user!.perfilId,
+        filialId: _user!.filialId,
+        imagemUrl: newPhotoUrl,
+        preferencias: _user!.preferencias,
+        criadoEm: _user!.criadoEm,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updatePreferences(Map<String, dynamic> newPrefs) async {
+    if (_user == null) return;
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _authService.updatePreferences(id: _user!.id, preferences: newPrefs);
+      
+      // Atualiza o objeto do usuário localmente
+      _user = Usuario(
+        id: _user!.id,
+        email: _user!.email,
+        nome: _user!.nome,
+        tipo: _user!.tipo,
+        perfilId: _user!.perfilId,
+        filialId: _user!.filialId,
+        imagemUrl: _user!.imagemUrl,
+        preferencias: newPrefs,
+        criadoEm: _user!.criadoEm,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> deleteAccount() async {
     if (_user == null) return;
     

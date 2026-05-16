@@ -13,7 +13,10 @@ import {
   atualizarMeuPerfilCliente,
   esqueciSenha,
   redefinirSenhaComToken,
+  atualizarFotoPerfil,
+  atualizarPreferenciasUsuario,
 } from '../services/usuario.service.js';
+import { processarUpload } from '../services/storage.service.js';
 import { requireCaller, requireTipo, requireOwnership, gerarToken } from '../middlewares/auth.js';
 
 
@@ -38,10 +41,10 @@ async function tratarErro(res: ServerResponse, err: unknown): Promise<void> {
   const mensagem = err instanceof Error ? err.message : 'Erro interno.';
   const status = mensagem.includes('inválid') || mensagem.includes('deve') ? 400
     : mensagem.includes('não encontrad') ? 404
-    : mensagem.includes('Credenciais') ? 401
-    : mensagem.includes('Não autorizado') ? 401
-    : mensagem.includes('Sem permissão') ? 403
-    : 500;
+      : mensagem.includes('Credenciais') ? 401
+        : mensagem.includes('Não autorizado') ? 401
+          : mensagem.includes('Sem permissão') ? 403
+            : 500;
   responder(res, status, { erro: mensagem });
 }
 
@@ -318,6 +321,48 @@ export async function deletarUsuario(req: IncomingMessage, res: ServerResponse, 
 
     await desativarUsuario(usuarioId);
     responder(res, 200, { mensagem: 'Usuário desativado com sucesso.' });
+  } catch (err) {
+    await tratarErro(res, err);
+  }
+}
+
+// ──────────────────────────────────────────────
+// POST /usuarios/me/foto
+// Acesso: logado
+// ──────────────────────────────────────────────
+export async function atualizarFotoPerfilHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  try {
+    const caller = requireCaller(req);
+    const { caminhoImagem } = await processarUpload(req, 'perfil');
+
+    if (!caminhoImagem) {
+      responder(res, 400, { erro: 'Nenhuma imagem enviada.' });
+      return;
+    }
+
+    await atualizarFotoPerfil(caller.usuarioId, caminhoImagem);
+    responder(res, 200, { mensagem: 'Foto atualizada!', imagem_url: caminhoImagem });
+  } catch (err) {
+    await tratarErro(res, err);
+  }
+}
+
+// ──────────────────────────────────────────────
+// PATCH /usuarios/me/preferencias
+// Acesso: logado
+// ──────────────────────────────────────────────
+export async function atualizarPreferenciasHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  try {
+    const caller = requireCaller(req);
+    const corpo = await lerCorpo(req);
+
+    if (!corpo || Object.keys(corpo).length === 0) {
+      responder(res, 400, { erro: 'Nenhuma preferência enviada.' });
+      return;
+    }
+
+    await atualizarPreferenciasUsuario(caller.usuarioId, corpo);
+    responder(res, 200, { mensagem: 'Preferências atualizadas!' });
   } catch (err) {
     await tratarErro(res, err);
   }

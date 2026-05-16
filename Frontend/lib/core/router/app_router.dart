@@ -13,6 +13,7 @@ import '../../features/client/booking/screens/checkout_screen.dart';
 import '../../features/client/reservations/screens/my_reservations_screen.dart';
 import '../../features/client/reservations/screens/reservation_detail_screen.dart';
 import '../../features/client/profile/screens/profile_screen.dart';
+import '../../features/client/profile/screens/settings_screen.dart';
 import '../models/reserva.dart';
 import '../../features/manager/dashboard/screens/dashboard_screen.dart';
 import '../../features/manager/reservations/screens/reservations_screen.dart';
@@ -104,6 +105,12 @@ class AppRouter {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+        routes: [
+          GoRoute(
+            path: 'settings',
+            builder: (context, state) => const SettingsScreen(),
+          ),
+        ],
       ),
 
       // Rotas do Gerente / Admin

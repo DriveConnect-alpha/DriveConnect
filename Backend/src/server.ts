@@ -76,6 +76,8 @@ import {
   desativarMinhaContaCliente,
   trocarSenha,
   deletarUsuario,
+  atualizarFotoPerfilHandler,
+  atualizarPreferenciasHandler,
 } from './routes/usuario.routes.js';
 
 // Rotas de filial / gerente
@@ -267,6 +269,8 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   if (method === 'GET' && path === '/usuarios/clientes/me') return buscarMeuPerfil(req, res);
   if (method === 'PUT' && path === '/usuarios/clientes/me') return editarMeuPerfil(req, res);
   if (method === 'DELETE' && path === '/usuarios/clientes/me') return desativarMinhaContaCliente(req, res);
+  if (method === 'POST' && path === '/usuarios/me/foto') return atualizarFotoPerfilHandler(req, res);
+  if (method === 'PATCH' && path === '/usuarios/me/preferencias') return atualizarPreferenciasHandler(req, res);
 
   const matchCliente = path.match(/^\/usuarios\/clientes\/([^/]+)$/);
   if (matchCliente) {
@@ -425,12 +429,13 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
     return cobrancaExtraHandler(req, res, matchCobranca[1]);
   }
 
-  // ── Storage (Imagens de Veículos) ─────────────
-  if (method === 'GET' && path.startsWith('/storage/carros/')) {
-    const filename = path.replace('/storage/carros/', '');
+  // ── Storage (Imagens de Veículos e Perfil) ────────
+  if (method === 'GET' && (path.startsWith('/storage/carros/') || path.startsWith('/storage/perfil/'))) {
+    const isPerfil = path.startsWith('/storage/perfil/');
+    const filename = path.replace(isPerfil ? '/storage/perfil/' : '/storage/carros/', '');
     const { lerArquivoSeguro } = await import('./services/storage.service.js');
     try {
-      const stream = lerArquivoSeguro(filename);
+      const stream = lerArquivoSeguro(filename, isPerfil ? 'perfil' : 'carros');
       const ext = filename.split('.').pop()?.toLowerCase();
       const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
       res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400' });

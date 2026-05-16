@@ -258,7 +258,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text(
                   title,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                    color: colorScheme.onSurfaceVariant,    
                     fontWeight: FontWeight.w500,
                   ),
                   textAlign: TextAlign.center,

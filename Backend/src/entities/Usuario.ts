@@ -8,6 +8,8 @@ export class Usuario {
   readonly id: string;
   readonly email: string;
   readonly tipo: TipoUsuario;
+  readonly imagemUrl: string | null;
+  readonly preferencias: any;
   readonly criadoEm: Date;
   readonly deletadoEm: Date | null;
 
@@ -15,12 +17,19 @@ export class Usuario {
     id: string;
     email: string;
     tipo: TipoUsuario;
+    imagemUrl?: string | null;
+    preferencias?: any;
     criadoEm: Date;
     deletadoEm: Date | null;
   }) {
     this.id = dados.id;
     this.email = dados.email;
     this.tipo = dados.tipo;
+    this.imagemUrl = dados.imagemUrl ?? null;
+    this.preferencias = dados.preferencias ?? {
+      notifications: { email: true, push: true, whatsapp: true },
+      theme: 'light'
+    };
     this.criadoEm = dados.criadoEm;
     this.deletadoEm = dados.deletadoEm;
   }

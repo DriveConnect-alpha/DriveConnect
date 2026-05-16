@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../providers/reservations_provider.dart';
 import '../../widgets/manager_scaffold.dart';
 import '../../../../core/widgets/dc_status_badge.dart';
+import '../../../../core/widgets/dc_card.dart';
 
 class ReservationsScreen extends StatefulWidget {
   final String? clienteId;
@@ -32,6 +33,8 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return ManagerScaffold(
       title: widget.clienteNome != null 
@@ -47,79 +50,204 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
             return Center(child: Text(provider.error!));
           }
 
-          return ListView.builder(
+          // Calcula estatísticas
+          final total = provider.reservas.length;
+          final pendentes = provider.reservas.where((r) => r.status == 'PENDENTE_PAGAMENTO').length;
+          final ativas = provider.reservas.where((r) => r.status == 'ATIVA').length;
+          final finalizadas = provider.reservas.where((r) => r.status == 'FINALIZADA').length;
+
+          return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            itemCount: provider.reservas.length,
-            itemBuilder: (context, index) {
-              try {
-                final reserva = provider.reservas[index];
-                final reservaIdShort = reserva.id.length >= 8 ? reserva.id.substring(0, 8) : reserva.id;
-                
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Reserva #$reservaIdShort',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            DCStatusBadge(status: reserva.status, label: reserva.status),
-                          ],
-                        ),
-                        const Divider(),
-                        Text('Cliente: ${reserva.cliente?.nomeCompleto ?? "N/A"}'),
-                        Text('Veículo: ${reserva.veiculo?.modelo?.marca ?? ""} ${reserva.veiculo?.modelo?.nome ?? ""} (${reserva.veiculo?.placa ?? "N/A"})'),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Symbols.calendar_today, size: 16),
-                            const SizedBox(width: 4),
-                            Text('${reserva.dataInicio != null ? dateFormat.format(reserva.dataInicio) : "N/A"} - ${reserva.dataFim != null ? dateFormat.format(reserva.dataFim) : "N/A"}'),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            if (reserva.status == 'PENDENTE_PAGAMENTO')
-                              TextButton(
-                                onPressed: () => _updateStatus(context, reserva.id, 'RESERVADA'),
-                                child: const Text('Confirmar Pagamento'),
-                              ),
-                            if (reserva.status == 'RESERVADA')
-                              TextButton(
-                                onPressed: () => _updateStatus(context, reserva.id, 'ATIVA'),
-                                child: const Text('Iniciar Aluguel'),
-                              ),
-                            if (reserva.status == 'ATIVA')
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  minimumSize: const Size(120, 40),
-                                ),
-                                onPressed: () => _updateStatus(context, reserva.id, 'FINALIZADA'),
-                                child: const Text('Finalizar'),
-                              ),
-                          ],
-                        )
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Cabeçalho com estatísticas
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        colorScheme.primary,
+                        Color.lerp(colorScheme.primary, colorScheme.primaryContainer, 0.28)!,
                       ],
                     ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorScheme.primary.withOpacity(0.18),
+                        blurRadius: 24,
+                        offset: const Offset(0, 12),
+                      ),
+                    ],
                   ),
-                );
-              } catch (e) {
-                return Card(
-                  child: ListTile(
-                    title: const Text('Erro ao exibir reserva'),
-                    subtitle: Text(e.toString()),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.16),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: const Icon(Symbols.confirmation_number, color: Colors.white),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Reservas',
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Acompanhe todas as reservas de veículos.',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white.withOpacity(0.9),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _StatChip(label: 'Total', value: total.toString(), icon: Symbols.list),
+                          _StatChip(label: 'Pendentes', value: pendentes.toString(), icon: Symbols.schedule),
+                          _StatChip(label: 'Ativas', value: ativas.toString(), icon: Symbols.check_circle),
+                          _StatChip(label: 'Finalizadas', value: finalizadas.toString(), icon: Symbols.task_alt),
+                        ],
+                      ),
+                    ],
                   ),
-                );
-              }
-            },
+                ),
+                const SizedBox(height: 20),
+                // Lista de reservas
+                if (provider.reservas.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          Icon(Symbols.inbox, size: 48, color: colorScheme.outline.withOpacity(0.5)),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Nenhuma reserva encontrada',
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: colorScheme.outline,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: provider.reservas.length,
+                    itemBuilder: (context, index) {
+                      try {
+                        final reserva = provider.reservas[index];
+                        final reservaIdShort = reserva.id.length >= 8 ? reserva.id.substring(0, 8) : reserva.id;
+                        
+                        return DCCard(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Reserva #$reservaIdShort',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: colorScheme.onSurface,
+                                      ),
+                                    ),
+                                    DCStatusBadge(status: reserva.status, label: reserva.status),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                _ReservaInfo(
+                                  icon: Symbols.person,
+                                  label: 'Cliente',
+                                  value: reserva.cliente?.nomeCompleto ?? 'N/A',
+                                  theme: theme,
+                                  colorScheme: colorScheme,
+                                ),
+                                const SizedBox(height: 8),
+                                _ReservaInfo(
+                                  icon: Symbols.directions_car,
+                                  label: 'Veículo',
+                                  value: '${reserva.veiculo?.modelo?.marca ?? ""} ${reserva.veiculo?.modelo?.nome ?? ""} (${reserva.veiculo?.placa ?? "N/A"})',
+                                  theme: theme,
+                                  colorScheme: colorScheme,
+                                ),
+                                const SizedBox(height: 8),
+                                _ReservaInfo(
+                                  icon: Symbols.calendar_today,
+                                  label: 'Período',
+                                  value: '${reserva.dataInicio != null ? dateFormat.format(reserva.dataInicio!) : "N/A"} - ${reserva.dataFim != null ? dateFormat.format(reserva.dataFim!) : "N/A"}',
+                                  theme: theme,
+                                  colorScheme: colorScheme,
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    if (reserva.status == 'PENDENTE_PAGAMENTO')
+                                      _ActionButton(
+                                        label: 'Confirmar',
+                                        onPressed: () => _updateStatus(context, reserva.id, 'RESERVADA'),
+                                        isPrimary: true,
+                                      )
+                                    else if (reserva.status == 'RESERVADA')
+                                      _ActionButton(
+                                        label: 'Iniciar',
+                                        onPressed: () => _updateStatus(context, reserva.id, 'ATIVA'),
+                                        isPrimary: true,
+                                      )
+                                    else if (reserva.status == 'ATIVA')
+                                      _ActionButton(
+                                        label: 'Finalizar',
+                                        onPressed: () => _updateStatus(context, reserva.id, 'FINALIZADA'),
+                                        isPrimary: true,
+                                      ),
+                                  ],
+                                )
+                              ],
+                            ),
+                          ),
+                        );
+                      } catch (e) {
+                        return Card(
+                          child: ListTile(
+                            title: const Text('Erro ao exibir reserva'),
+                            subtitle: Text(e.toString()),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+              ],
+            ),
           );
         },
       ),
@@ -132,6 +260,135 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
     
     scaffoldMessenger.showSnackBar(
       SnackBar(content: Text(success ? 'Status atualizado' : 'Erro ao atualizar')),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _StatChip({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: Colors.white),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReservaInfo extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final TextTheme textTheme;
+  final ColorScheme colorScheme;
+
+  const _ReservaInfo({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.textTheme,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: colorScheme.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.outline,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+  final bool isPrimary;
+
+  const _ActionButton({
+    required this.label,
+    required this.onPressed,
+    this.isPrimary = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isPrimary ? colorScheme.primary : null,
+        foregroundColor: isPrimary ? Colors.white : null,
+        minimumSize: const Size(100, 36),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+      ),
+      child: Text(label),
     );
   }
 }

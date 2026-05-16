@@ -206,9 +206,7 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
                           runSpacing: 8,
                           children: [
                             _SummaryChip(label: 'Total', value: _conversations.length.toString(), icon: Symbols.chat),
-                            _SummaryChip(label: 'Abertos', value: openCount.toString(), icon: Symbols.mark_chat_unread),
                             _SummaryChip(label: 'Pausados', value: pausedCount.toString(), icon: Symbols.pause_circle),
-                            _SummaryChip(label: 'Clientes', value: incomingCount.toString(), icon: Symbols.person),
                           ],
                         ),
                       ],

@@ -3,7 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../providers/booking_provider.dart';
+import '../../../../calls/api_core.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/widgets/dc_button.dart';
 import '../../../../core/widgets/dc_card.dart';
@@ -49,11 +53,19 @@ class CheckoutScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceVariant,
                       borderRadius: BorderRadius.circular(8),
-                      image: const DecorationImage(
-                        image: NetworkImage('https://placehold.co/200x150/png?text=Car'),
-                        fit: BoxFit.cover,
-                      ),
+                      image: veiculo.imagemUrl != null
+                          ? DecorationImage(
+                              image: NetworkImage(
+                                '$apiBaseUrl/storage/carros/${veiculo.imagemUrl}',
+                                headers: vehicleImageHeaders,
+                              ),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
                     ),
+                    child: veiculo.imagemUrl == null
+                        ? Icon(Symbols.directions_car, color: theme.colorScheme.onSurfaceVariant, size: 32)
+                        : null,
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -247,33 +259,63 @@ class _PaymentProcessingSheetState extends State<_PaymentProcessingSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final provider = context.watch<BookingProvider>();
+    final veiculo = provider.selectedVehicle;
+    
+    // Calcula total novamente para o preview (ou poderia vir do provider se salvo)
+    final dias = provider.endDate!.difference(provider.startDate!).inDays;
+    final totalDiarias = (veiculo?.modelo?.tipoCarro?.precoBaseDiaria ?? 0) * dias;
+    const taxaServico = 45.00;
+    const planoProtecao = 80.00;
+    final totalGeral = totalDiarias + taxaServico + planoProtecao;
 
     return Container(
       padding: const EdgeInsets.all(24),
-      height: 480,
+      height: 600, // Aumentado para o preview
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Symbols.bolt, size: 60, color: Color(0xFF00628b)),
+          const Icon(Symbols.credit_score, size: 60, color: Color(0xFF00628b)),
           const SizedBox(height: 16),
-          const DCLoading(message: 'Aguardando confirmação...'),
+          Text(
+            'Link de Pagamento Gerado!',
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 24),
-          const Text(
-            'Para concluir, realize o pagamento no ambiente seguro da InfinitePay.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontWeight: FontWeight.bold),
+          
+          // Preview Card
+          DCCard(
+            color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(veiculo?.modelo?.nome ?? 'Veículo', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text('R\$ ${totalGeral.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const Divider(height: 24),
+                Row(
+                  children: [
+                    const Icon(Symbols.calendar_month, size: 16, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${DateFormat('dd/MM').format(provider.startDate!)} até ${DateFormat('dd/MM').format(provider.endDate!)}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'Após o pagamento, esta tela será atualizada automaticamente.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey, fontSize: 13),
-          ),
+          
           const SizedBox(height: 32),
-          if (provider.paymentLink != null)
+          if (provider.paymentLink != null) ...[
             DCButton(
-              label: 'Abrir Pagamento Manualmente',
+              label: 'Pagar Agora (Abrir Link)',
               onPressed: () async {
                 final uri = Uri.parse(provider.paymentLink!);
                 if (await canLaunchUrl(uri)) {
@@ -281,7 +323,25 @@ class _PaymentProcessingSheetState extends State<_PaymentProcessingSheet> {
                 }
               },
             ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: provider.paymentLink!));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Link copiado para a área de transferência!'), behavior: SnackBarBehavior.floating),
+                );
+              },
+              icon: const Icon(Symbols.content_copy, size: 20),
+              label: const Text('Copiar Link de Pagamento'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+                side: BorderSide(color: theme.colorScheme.primary),
+              ),
+            ),
+          ],
+          const SizedBox(height: 24),
+          const DCLoading(message: 'Aguardando confirmação automática...'),
+          const SizedBox(height: 24),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Voltar e revisar', style: TextStyle(color: Colors.grey)),

@@ -60,14 +60,18 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                       '$apiBaseUrl/storage/carros/${veiculo.imagemUrl}',
                       headers: vehicleImageHeaders,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Image.network(
-                        'https://placehold.co/800x600/png?text=${veiculo.modelo?.nome}',
-                        fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: Colors.grey[200],
+                        child: Center(
+                          child: Icon(Symbols.directions_car, size: 64, color: Colors.grey[400]),
+                        ),
                       ),
                     )
-                  : Image.network(
-                      'https://placehold.co/800x600/png?text=${veiculo.modelo?.nome}',
-                      fit: BoxFit.cover,
+                  : Container(
+                      color: Colors.grey[200],
+                      child: Center(
+                        child: Icon(Symbols.directions_car, size: 64, color: Colors.grey[400]),
+                      ),
                     ),
             ),
             actions: [

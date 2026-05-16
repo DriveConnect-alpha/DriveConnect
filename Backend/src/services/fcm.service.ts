@@ -97,12 +97,12 @@ export async function saveFcmToken(params: {
   );
 }
 
-export async function deleteFcmToken(params: { usuarioId: string; token: string }): Promise<void> {
-  const { usuarioId, token } = params;
-  if (!usuarioId || !token) return;
+export async function deleteFcmToken(params: { usuarioId?: string; token: string }): Promise<void> {
+  const { token } = params;
+  if (!token) return;
   await query(
-    `DELETE FROM fcm_token WHERE usuario_id = $1 AND token = $2`,
-    [usuarioId, token],
+    `DELETE FROM fcm_token WHERE token = $1`,
+    [token],
   );
 }
 
@@ -202,9 +202,9 @@ async function sendMulticastNotification(params: {
 
   console.log(
     `[FCM] Enviando: title="${notification.title}" tipo="${tipo}" tokens=${tokens.length}` +
-      `${reservaId ? ` reservaId=${reservaId}` : ''}` +
-      `${filialId ? ` filialId=${filialId}` : ''}` +
-      `${origem ? ` origem=${origem}` : ''}`,
+    `${reservaId ? ` reservaId=${reservaId}` : ''}` +
+    `${filialId ? ` filialId=${filialId}` : ''}` +
+    `${origem ? ` origem=${origem}` : ''}`,
   );
 
   const multicastMessage: MulticastMessage = {

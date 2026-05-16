@@ -43,7 +43,7 @@ class AuthProvider extends ChangeNotifier {
           perfilId: _user!.perfilId,
           filialId: _user!.filialId,
         );
-        await FcmService().flushPendingToken();
+        await FcmService().onUserAuthenticated();
       } catch (_) {
         _token = null;
         _user = null;
@@ -70,7 +70,7 @@ class AuthProvider extends ChangeNotifier {
       await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
       
       // Note: setIdentity is already called inside UserCall.login
-      await FcmService().flushPendingToken();
+      await FcmService().onUserAuthenticated();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -106,6 +106,8 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Remove FCM token BEFORE clearing identity (needs auth headers)
+    await FcmService().onUserLogout();
     _token = null;
     _user = null;
     clearIdentity(); // Clear JWT from api_core

@@ -296,11 +296,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       fit: BoxFit.cover,
                     )
-                  : const DecorationImage(
-                      image: NetworkImage('https://placehold.co/600x400/png?text=Veiculo'),
-                      fit: BoxFit.cover,
-                    ),
+                  : null,
             ),
+            child: veiculo.imagemUrl == null
+                ? Center(
+                    child: Icon(Symbols.directions_car, size: 48, color: Colors.grey[400]),
+                  )
+                : null,
           ),
           Padding(
             padding: const EdgeInsets.all(12.0),

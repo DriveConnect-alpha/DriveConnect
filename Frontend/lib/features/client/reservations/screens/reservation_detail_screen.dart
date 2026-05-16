@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../calls/api_core.dart';
 import '../../../../core/models/reserva.dart';
 import '../../../../core/widgets/dc_card.dart';
 import '../../../../core/widgets/dc_status_badge.dart';
@@ -58,11 +59,19 @@ class ReservationDetailScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceVariant,
                       borderRadius: BorderRadius.circular(8),
-                      image: const DecorationImage(
-                        image: NetworkImage('https://placehold.co/200x150/png?text=Car'),
-                        fit: BoxFit.cover,
-                      ),
+                      image: reserva.veiculo?.imagemUrl != null
+                          ? DecorationImage(
+                              image: NetworkImage(
+                                '$apiBaseUrl/storage/carros/${reserva.veiculo!.imagemUrl}',
+                                headers: vehicleImageHeaders,
+                              ),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
                     ),
+                    child: reserva.veiculo?.imagemUrl == null
+                        ? Icon(Symbols.directions_car, color: theme.colorScheme.onSurfaceVariant, size: 28)
+                        : null,
                   ),
                   const SizedBox(width: 16),
                   Expanded(

@@ -183,13 +183,6 @@ export async function criarReservaPendente(
   const valorSeguro = calcularValorSeguro(planoFinal.percentual, params.valorAluguel);
   const valorTotal = params.valorAluguel + valorSeguro;
 
-  console.log('[ReservaService] Criando reserva pendente:', {
-    clienteId: params.clienteId,
-    veiculoId: params.veiculoId,
-    valorTotal,
-    metodo: params.metodoPagamento,
-  });
-
   // Cria a reserva com seguro incluído
   const sqlInsert = `
     INSERT INTO reserva (
@@ -298,6 +291,146 @@ export async function criarReservaPendente(
   });
 
   return { reservaId, linkPagamento: link_pagamento, valorTotal, valorSeguro, planoSeguro: planoFinal.nome, status: statusInicial };
+}
+
+/**
+ * Atualiza uma reserva que ainda esteja com status PENDENTE_PAGAMENTO.
+ * Permite alterar veículo e datas. Recalcula o valor total.
+ */
+export async function atualizarReservaPendente(
+  reservaId: string,
+  params: {
+    veiculoId?: string;
+    dataInicio?: Date;
+    dataFim?: Date;
+  },
+  caller: any
+): Promise<any> {
+  const result = await query(
+    `SELECT r.*, c.nome_completo, u.email, c.telefone, v.modelo_id, m.nome as modelo_nome, m.marca as modelo_marca
+     FROM reserva r
+     JOIN cliente c ON c.id = r.cliente_id
+     JOIN usuario u ON u.id = c.usuario_id
+     JOIN veiculo v ON v.id = r.veiculo_id
+     JOIN modelo m ON m.id = v.modelo_id
+     WHERE r.id = $1 AND r.deletado_em IS NULL`,
+    [reservaId]
+  );
+
+  const reserva = result.rows[0];
+  if (!reserva) throw new Error('Reserva não encontrada.');
+
+  if (reserva.status !== 'PENDENTE_PAGAMENTO') {
+    throw new Error('Apenas reservas com status PENDENTE_PAGAMENTO podem ser editadas.');
+  }
+
+  // Se o caller for gerente, validar filial se necessário
+  if (caller.tipo === 'GERENTE' && caller.filialId && reserva.filial_retirada_id !== caller.filialId) {
+    throw new Error('Sem permissão para editar reserva de outra filial.');
+  }
+
+  const novoVeiculoId = params.veiculoId ?? reserva.veiculo_id;
+  const novaDataInicio = params.dataInicio ?? new Date(reserva.data_inicio);
+  const novaDataFim = params.dataFim ?? new Date(reserva.data_fim);
+
+  // Se mudou algo crucial, verifica disponibilidade
+  if (
+    novoVeiculoId !== reserva.veiculo_id ||
+    novaDataInicio.getTime() !== new Date(reserva.data_inicio).getTime() ||
+    novaDataFim.getTime() !== new Date(reserva.data_fim).getTime()
+  ) {
+    // Verifica se o novo veículo (ou o mesmo com novas datas) está disponível
+    // IMPORTANTE: precisamos ignorar a PRÓPRIA reserva na checagem de conflito
+    const conflito = await query(`
+      SELECT 1 FROM reserva
+      WHERE veiculo_id = $1
+        AND id != $2
+        AND deletado_em IS NULL
+        AND status IN ('RESERVADA', 'ATIVA', 'PENDENTE_PAGAMENTO')
+        AND (status != 'PENDENTE_PAGAMENTO' OR expira_em > NOW())
+        AND data_inicio <= $3
+        AND data_fim >= $4
+    `, [novoVeiculoId, reservaId, novaDataFim, novaDataInicio]);
+
+    if (conflito.rowCount && conflito.rowCount > 0) {
+      throw new Error('O veículo/período solicitado possui conflito com outra reserva.');
+    }
+  }
+
+  // Recalcula valor total
+  let novoModeloId = reserva.modelo_id;
+  let descricaoModelo = `${reserva.modelo_marca} ${reserva.modelo_nome}`;
+
+  if (novoVeiculoId !== reserva.veiculo_id) {
+    const vResult = await query(
+      'SELECT v.modelo_id, m.nome, m.marca FROM veiculo v JOIN modelo m ON m.id = v.modelo_id WHERE v.id = $1',
+      [novoVeiculoId]
+    );
+    if (!vResult.rows[0]) throw new Error('Novo veículo não encontrado.');
+    novoModeloId = vResult.rows[0].modelo_id;
+    descricaoModelo = `${vResult.rows[0].marca} ${vResult.rows[0].nome}`;
+  }
+
+  const novoValorAluguel = await calcularValorTotal(
+    novoModeloId,
+    reserva.filial_retirada_id,
+    novaDataInicio,
+    novaDataFim
+  );
+
+  // Busca plano de seguro para recalcular total
+  let plano = reserva.plano_seguro_id
+    ? await buscarPlanoPorId(reserva.plano_seguro_id)
+    : await buscarPlanoBasico();
+
+  if (!plano) plano = await buscarPlanoBasico();
+  if (!plano) throw new Error('Falha ao obter plano de seguro.');
+
+  const novoValorSeguro = calcularValorSeguro(plano.percentual, novoValorAluguel);
+  const novoValorTotal = novoValorAluguel + novoValorSeguro;
+
+  // Atualiza banco
+  await query(
+    `UPDATE reserva 
+     SET veiculo_id = $1, data_inicio = $2, data_fim = $3, valor_total = $4, valor_seguro = $5
+     WHERE id = $6`,
+    [novoVeiculoId, novaDataInicio, novaDataFim, novoValorTotal, novoValorSeguro, reservaId]
+  );
+
+  // Se mudou o valor ou os dados, é preferível regenerar o link de pagamento
+  // (Opcional, mas recomendado pelo usuário)
+  const { link_pagamento, slug } = await gerarLinkPagamento({
+    orderNsu: reservaId,
+    itens: [
+      {
+        quantity: 1,
+        price: Math.round(novoValorAluguel * 100),
+        description: descricaoModelo,
+      },
+      ...(novoValorSeguro > 0 ? [{
+        quantity: 1,
+        price: Math.round(novoValorSeguro * 100),
+        description: `Seguro ${plano.nome}`,
+      }] : []),
+    ],
+    cliente: {
+      name: reserva.nome_completo,
+      email: reserva.email,
+      ...(reserva.telefone ? { phone_number: reserva.telefone } : {}),
+    },
+  });
+
+  await query(
+    `UPDATE reserva SET link_pagamento = $1, infinitepay_order_nsu = $2, infinitepay_slug = $3 WHERE id = $4`,
+    [link_pagamento, reservaId, slug ?? null, reservaId],
+  );
+
+  return {
+    reservaId,
+    linkPagamento: link_pagamento,
+    valorTotal: novoValorTotal,
+    valorSeguro: novoValorSeguro
+  };
 }
 
 interface DadosWebhook {

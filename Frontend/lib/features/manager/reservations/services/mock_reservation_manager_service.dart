@@ -49,7 +49,16 @@ class MockReservationManagerService implements IReservationManagerService {
     String? planoSeguroId,
     String? metodoPagamento,
   }) async {
-    await Future.delayed(const Duration(seconds: 1));
     return {'reservaId': 'mock-new', 'status': 'RESERVADA'};
+  }
+
+  @override
+  Future<void> cancelReservation({
+    required String reservaId,
+    required void Function() onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    onSuccess();
   }
 }

@@ -7,6 +7,7 @@ import '../providers/reservations_provider.dart';
 import '../../widgets/manager_scaffold.dart';
 import '../../../../core/widgets/dc_status_badge.dart';
 import '../../../../core/widgets/dc_card.dart';
+import '../widgets/edit_reservation_modal.dart';
 
 class ReservationsScreen extends StatefulWidget {
   final String? clienteId;
@@ -266,13 +267,29 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.end,
                                             children: [
-                                              if (reserva.status == 'PENDENTE_PAGAMENTO')
+                                              if (reserva.status == 'PENDENTE_PAGAMENTO' || reserva.status == 'RESERVADA')
+                                                Padding(
+                                                  padding: const EdgeInsets.only(right: 8),
+                                                  child: _ActionButton(
+                                                    label: 'Cancelar',
+                                                    onPressed: () => _confirmCancel(context, reserva.id),
+                                                    isDanger: true,
+                                                  ),
+                                                ),
+                                              if (reserva.status == 'PENDENTE_PAGAMENTO') ...[
+                                                Padding(
+                                                  padding: const EdgeInsets.only(right: 8),
+                                                  child: _ActionButton(
+                                                    label: 'Editar',
+                                                    onPressed: () => _showEditModal(context, reserva),
+                                                  ),
+                                                ),
                                                 _ActionButton(
                                                   label: 'Confirmar',
                                                   onPressed: () => _updateStatus(context, reserva.id, 'RESERVADA'),
                                                   isPrimary: true,
-                                                )
-                                              else if (reserva.status == 'RESERVADA')
+                                                ),
+                                              ] else if (reserva.status == 'RESERVADA')
                                                 _ActionButton(
                                                   label: 'Iniciar',
                                                   onPressed: () => _updateStatus(context, reserva.id, 'ATIVA'),
@@ -317,6 +334,54 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
     
     scaffoldMessenger.showSnackBar(
       SnackBar(content: Text(success ? 'Status atualizado' : 'Erro ao atualizar')),
+    );
+  }
+
+  void _confirmCancel(BuildContext context, String id) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancelar Reserva?'),
+        content: const Text('Esta ação não pode ser desfeita. Você deseja realmente cancelar esta reserva?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Voltar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final provider = this.context.read<ReservationsProvider>();
+              final success = await provider.cancelReservation(id);
+              if (mounted) {
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(
+                    content: Text(success ? 'Reserva cancelada com sucesso' : (provider.error ?? 'Erro ao cancelar reserva')),
+                    backgroundColor: success ? Colors.green : Colors.red,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Confirmar Cancelamento'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditModal(BuildContext context, dynamic reserva) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: EditReservationModal(reserva: reserva),
+      ),
     );
   }
 }
@@ -428,11 +493,13 @@ class _ActionButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
   final bool isPrimary;
+  final bool isDanger;
 
   const _ActionButton({
     required this.label,
     required this.onPressed,
     this.isPrimary = false,
+    this.isDanger = false,
   });
 
   @override
@@ -442,10 +509,12 @@ class _ActionButton extends StatelessWidget {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: isPrimary ? colorScheme.primary : null,
-        foregroundColor: isPrimary ? Colors.white : null,
+        backgroundColor: isPrimary ? colorScheme.primary : (isDanger ? Colors.red.shade50 : null),
+        foregroundColor: isPrimary ? Colors.white : (isDanger ? Colors.red : null),
+        side: isDanger ? BorderSide(color: Colors.red.shade200) : null,
         minimumSize: const Size(100, 36),
         padding: const EdgeInsets.symmetric(horizontal: 16),
+        elevation: isDanger ? 0 : null,
       ),
       child: Text(label),
     );

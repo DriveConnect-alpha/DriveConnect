@@ -91,4 +91,43 @@ class ReservationManagerService implements IReservationManagerService {
 
     return completer.future;
   }
+
+  @override
+  Future<void> cancelReservation({
+    required String reservaId,
+    required void Function() onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    await ReservaCall.cancelar(
+      reservaId: reservaId,
+      onSuccess: (_) => onSuccess(),
+      onError: (msg) => onError(msg),
+    );
+  }
+
+  @override
+  Future<void> updateReservation({
+    required String reservaId,
+    String? veiculoId,
+    String? dataInicio,
+    String? dataFim,
+    required void Function(Map<String, dynamic> data) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.patch<Map<String, dynamic>>(
+        '/reservas/$reservaId',
+        data: {
+          if (veiculoId != null) 'veiculo_id': veiculoId,
+          if (dataInicio != null) 'data_inicio': dataInicio,
+          if (dataFim != null) 'data_fim': dataFim,
+        },
+      );
+      onSuccess(response.data!);
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
 }

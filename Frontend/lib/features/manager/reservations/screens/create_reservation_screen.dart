@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/widgets/dc_card.dart';
@@ -118,14 +119,21 @@ class _CreateReservationScreenState extends State<CreateReservationScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fechar'),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: link)).then((_) {
+                if (mounted) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(content: Text('Link copiado para a área de transferência!')),
+                  );
+                }
+              });
+            },
+            child: const Text('Copiar Link'),
           ),
           ElevatedButton(
             onPressed: () {
-              // Copy to clipboard logic could go here
-              Navigator.pop(context);
-              GoRouter.of(this.context).pop();
+              Navigator.pop(context); // Close dialog
+              GoRouter.of(this.context).pop(); // Go back to list
             },
             child: const Text('OK'),
           ),

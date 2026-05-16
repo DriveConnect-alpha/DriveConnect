@@ -11,6 +11,7 @@ import {
   confirmarDevolucao,
   estenderReservaHandler,
   manualConfirmarPagamento,
+  atualizarReservaHandler,
 } from './routes/reserva.routes.js';
 
 // Rotas de relatórios / dashboards
@@ -344,7 +345,7 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
     const reservaId = matchEstender[1];
     if (reservaId !== undefined) return estenderReservaHandler(req, res, reservaId);
   }
-  
+
   const matchConfirmarPagamento = path.match(/^\/reservas\/([^/]+)\/confirmar-pagamento$/);
   if (matchConfirmarPagamento && method === 'POST') {
     const reservaId = matchConfirmarPagamento[1];
@@ -370,9 +371,12 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   }
 
   const matchReserva = path.match(/^\/reservas\/([^/]+)$/);
-  if (matchReserva && method === 'GET') {
+  if (matchReserva) {
     const reservaId = matchReserva[1];
-    if (reservaId !== undefined) return detalharReserva(req, res, reservaId);
+    if (reservaId !== undefined) {
+      if (method === 'GET') return detalharReserva(req, res, reservaId);
+      if (method === 'PATCH') return atualizarReservaHandler(req, res, reservaId);
+    }
   }
 
   // ── Seguros ───────────────────────────────────

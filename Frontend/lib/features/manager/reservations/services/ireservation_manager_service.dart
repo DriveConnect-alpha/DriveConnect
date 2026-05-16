@@ -13,4 +13,19 @@ abstract class IReservationManagerService {
     String? planoSeguroId,
     String? metodoPagamento,
   });
+
+  Future<void> cancelReservation({
+    required String reservaId,
+    required void Function() onSuccess,
+    required void Function(String message) onError,
+  });
+
+  Future<void> updateReservation({
+    required String reservaId,
+    String? veiculoId,
+    String? dataInicio,
+    String? dataFim,
+    required void Function(Map<String, dynamic> data) onSuccess,
+    required void Function(String message) onError,
+  });
 }

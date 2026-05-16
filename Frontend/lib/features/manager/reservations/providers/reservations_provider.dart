@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/models/reserva.dart';
 import '../../../../core/network/api_exceptions.dart';
@@ -76,6 +77,81 @@ class ReservationsProvider with ChangeNotifier {
       return null;
     } catch (e) {
       _error = 'Erro inesperado ao criar reserva';
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> cancelReservation(String reservaId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final completer = Completer<void>();
+      String? errorMessage;
+
+      await _service.cancelReservation(
+        reservaId: reservaId,
+        onSuccess: () => completer.complete(),
+        onError: (msg) {
+          errorMessage = msg;
+          completer.complete();
+        },
+      );
+
+      await completer.future;
+
+      if (errorMessage != null) {
+        _error = errorMessage;
+        return false;
+      }
+
+      await fetchReservations();
+      return true;
+    } catch (e) {
+      _error = 'Erro inesperado ao cancelar reserva';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>?> updateReservation({
+    required String reservaId,
+    String? veiculoId,
+    String? dataInicio,
+    String? dataFim,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final completer = Completer<Map<String, dynamic>?>();
+      
+      await _service.updateReservation(
+        reservaId: reservaId,
+        veiculoId: veiculoId,
+        dataInicio: dataInicio,
+        dataFim: dataFim,
+        onSuccess: (data) => completer.complete(data),
+        onError: (msg) {
+          _error = msg;
+          completer.complete(null);
+        },
+      );
+
+      final result = await completer.future;
+      if (result != null) {
+        await fetchReservations();
+      }
+      return result;
+    } catch (e) {
+      _error = 'Erro inesperado ao editar reserva';
       return null;
     } finally {
       _isLoading = false;

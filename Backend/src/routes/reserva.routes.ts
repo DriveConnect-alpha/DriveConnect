@@ -6,6 +6,7 @@ import {
   verificarDisponibilidadeRetirada,
   criarReservaPendente,
   estenderReserva,
+  atualizarReservaPendente,
 } from '../services/reserva.service.js';
 import { requireCaller, requireTipo } from '../middlewares/auth.js';
 import { atualizarStatusVeiculoPorReservaE_Notificar } from '../services/veiculo.service.js';
@@ -94,16 +95,7 @@ export async function registrarReserva(req: IncomingMessage, res: ServerResponse
       cliente_id
     } = corpo;
 
-    console.log('[Reserva] Iniciando criação de reserva:', {
-      caller: { id: caller.usuarioId, tipo: caller.tipo },
-      veiculo_id,
-      cliente_id,
-      data_inicio,
-      data_fim
-    });
-
     if (!veiculo_id || !filial_retirada_id || !filial_devolucao_id || !data_inicio || !data_fim) {
-      console.warn('[Reserva] Parâmetros obrigatórios ausentes no corpo:', corpo);
       responder(res, 400, { erro: 'Parâmetros obrigatórios ausentes.' });
       return;
     }
@@ -185,10 +177,8 @@ export async function registrarReserva(req: IncomingMessage, res: ServerResponse
       origem: caller.tipo === 'CLIENTE' ? 'APP' : 'GERENTE_APP',
     });
 
-    console.log('[Reserva] Reserva criada com sucesso:', reserva.reservaId);
     responder(res, 201, reserva);
   } catch (err) {
-    console.error('[Reserva] Erro catastrófico ao registrar reserva:', err);
     const { status, mensagem } = mapearErro(err);
     responder(res, status, { erro: mensagem });
   }
@@ -309,6 +299,34 @@ export async function manualConfirmarPagamento(req: IncomingMessage, res: Server
     );
 
     responder(res, 200, { mensagem: 'Pagamento confirmado manualmente. Reserva agora está RESERVADA.' });
+  } catch (err) {
+    const { status, mensagem } = mapearErro(err);
+    responder(res, status, { erro: mensagem });
+  }
+}
+
+// ──────────────────────────────────────────────
+// PATCH /reservas/:id
+// Atualiza uma reserva pendente (veículo e datas)
+// Acesso: CLIENTE (própria), GERENTE (filial própria) | ADMIN
+// ──────────────────────────────────────────────
+export async function atualizarReservaHandler(req: IncomingMessage, res: ServerResponse, reservaId: string) {
+  try {
+    const caller = requireCaller(req);
+    const corpo = await lerCorpo(req) as Record<string, string>;
+
+    const params: {
+      veiculoId?: string;
+      dataInicio?: Date;
+      dataFim?: Date;
+    } = {};
+
+    if (corpo.veiculo_id) params.veiculoId = corpo.veiculo_id;
+    if (corpo.data_inicio) params.dataInicio = new Date(corpo.data_inicio);
+    if (corpo.data_fim) params.dataFim = new Date(corpo.data_fim);
+
+    const resultado = await atualizarReservaPendente(reservaId, params, caller);
+    responder(res, 200, resultado);
   } catch (err) {
     const { status, mensagem } = mapearErro(err);
     responder(res, status, { erro: mensagem });

@@ -122,29 +122,30 @@ class ChatBubble extends StatelessWidget {
                           height: 1.35,
                         ),
                       ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _formatTime(timestamp),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: isOutgoing ? colorScheme.onPrimary.withOpacity(0.78) : colorScheme.outline,
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _formatTime(timestamp),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: isOutgoing ? colorScheme.onPrimary.withOpacity(0.78) : colorScheme.outline,
+                            ),
                           ),
-                        ),
-                        if (isOutgoing) ...[
-                          const SizedBox(width: 4),
-                          Icon(
-                            _getStatusIcon(status),
-                            size: 14,
-                            color: colorScheme.onPrimary.withOpacity(0.78),
-                          ),
+                          if (isOutgoing) ...[
+                            const SizedBox(width: 4),
+                            Icon(
+                              _getStatusIcon(status),
+                              size: 14,
+                              color: colorScheme.onPrimary.withOpacity(0.78),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

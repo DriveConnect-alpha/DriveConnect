@@ -138,13 +138,13 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
@@ -200,10 +200,10 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
                             ),
                           ],
                         ),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 12),
                         Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
                             _SummaryChip(label: 'Total', value: _conversations.length.toString(), icon: Symbols.chat),
                             _SummaryChip(label: 'Abertos', value: openCount.toString(), icon: Symbols.mark_chat_unread),
@@ -214,11 +214,11 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
                   Card(
                     elevation: 0,
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(12),
                       child: Column(
                         children: [
                           Row(
@@ -248,7 +248,7 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
                               ),
                             ],
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 10),
                           Wrap(
                             spacing: 12,
                             runSpacing: 12,
@@ -356,9 +356,9 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
                 child: RefreshIndicator(
                   onRefresh: _loadConversations,
                   child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                     itemCount: filtered.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final conversation = filtered[index];
                       final isIncoming = conversation.lastMessageDirection == 'IN';
@@ -369,21 +369,22 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
                       return Card(
                         elevation: 0,
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(16),
                           onTap: () => _openConversation(conversation),
                           child: Padding(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(12),
                             child: Row(
                               children: [
                                 Stack(
                                   children: [
                                     CircleAvatar(
-                                      radius: 24,
+                                      radius: 20,
                                       backgroundColor: isIncoming
                                           ? colorScheme.secondaryContainer
                                           : colorScheme.primaryContainer,
                                       child: Icon(
                                         isIncoming ? Symbols.call_received : Symbols.smart_toy,
+                                        size: 20,
                                         color: isIncoming
                                             ? colorScheme.onSecondaryContainer
                                             : colorScheme.onPrimaryContainer,
@@ -393,18 +394,18 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
                                       right: 0,
                                       bottom: 0,
                                       child: Container(
-                                        width: 12,
-                                        height: 12,
+                                        width: 10,
+                                        height: 10,
                                         decoration: BoxDecoration(
                                           color: conversation.paused ? colorScheme.tertiary : colorScheme.primary,
                                           shape: BoxShape.circle,
-                                          border: Border.all(color: colorScheme.surface, width: 2),
+                                          border: Border.all(color: colorScheme.surface, width: 1.5),
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(width: 14),
+                                const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -423,7 +424,7 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 6),
+                                      const SizedBox(height: 4),
                                       Text(
                                         messagePreview,
                                         maxLines: 2,

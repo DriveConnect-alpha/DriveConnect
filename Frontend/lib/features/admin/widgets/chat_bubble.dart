@@ -38,6 +38,9 @@ class ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final maxBubbleWidth = screenWidth * 0.75; // 75% da tela
+    
     final outgoingGradient = isOutgoing
         ? LinearGradient(
             begin: Alignment.topLeft,
@@ -72,52 +75,53 @@ class ChatBubble extends StatelessWidget {
               ),
               const SizedBox(width: 10),
             ],
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: outgoingGradient,
-                  color: isOutgoing ? null : colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(20),
-                    topRight: const Radius.circular(20),
-                    bottomLeft: Radius.circular(isOutgoing ? 20 : 6),
-                    bottomRight: Radius.circular(isOutgoing ? 6 : 20),
-                  ),
-                  border: isOutgoing ? null : Border.all(color: colorScheme.outlineVariant.withOpacity(0.75)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+            Flexible(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxBubbleWidth),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: outgoingGradient,
+                    color: isOutgoing ? null : colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(20),
+                      topRight: const Radius.circular(20),
+                      bottomLeft: Radius.circular(isOutgoing ? 20 : 6),
+                      bottomRight: Radius.circular(isOutgoing ? 6 : 20),
                     ),
-                  ],
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (senderLabel.isNotEmpty) ...[
+                    border: isOutgoing ? null : Border.all(color: colorScheme.outlineVariant.withOpacity(0.75)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (senderLabel.isNotEmpty) ...[
+                        Text(
+                          senderLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                            color: isOutgoing ? colorScheme.onPrimary.withOpacity(0.82) : colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                      ],
                       Text(
-                        senderLabel,
+                        text.isNotEmpty ? text : '(mensagem sem texto)',
                         style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
-                          color: isOutgoing ? colorScheme.onPrimary.withOpacity(0.82) : colorScheme.primary,
+                          color: isOutgoing ? colorScheme.onPrimary : colorScheme.onSurface,
+                          fontSize: 15,
+                          height: 1.35,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                    ],
-                    Text(
-                      text.isNotEmpty ? text : '(mensagem sem texto)',
-                      style: TextStyle(
-                        color: isOutgoing ? colorScheme.onPrimary : colorScheme.onSurface,
-                        fontSize: 15,
-                        height: 1.35,
-                      ),
-                    ),
                     const SizedBox(height: 6),
                     Row(
                       mainAxisSize: MainAxisSize.min,

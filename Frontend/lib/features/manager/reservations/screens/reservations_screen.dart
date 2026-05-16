@@ -64,7 +64,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                 // Cabeçalho com estatísticas
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
@@ -74,63 +74,18 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                         Color.lerp(colorScheme.primary, colorScheme.primaryContainer, 0.28)!,
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.primary.withOpacity(0.18),
-                        blurRadius: 24,
-                        offset: const Offset(0, 12),
-                      ),
-                    ],
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 1.8,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.16),
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: const Icon(Symbols.confirmation_number, color: Colors.white),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Reservas',
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Acompanhe todas as reservas de veículos.',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: Colors.white.withOpacity(0.9),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _StatChip(label: 'Total', value: total.toString(), icon: Symbols.list),
-                          _StatChip(label: 'Pendentes', value: pendentes.toString(), icon: Symbols.schedule),
-                          _StatChip(label: 'Ativas', value: ativas.toString(), icon: Symbols.check_circle),
-                          _StatChip(label: 'Finalizadas', value: finalizadas.toString(), icon: Symbols.task_alt),
-                        ],
-                      ),
+                      _StatChip(label: 'Total', value: total.toString(), icon: Symbols.list),
+                      _StatChip(label: 'Ativas', value: ativas.toString(), icon: Symbols.check_circle),
                     ],
                   ),
                 ),
@@ -167,11 +122,19 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: DCCard(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: colorScheme.outline.withOpacity(0.12),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
@@ -236,6 +199,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                               ],
                             ),
                           ),
+                            ),
                           ),
                         );
                       } catch (e) {

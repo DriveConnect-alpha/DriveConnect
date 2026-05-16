@@ -219,10 +219,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return DCCard(
       padding: const EdgeInsets.all(16),
       elevation: 6.0,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: colorScheme.outline.withOpacity(0.12),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
           Center(
             child: Container(
               padding: const EdgeInsets.all(12),
@@ -264,7 +272,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -288,7 +296,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Center(
@@ -301,7 +309,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Icon(icon, size: 20, color: colorScheme.primary),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 8),
               Text(
                 title,
                 textAlign: TextAlign.center,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/reservations_provider.dart';
 import '../../widgets/manager_scaffold.dart';
 import '../../../../core/widgets/dc_status_badge.dart';
@@ -60,6 +61,12 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
       title: widget.clienteNome != null 
           ? 'Reservas de ${widget.clienteNome}' 
           : 'Gestão de Reservas',
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.push('/manager/reservations/create'),
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        child: const Icon(Symbols.add, size: 28),
+      ),
       child: Consumer<ReservationsProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading) {

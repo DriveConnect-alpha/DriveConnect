@@ -16,6 +16,7 @@ import '../../features/client/profile/screens/profile_screen.dart';
 import '../models/reserva.dart';
 import '../../features/manager/dashboard/screens/dashboard_screen.dart';
 import '../../features/manager/reservations/screens/reservations_screen.dart';
+import '../../features/manager/reservations/screens/create_reservation_screen.dart';
 import '../../features/manager/inventory/screens/inventory_screen.dart';
 import '../../features/manager/inventory/screens/add_vehicle_screen.dart';
 import '../../features/manager/inventory/screens/edit_vehicle_screen.dart';
@@ -128,6 +129,12 @@ class AppRouter {
       GoRoute(
         path: '/manager/reservations',
         builder: (context, state) => const ReservationsScreen(),
+        routes: [
+          GoRoute(
+            path: 'create',
+            builder: (context, state) => const CreateReservationScreen(),
+          ),
+        ],
       ),
       GoRoute(
         path: '/manager/inventory',

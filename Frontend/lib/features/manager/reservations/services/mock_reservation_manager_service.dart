@@ -37,4 +37,19 @@ class MockReservationManagerService implements IReservationManagerService {
   Future<void> updateReservationStatus(String id, String status) async {
     await Future.delayed(const Duration(milliseconds: 500));
   }
+
+  @override
+  Future<Map<String, dynamic>> createReservation({
+    required String veiculoId,
+    required String clienteId,
+    required String filialRetiradaId,
+    required String filialDevolucaoId,
+    required String dataInicio,
+    required String dataFim,
+    String? planoSeguroId,
+    String? metodoPagamento,
+  }) async {
+    await Future.delayed(const Duration(seconds: 1));
+    return {'reservaId': 'mock-new', 'status': 'RESERVADA'};
+  }
 }

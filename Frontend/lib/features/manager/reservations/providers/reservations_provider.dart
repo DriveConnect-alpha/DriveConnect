@@ -43,4 +43,43 @@ class ReservationsProvider with ChangeNotifier {
       return false;
     }
   }
+
+  Future<Map<String, dynamic>?> createReservation({
+    required String veiculoId,
+    required String clienteId,
+    required String filialRetiradaId,
+    required String filialDevolucaoId,
+    required String dataInicio,
+    required String dataFim,
+    String? planoSeguroId,
+    String? metodoPagamento,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final result = await _service.createReservation(
+        veiculoId: veiculoId,
+        clienteId: clienteId,
+        filialRetiradaId: filialRetiradaId,
+        filialDevolucaoId: filialDevolucaoId,
+        dataInicio: dataInicio,
+        dataFim: dataFim,
+        planoSeguroId: planoSeguroId,
+        metodoPagamento: metodoPagamento,
+      );
+      await fetchReservations();
+      return result;
+    } on ApiException catch (e) {
+      _error = e.message;
+      return null;
+    } catch (e) {
+      _error = 'Erro inesperado ao criar reserva';
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 }

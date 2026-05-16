@@ -78,19 +78,46 @@ export async function checarDisponibilidade(req: IncomingMessage, res: ServerRes
 export async function registrarReserva(req: IncomingMessage, res: ServerResponse) {
   try {
     const caller = requireCaller(req);
-    requireTipo(caller, 'CLIENTE');
+    requireTipo(caller, 'CLIENTE', 'GERENTE', 'ADMIN');
 
     const corpo = await lerCorpo(req) as Record<string, string>;
 
-    const { veiculo_id, filial_retirada_id, filial_devolucao_id, data_inicio, data_fim, plano_seguro_id, metodo_pagamento } = corpo;
+    const {
+      veiculo_id,
+      filial_retirada_id,
+      filial_devolucao_id,
+      data_inicio,
+      data_fim,
+      plano_seguro_id,
+      metodo_pagamento,
+      cliente_id
+    } = corpo;
 
     if (!veiculo_id || !filial_retirada_id || !filial_devolucao_id || !data_inicio || !data_fim) {
       responder(res, 400, { erro: 'Parâmetros obrigatórios ausentes.' });
       return;
     }
 
+    // Define qual ID de cliente usar
+    let finalClienteId: string;
+    if (caller.tipo === 'CLIENTE') {
+      finalClienteId = caller.usuarioId;
+    } else {
+      if (!cliente_id) {
+        responder(res, 400, { erro: 'cliente_id é obrigatório para gerentes.' });
+        return;
+      }
+      finalClienteId = cliente_id;
+
+      // Se for gerente, validar se a filial pertence a ele (opcional dependendo da regra de negócio)
+      if (caller.tipo === 'GERENTE' && caller.filialId && caller.filialId !== filial_retirada_id) {
+        responder(res, 403, { erro: 'Gerente só pode criar reserva para sua própria filial.' });
+        return;
+      }
+    }
+
     // Busca dados complementares do cliente e veículo
-    const clienteResult = await query('SELECT nome_completo, email, telefone FROM cliente WHERE id = $1', [caller.usuarioId]);
+    const clienteResult = await query('SELECT nome_completo, email, telefone FROM cliente WHERE id = $1', [finalClienteId]);
     if (!clienteResult.rows[0]) throw new Error('Cliente não encontrado.');
     const cliente = clienteResult.rows[0];
 
@@ -113,7 +140,7 @@ export async function registrarReserva(req: IncomingMessage, res: ServerResponse
 
     // Cria a reserva chamando o service que integra com InfinitePay
     const paramsReserva: any = {
-      clienteId: caller.usuarioId,
+      clienteId: finalClienteId,
       veiculoId: veiculo_id,
       filialRetiradaId: filial_retirada_id,
       filialDevolucaoId: filial_devolucao_id,
@@ -131,7 +158,7 @@ export async function registrarReserva(req: IncomingMessage, res: ServerResponse
 
     const reserva = await criarReservaPendente({
       ...paramsReserva,
-      origem: 'APP',
+      origem: caller.tipo === 'CLIENTE' ? 'APP' : 'GERENTE_APP',
     });
 
     responder(res, 201, reserva);

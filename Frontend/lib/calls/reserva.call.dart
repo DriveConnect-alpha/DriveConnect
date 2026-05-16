@@ -61,6 +61,8 @@ class ReservaCall {
     required String dataInicio,
     required String dataFim,
     String? planoSeguroId,
+    String? clienteId,
+    String? metodoPagamento,
     required void Function(Map<String, dynamic> data) onSuccess,
     required void Function(String message) onError,
   }) async {
@@ -74,6 +76,8 @@ class ReservaCall {
           'data_inicio': dataInicio,
           'data_fim': dataFim,
           if (planoSeguroId != null) 'plano_seguro_id': planoSeguroId,
+          if (clienteId != null) 'cliente_id': clienteId,
+          if (metodoPagamento != null) 'metodo_pagamento': metodoPagamento,
         },
       );
 

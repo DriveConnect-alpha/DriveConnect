@@ -22,6 +22,7 @@ import {
   resumeConversation,
   sendManagerMessage,
 } from './whatsappStorage.service.js';
+import { notifyNovaConversa, notifyNovaMensagemAtendimento } from './fcm.service.js';
 import { criarCliente } from './usuario.service.js';
 import crypto from 'crypto';
 
@@ -206,6 +207,10 @@ export async function processIncomingMessage(payload: any): Promise<void> {
       rawPayload: message,
       status: 'received',
     });
+    // Notifica gerentes/admin sobre nova mensagem mesmo se conversa estiver pausada
+    void notifyNovaMensagemAtendimento({ phone: from, conversationId: conversation.id, message: text }).catch((err) => {
+      console.error('[WhatsApp] Falha ao notificar nova mensagem via FCM:', err);
+    });
     return;
   }
 
@@ -217,6 +222,17 @@ export async function processIncomingMessage(payload: any): Promise<void> {
     rawPayload: message,
     status: 'received',
   });
+
+  // Notifica gerentes/admins: se é criação de conversa, nova conversa; caso contrário, nova mensagem
+  if ((conversation as any).created) {
+    void notifyNovaConversa({ phone: from, conversationId: conversation.id, message: text }).catch((err) => {
+      console.error('[WhatsApp] Falha ao notificar nova conversa via FCM:', err);
+    });
+  } else {
+    void notifyNovaMensagemAtendimento({ phone: from, conversationId: conversation.id, message: text }).catch((err) => {
+      console.error('[WhatsApp] Falha ao notificar nova mensagem via FCM:', err);
+    });
+  }
 
   if (!text) {
     const fallback = 'Mensagem de mídia recebida, consigo processar apenas texto no momento.';

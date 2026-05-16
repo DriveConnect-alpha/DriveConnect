@@ -6,6 +6,7 @@ import { Cliente } from '../entities/Cliente.js';
 import { Gerente } from '../entities/Gerente.js';
 
 import crypto from 'crypto';
+import { notifyNovoCliente } from './fcm.service.js';
 
 // ──────────────────────────────────────────────
 // AUTENTICAÇÃO
@@ -116,6 +117,11 @@ export async function criarCliente(params: CriarClienteParams): Promise<{ usuari
     const clienteId: string = clienteRes.rows[0].id;
 
     await client.query('COMMIT');
+    // Notifica gerentes/admin sobre novo cliente (não bloqueia fluxo)
+    void notifyNovoCliente({ clienteId, clienteNome: params.nomeCompleto }).catch((err) => {
+      console.error('[Usuario] Falha ao notificar novo cliente via FCM:', err);
+    });
+
     return { usuarioId, clienteId };
   } catch (err) {
     await client.query('ROLLBACK');

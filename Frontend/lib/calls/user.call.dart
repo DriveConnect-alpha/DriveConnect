@@ -228,4 +228,20 @@ class UserCall {
       onError(e.toString());
     }
   }
+
+  /// Remove a foto de perfil do usuário logado.
+  /// ROUTE: DELETE /usuarios/me/foto
+  static Future<void> removerFotoPerfil({
+    required void Function(void) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      await dioClient.delete('/usuarios/me/foto');
+      onSuccess(null);
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
 }

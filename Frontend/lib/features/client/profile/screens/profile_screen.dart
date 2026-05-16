@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
@@ -22,11 +23,62 @@ class ProfileScreen extends StatelessWidget {
 
   Future<void> _pickImage(BuildContext context, AuthProvider authProvider) async {
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-    
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Symbols.photo_camera),
+              title: const Text('Tirar Foto'),
+              onTap: () => Navigator.pop(ctx, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(Symbols.image),
+              title: const Text('Escolher da Galeria'),
+              onTap: () => Navigator.pop(ctx, 'gallery'),
+            ),
+            if (authProvider.user?.imagemUrl != null)
+              ListTile(
+                leading: const Icon(Symbols.delete, color: Colors.red),
+                title: const Text('Remover Foto Atual', style: TextStyle(color: Colors.red)),
+                onTap: () => Navigator.pop(ctx, 'remove'),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    if (action == null) return;
+
+    if (action == 'remove') {
+      try {
+        await authProvider.removeProfilePhoto();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Foto removida com sucesso!')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao remover: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+      return;
+    }
+
+    final source = action == 'camera' ? ImageSource.camera : ImageSource.gallery;
+    final image = await picker.pickImage(source: source, imageQuality: 70);
+
     if (image != null) {
       try {
-        await authProvider.updateProfilePhoto(image);
+        // AuthProvider.updateProfilePhoto espera File em algumas implementações, 
+        // mas o image_picker retorna XFile. Convertemos para File.
+        await authProvider.updateProfilePhoto(File(image.path));
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Foto atualizada com sucesso!')),
@@ -63,7 +115,9 @@ class ProfileScreen extends StatelessWidget {
                   backgroundColor: theme.colorScheme.primaryContainer,
                   backgroundImage: user?.imagemUrl != null
                       ? CachedNetworkImageProvider(
-                          '$apiBaseUrl/storage/perfil/${user!.imagemUrl}')
+                          '$apiBaseUrl/usuarios/me/foto?v=${user!.imagemUrl}',
+                          headers: authHeaders,
+                        )
                       : null,
                   child: user?.imagemUrl == null
                       ? Icon(Symbols.person, size: 40, color: theme.colorScheme.onPrimaryContainer)

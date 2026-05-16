@@ -96,6 +96,11 @@ class MockAuthService implements IAuthService {
   }
 
   @override
+  Future<void> removeProfilePhoto({required String id}) async {
+    await Future.delayed(const Duration(seconds: 1));
+  }
+
+  @override
   Future<void> deleteAccount(String id) async {
     await Future.delayed(const Duration(seconds: 1));
   }

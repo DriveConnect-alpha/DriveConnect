@@ -25,5 +25,6 @@ abstract class IAuthService {
     required String id,
     required Map<String, dynamic> preferences,
   });
+  Future<void> removeProfilePhoto({required String id});
   Future<void> deleteAccount(String id);
 }

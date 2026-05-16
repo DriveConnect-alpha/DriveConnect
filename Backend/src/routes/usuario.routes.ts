@@ -15,6 +15,7 @@ import {
   redefinirSenhaComToken,
   atualizarFotoPerfil,
   atualizarPreferenciasUsuario,
+  buscarUsuarioPorId,
 } from '../services/usuario.service.js';
 import { processarUpload } from '../services/storage.service.js';
 import { requireCaller, requireTipo, requireOwnership, gerarToken } from '../middlewares/auth.js';
@@ -363,6 +364,51 @@ export async function atualizarPreferenciasHandler(req: IncomingMessage, res: Se
 
     await atualizarPreferenciasUsuario(caller.usuarioId, corpo);
     responder(res, 200, { mensagem: 'Preferências atualizadas!' });
+  } catch (err) {
+    await tratarErro(res, err);
+  }
+}
+
+
+// ──────────────────────────────────────────────
+// GET /usuarios/me/foto
+// Acesso: logado (serve a própria imagem binária)
+// ──────────────────────────────────────────────
+export async function baixarMinhaFotoHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  try {
+    const caller = requireCaller(req);
+    const usuario = await buscarUsuarioPorId(caller.usuarioId);
+
+    if (!usuario?.imagemUrl) {
+      responder(res, 404, { erro: 'O usuário não possui foto de perfil configurada.' });
+      return;
+    }
+
+    const { lerArquivoSeguro } = await import('../services/storage.service.js');
+    const stream = lerArquivoSeguro(usuario.imagemUrl, 'perfil');
+
+    const ext = usuario.imagemUrl.split('.').pop()?.toLowerCase();
+    const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+
+    res.writeHead(200, {
+      'Content-Type': mime,
+      'Cache-Control': 'private, max-age=86400'
+    });
+    stream.pipe(res);
+  } catch (err) {
+    await tratarErro(res, err);
+  }
+}
+
+// ──────────────────────────────────────────────
+// DELETE /usuarios/me/foto
+// Acesso: logado
+// ──────────────────────────────────────────────
+export async function removerFotoPerfilHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  try {
+    const caller = requireCaller(req);
+    await atualizarFotoPerfil(caller.usuarioId, null as any); // cast para aceitar null no banco
+    responder(res, 200, { mensagem: 'Foto removida com sucesso.' });
   } catch (err) {
     await tratarErro(res, err);
   }

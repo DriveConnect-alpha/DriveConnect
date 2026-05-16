@@ -78,6 +78,8 @@ import {
   deletarUsuario,
   atualizarFotoPerfilHandler,
   atualizarPreferenciasHandler,
+  baixarMinhaFotoHandler,
+  removerFotoPerfilHandler,
 } from './routes/usuario.routes.js';
 
 // Rotas de filial / gerente
@@ -270,6 +272,8 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   if (method === 'PUT' && path === '/usuarios/clientes/me') return editarMeuPerfil(req, res);
   if (method === 'DELETE' && path === '/usuarios/clientes/me') return desativarMinhaContaCliente(req, res);
   if (method === 'POST' && path === '/usuarios/me/foto') return atualizarFotoPerfilHandler(req, res);
+  if (method === 'GET' && path === '/usuarios/me/foto') return baixarMinhaFotoHandler(req, res);
+  if (method === 'DELETE' && path === '/usuarios/me/foto') return removerFotoPerfilHandler(req, res);
   if (method === 'PATCH' && path === '/usuarios/me/preferencias') return atualizarPreferenciasHandler(req, res);
 
   const matchCliente = path.match(/^\/usuarios\/clientes\/([^/]+)$/);

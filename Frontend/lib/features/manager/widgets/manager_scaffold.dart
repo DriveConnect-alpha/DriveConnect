@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../calls/api_core.dart';
 
 class ManagerScaffold extends StatelessWidget {
   final Widget child;
@@ -64,7 +66,18 @@ class ManagerScaffold extends StatelessWidget {
                   UserAccountsDrawerHeader(
                     accountName: Text(authProvider.user?.email.split('@')[0] ?? 'Gerente'),
                     accountEmail: Text(authProvider.user?.email ?? ''),
-                    currentAccountPicture: const CircleAvatar(child: Icon(Symbols.person)),
+                    currentAccountPicture: CircleAvatar(
+                      backgroundColor: theme.colorScheme.onPrimary,
+                      backgroundImage: authProvider.user?.imagemUrl != null
+                          ? CachedNetworkImageProvider(
+                              '$apiBaseUrl/usuarios/me/foto?v=${authProvider.user!.imagemUrl}',
+                              headers: authHeaders,
+                            )
+                          : null,
+                      child: authProvider.user?.imagemUrl == null
+                          ? Icon(Symbols.person, color: theme.colorScheme.primary)
+                          : null,
+                    ),
                     decoration: BoxDecoration(color: theme.colorScheme.primary),
                   ),
                   ...menuItems.map((item) => ListTile(
@@ -138,7 +151,7 @@ class ManagerScaffold extends StatelessWidget {
       ),
       bottomNavigationBar: !useSideRail
           ? BottomNavigationBar(
-              currentIndex: currentIndex >= 4 ? 0 : currentIndex, // Ajuste simples
+              currentIndex: currentIndex >= 4 ? 0 : currentIndex,
               onTap: (index) => context.go(menuItems[index]['path']),
               type: BottomNavigationBarType.fixed,
               items: menuItems.take(4).map((item) => BottomNavigationBarItem(

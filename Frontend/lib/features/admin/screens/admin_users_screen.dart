@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/admin_provider.dart';
 import '../models/admin_user.dart';
 import '../../manager/widgets/manager_scaffold.dart';
+import '../../../calls/api_core.dart';
 
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
@@ -43,7 +45,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   void _showEditDialog(BuildContext context, AdminUser user) {
-// ... (rest of the dialog logic remains same)
     final nomeController = TextEditingController(text: user.nome);
     final emailController = TextEditingController(text: user.email);
     final senhaController = TextEditingController();
@@ -199,7 +200,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
           return Column(
             children: [
-              // Cabeçalho fixo
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Column(
@@ -338,7 +338,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                               child: ListTile(
                                 leading: CircleAvatar(
                                   backgroundColor: iconColor.withAlpha(40),
-                                  child: Icon(icon, color: iconColor),
+                                  backgroundImage: user.imagemUrl != null
+                                      ? CachedNetworkImageProvider(
+                                          '$apiBaseUrl/storage/perfil/${user.imagemUrl}',
+                                          headers: vehicleImageHeaders,
+                                        )
+                                      : null,
+                                  child: user.imagemUrl == null 
+                                    ? Icon(icon, color: iconColor)
+                                    : null,
                                 ),
                                 title: Text(user.nome, style: const TextStyle(fontWeight: FontWeight.bold)),
                                 subtitle: Column(

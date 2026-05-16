@@ -217,6 +217,7 @@ export async function listarClientes(): Promise<any[]> {
           'id', u.id,
           'email', u.email,
           'tipo', u.tipo,
+          'imagemUrl', u.imagem_url,
           'criado_em', u.criado_em,
           'nome', c.nome_completo,
           'perfilId', c.id
@@ -238,6 +239,7 @@ export async function listarUsuariosSistema(): Promise<any[]> {
         u.id, 
         u.email, 
         u.tipo, 
+        u.imagem_url as "imagemUrl",
         u.criado_em,
         COALESCE(c.nome_completo, g.nome_completo, 'Administrador') as nome
      FROM usuario u

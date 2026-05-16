@@ -35,6 +35,19 @@ Map<String, String> get vehicleImageHeaders {
   return apiKey != null ? {'x-api-key': apiKey} : const {};
 }
 
+/// Headers used for authenticated resource requests (like profile photo).
+Map<String, String> get authHeaders {
+  final Map<String, String> headers = {};
+  if (_jwtToken != null) {
+    headers['Authorization'] = 'Bearer $_jwtToken';
+  }
+  final apiKey = _apiKey ?? dotenv.env['API_KEY'];
+  if (apiKey != null) {
+    headers['x-api-key'] = apiKey;
+  }
+  return headers;
+}
+
 // ── Identity store (in-memory) ────────────────────────────────────────────────
 String? _jwtToken;
 String? _usuarioId;

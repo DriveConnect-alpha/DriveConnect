@@ -190,6 +190,37 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> removeProfilePhoto() async {
+    if (_user == null) return;
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _authService.removeProfilePhoto(id: _user!.id);
+      
+      // Atualiza o objeto do usuário localmente retirando a foto
+      _user = Usuario(
+        id: _user!.id,
+        email: _user!.email,
+        nome: _user!.nome,
+        tipo: _user!.tipo,
+        perfilId: _user!.perfilId,
+        filialId: _user!.filialId,
+        imagemUrl: null,
+        preferencias: _user!.preferencias,
+        criadoEm: _user!.criadoEm,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> updatePreferences(Map<String, dynamic> newPrefs) async {
     if (_user == null) return;
     _isLoading = true;

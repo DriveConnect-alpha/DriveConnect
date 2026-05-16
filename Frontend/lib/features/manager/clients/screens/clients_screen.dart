@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/clients_provider.dart';
 import '../../widgets/manager_scaffold.dart';
+import '../../../../calls/api_core.dart';
+import '../../../../core/models/cliente.dart';
 
 class ClientsScreen extends StatefulWidget {
   const ClientsScreen({super.key});
@@ -30,13 +33,13 @@ class _ClientsScreenState extends State<ClientsScreen> {
     super.dispose();
   }
 
-  List<dynamic> _filteredClientes(List<dynamic> clientes) {
+  List<Cliente> _filteredClientes(List<Cliente> clientes) {
     if (_searchQuery.isEmpty) return clientes;
     final query = _searchQuery.toLowerCase();
     return clientes.where((cliente) {
       final name = cliente.nomeCompleto.toLowerCase();
       final cpf = cliente.cpf.toLowerCase();
-      final email = cliente.usuario?.email?.toLowerCase() ?? '';
+      final email = cliente.usuario?.email.toLowerCase() ?? '';
       return name.contains(query) || cpf.contains(query) || email.contains(query);
     }).toList();
   }
@@ -50,11 +53,11 @@ class _ClientsScreenState extends State<ClientsScreen> {
       title: 'Gestão de Clientes',
       child: Consumer<ClientsProvider>(
         builder: (context, provider, child) {
-          if (provider.isLoading) {
+          if (provider.isLoading && provider.clientes.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (provider.error != null) {
+          if (provider.error != null && provider.clientes.isEmpty) {
             return Center(child: Text(provider.error!));
           }
 
@@ -63,7 +66,6 @@ class _ClientsScreenState extends State<ClientsScreen> {
 
           return Column(
             children: [
-              // Cabeçalho fixo
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Column(
@@ -178,10 +180,20 @@ class _ClientsScreenState extends State<ClientsScreen> {
                           itemCount: filtered.length,
                           itemBuilder: (context, index) {
                             final cliente = filtered[index];
+                            final imageUrl = cliente.usuario?.imagemUrl;
+                            
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
                               child: ListTile(
-                                leading: const CircleAvatar(child: Icon(Symbols.person)),
+                                leading: CircleAvatar(
+                                  backgroundImage: imageUrl != null
+                                      ? CachedNetworkImageProvider(
+                                          '$apiBaseUrl/storage/perfil/$imageUrl',
+                                          headers: vehicleImageHeaders,
+                                        )
+                                      : null,
+                                  child: imageUrl == null ? const Icon(Symbols.person) : null,
+                                ),
                                 title: Text(cliente.nomeCompleto),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,

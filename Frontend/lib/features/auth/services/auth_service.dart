@@ -116,6 +116,16 @@ class AuthService implements IAuthService {
   }
 
   @override
+  Future<void> removeProfilePhoto({required String id}) async {
+    final completer = Completer<void>();
+    await UserCall.removerFotoPerfil(
+      onSuccess: (_) => completer.complete(),
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+    return completer.future;
+  }
+
+  @override
   Future<void> deleteAccount(String id) async {
     final completer = Completer<void>();
 

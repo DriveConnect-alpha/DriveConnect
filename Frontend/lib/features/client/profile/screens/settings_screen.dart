@@ -15,13 +15,16 @@ class SettingsScreen extends StatelessWidget {
     final themeProvider = context.watch<ThemeProvider>();
     final user = authProvider.currentUser;
 
-    // Preferências locais
-    final Map<String, dynamic> prefs = Map.from(user?.preferencias ?? {
-      'notifications': {'email': true, 'push': true, 'whatsapp': true},
-      'theme': 'light'
-    });
-
-    final notifications = prefs['notifications'] as Map<String, dynamic>;
+    // Preferências locais com fallback seguro para chaves ausentes
+    final Map<String, dynamic> prefs = Map.from(user?.preferencias ?? {});
+    
+    final notifications = (prefs['notifications'] as Map<String, dynamic>?) ?? {
+      'email': true, 
+      'push': true, 
+      'whatsapp': true
+    };
+    
+    final currentTheme = prefs['theme'] ?? 'light';
 
     return Scaffold(
       appBar: AppBar(

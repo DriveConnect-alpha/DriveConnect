@@ -30,58 +30,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final authProvider = context.watch<AuthProvider>();
 
     return ManagerScaffold(
-      title: 'Dashboard',
-      child: Consumer<DashboardProvider>(
-        builder: (context, provider, child) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final stats = provider.stats;
-          final colorScheme = theme.colorScheme;
-          final greetingName = authProvider.user?.email.split('@')[0] ?? 'Gerente';
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+      return InkWell(
+        onTap: () => context.go(route),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: colorScheme.surface,
+            border: Border.all(color: colorScheme.primary.withOpacity(0.14), width: 1.2),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.02),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    color: colorScheme.primary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary.withOpacity(0.14),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(Symbols.dashboard, color: colorScheme.primary, size: 22),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Olá, $greetingName!',
-                                  style: theme.textTheme.headlineSmall?.copyWith(
+                  child: Icon(icon, size: 20, color: colorScheme.primary),
+                ),
+                const Spacer(),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Abrir módulo',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant.withOpacity(0.75),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
                                     color: colorScheme.onSurface,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -245,22 +239,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return DCCard(
       padding: const EdgeInsets.all(16),
+      elevation: 4.0,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: accent.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: accent, size: 20),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: accent.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
               ),
-            ],
+              child: Icon(icon, color: accent, size: 20),
+            ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,6 +271,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 6),
               Text(

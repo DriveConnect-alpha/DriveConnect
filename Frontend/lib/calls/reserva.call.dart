@@ -269,5 +269,34 @@ class ReservaCall {
       onError(e.toString());
     }
   }
+
+  /// Atualiza uma reserva pendente (veículo e datas).
+  /// ROUTE: PATCH /reservas/:id
+  /// AUTH: required (Gerente, Admin, Cliente dono)
+  static Future<void> atualizarReserva({
+    required String reservaId,
+    String? veiculoId,
+    String? dataInicio,
+    String? dataFim,
+    required void Function(Map<String, dynamic> data) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.patch<Map<String, dynamic>>(
+        '/reservas/$reservaId',
+        data: {
+          if (veiculoId != null) 'veiculo_id': veiculoId,
+          if (dataInicio != null) 'data_inicio': dataInicio,
+          if (dataFim != null) 'data_fim': dataFim,
+        },
+      );
+
+      onSuccess(response.data!);
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
 }
 

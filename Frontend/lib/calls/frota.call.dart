@@ -326,4 +326,32 @@ class FrotaCall {
       onError(e.toString());
     }
   }
+
+  /// Lista veículos disponíveis para um período e filial.
+  /// ROUTE: GET /veiculos/disponiveis
+  static Future<void> listarDisponiveis({
+    required String filialId,
+    required String dataInicio,
+    required String dataFim,
+    required void Function(List<Map<String, dynamic>> veiculos) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      final response = await dioClient.get<List<dynamic>>(
+        '/veiculos/disponiveis',
+        queryParameters: {
+          'filialId': filialId,
+          'data_inicio': dataInicio,
+          'data_fim': dataFim,
+        },
+      );
+
+      final data = (response.data ?? []).cast<Map<String, dynamic>>();
+      onSuccess(data);
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
 }

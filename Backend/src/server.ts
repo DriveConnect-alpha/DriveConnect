@@ -116,7 +116,8 @@ import {
   atualizar,
   deletar,
   listarOpcionais,
-  listarReservasVeiculoHandler
+  listarReservasVeiculoHandler,
+  listarDisponiveis as listarVeiculosDisponiveisRoute
 } from './routes/veiculo.routes.js';
 
 // Rotas de WhatsApp
@@ -444,6 +445,7 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
 
   // ── Veículos ──────────────────────────────────
   if (method === 'POST' && path === '/veiculos') return registrarVeiculo(req, res);
+  if (method === 'GET' && path === '/veiculos/disponiveis') return listarVeiculosDisponiveisRoute(req, res);
   if (method === 'GET' && path === '/veiculos') return listar(req, res);
   if (method === 'GET' && path === '/opcionais') return listarOpcionais(req, res);
 

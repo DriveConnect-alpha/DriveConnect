@@ -61,4 +61,17 @@ class MockReservationManagerService implements IReservationManagerService {
     await Future.delayed(const Duration(milliseconds: 500));
     onSuccess();
   }
+
+  @override
+  Future<void> updateReservation({
+    required String reservaId,
+    String? veiculoId,
+    String? dataInicio,
+    String? dataFim,
+    required void Function(Map<String, dynamic> data) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    onSuccess({'linkPagamento': 'https://mock.link'});
+  }
 }

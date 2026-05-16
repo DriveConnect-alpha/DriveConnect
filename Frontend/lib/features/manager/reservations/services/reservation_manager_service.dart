@@ -114,20 +114,13 @@ class ReservationManagerService implements IReservationManagerService {
     required void Function(Map<String, dynamic> data) onSuccess,
     required void Function(String message) onError,
   }) async {
-    try {
-      final response = await dioClient.patch<Map<String, dynamic>>(
-        '/reservas/$reservaId',
-        data: {
-          if (veiculoId != null) 'veiculo_id': veiculoId,
-          if (dataInicio != null) 'data_inicio': dataInicio,
-          if (dataFim != null) 'data_fim': dataFim,
-        },
-      );
-      onSuccess(response.data!);
-    } on DioException catch (e) {
-      handleApiError(e, onError);
-    } catch (e) {
-      onError(e.toString());
-    }
+    await ReservaCall.atualizarReserva(
+      reservaId: reservaId,
+      veiculoId: veiculoId,
+      dataInicio: dataInicio,
+      dataFim: dataFim,
+      onSuccess: onSuccess,
+      onError: onError,
+    );
   }
 }

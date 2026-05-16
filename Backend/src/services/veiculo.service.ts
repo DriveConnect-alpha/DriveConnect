@@ -84,14 +84,14 @@ export async function listarVeiculos(filialId?: string): Promise<any[]> {
     INNER JOIN filial f ON v.filial_id = f.id
     WHERE v.deletado_em IS NULL
     `;
-    
+
     const values = [];
     if (filialId) {
         queryText += ` AND v.filial_id = $1`;
         values.push(filialId);
     }
     queryText += ` ORDER BY v.criado_em DESC`;
-    
+
     const result = await query(queryText, values);
     return result.rows;
 }
@@ -310,5 +310,37 @@ export async function listarReservasDoVeiculo(veiculoId: string): Promise<any[]>
         ORDER BY data_inicio ASC;
     `;
     const result = await query(q, [veiculoId]);
+    return result.rows;
+}
+
+export async function listarVeiculosDisponiveis(filialId: string, dataInicio: Date, dataFim: Date): Promise<any[]> {
+    const q = `
+    SELECT
+        v.id, v.modelo_id, v.filial_id, v.placa, v.ano, v.cor, v.status,
+        COALESCE(v.imagem_url, (SELECT filename FROM veiculo_imagem WHERE veiculo_id = v.id ORDER BY is_principal DESC, ordem ASC LIMIT 1)) as imagem_url,
+        v.preco_diaria,
+        json_build_object(
+            'id', m.id,
+            'nome', m.nome,
+            'marca', m.marca,
+            'tipo_carro_id', m.tipo_carro_id
+        ) as modelo
+    FROM veiculo v
+    INNER JOIN modelo m ON v.modelo_id = m.id
+    WHERE v.filial_id = $1
+      AND v.status = 'DISPONIVEL'
+      AND v.deletado_em IS NULL
+      AND NOT EXISTS (
+          SELECT 1 FROM reserva r
+          WHERE r.veiculo_id = v.id
+            AND r.deletado_em IS NULL
+            AND r.status IN ('RESERVADA', 'ATIVA', 'PENDENTE_PAGAMENTO')
+            AND (r.status != 'PENDENTE_PAGAMENTO' OR r.expira_em > NOW())
+            AND r.data_inicio <= $3
+            AND r.data_fim >= $2
+      )
+    ORDER BY m.marca ASC, m.nome ASC;
+    `;
+    const result = await query(q, [filialId, dataInicio, dataFim]);
     return result.rows;
 }

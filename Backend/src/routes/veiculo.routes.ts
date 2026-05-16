@@ -6,7 +6,8 @@ import {
     atualizarVeiculo,
     deletarVeiculo,
     listarItens,
-    atualizarStatusVeiculoE_Notificar
+    atualizarStatusVeiculoE_Notificar,
+    listarVeiculosDisponiveis
 } from '../services/veiculo.service.js';
 import { processarUpload } from '../services/storage.service.js';
 import { requireCaller, requireTipo } from '../middlewares/auth.js';
@@ -289,6 +290,28 @@ export async function listarReservasVeiculoHandler(req: IncomingMessage, res: Se
         const { listarReservasDoVeiculo } = await import('../services/veiculo.service.js');
         const reservas = await listarReservasDoVeiculo(id);
         responder(res, 200, reservas);
+    } catch (err) {
+        await tratarErro(res, err);
+    }
+}
+
+export async function listarDisponiveis(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+        const caller = requireCaller(req);
+        requireTipo(caller, 'GERENTE', 'ADMIN', 'CLIENTE');
+
+        const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+        const filialId = url.searchParams.get('filialId');
+        const dataInicio = url.searchParams.get('data_inicio');
+        const dataFim = url.searchParams.get('data_fim');
+
+        if (!filialId || !dataInicio || !dataFim) {
+            responder(res, 400, { erro: 'Parâmetros obrigatórios: filialId, data_inicio, data_fim.' });
+            return;
+        }
+
+        const veiculos = await listarVeiculosDisponiveis(filialId, new Date(dataInicio), new Date(dataFim));
+        responder(res, 200, veiculos);
     } catch (err) {
         await tratarErro(res, err);
     }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/booking_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/widgets/dc_button.dart';
@@ -219,33 +220,71 @@ class _PaymentProcessingSheetState extends State<_PaymentProcessingSheet> {
 
   void _startPolling() async {
     final provider = context.read<BookingProvider>();
-    // Simulação de polling
-    await Future.delayed(const Duration(seconds: 5));
-    if (mounted) {
-      // No mundo real, verificaríamos o status via provider
+    
+    // Abre o link automaticamente se disponível
+    if (provider.paymentLink != null) {
+      final uri = Uri.parse(provider.paymentLink!);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }
+
+    // Polling real de status através do provider
+    bool isPaid = false;
+    while (mounted && !isPaid) {
+      await provider.pollPaymentStatus();
+      if (provider.paymentStatus == 'RESERVADA') {
+        isPaid = true;
+        break;
+      }
+      await Future.delayed(const Duration(seconds: 4));
+    }
+
+    if (mounted && isPaid) {
       context.go('/my-reservations');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<BookingProvider>();
+
     return Container(
       padding: const EdgeInsets.all(24),
-      height: 400,
+      height: 480,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const DCLoading(message: 'Aguardando confirmação do pagamento...'),
+          const Icon(Symbols.bolt, size: 60, color: Color(0xFF00628b)),
+          const SizedBox(height: 16),
+          const DCLoading(message: 'Aguardando confirmação...'),
           const SizedBox(height: 24),
           const Text(
-            'Estamos processando seu pagamento via InfinitePay. Por favor, não feche esta tela.',
+            'Para concluir, realize o pagamento no ambiente seguro da InfinitePay.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey),
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Após o pagamento, esta tela será atualizada automaticamente.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey, fontSize: 13),
           ),
           const SizedBox(height: 32),
+          if (provider.paymentLink != null)
+            DCButton(
+              label: 'Abrir Pagamento Manualmente',
+              onPressed: () async {
+                final uri = Uri.parse(provider.paymentLink!);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          const SizedBox(height: 16),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar Pagamento'),
+            child: const Text('Voltar e revisar', style: TextStyle(color: Colors.grey)),
           ),
         ],
       ),

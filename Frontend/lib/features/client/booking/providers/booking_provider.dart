@@ -21,6 +21,7 @@ class BookingProvider extends ChangeNotifier {
   Map<String, dynamic>? _availabilityResult;
   String? _currentReservaId;
   String? _paymentStatus;
+  String? _paymentLink;
   List<DateTimeRange> _occupiedDates = [];
 
   // Getters
@@ -34,6 +35,7 @@ class BookingProvider extends ChangeNotifier {
   String? get error => _error;
   Map<String, dynamic>? get availabilityResult => _availabilityResult;
   String? get paymentStatus => _paymentStatus;
+  String? get paymentLink => _paymentLink;
   String get paymentMethod => _paymentMethod;
   List<DateTimeRange> get occupiedDates => _occupiedDates;
 
@@ -129,6 +131,7 @@ class BookingProvider extends ChangeNotifier {
       );
       _currentReservaId = result['id'] ?? result['reserva_id'];
       _paymentStatus = result['status']; // Se for DINHEIRO, virá 'RESERVADA'
+      _paymentLink = result['linkPagamento'];
       return true;
     } catch (e) {
       _error = e.toString();

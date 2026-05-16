@@ -252,53 +252,39 @@ export async function listarUsuariosSistema(): Promise<any[]> {
 }
 
 /** Busca um cliente ativo por ID com seus dados de perfil. */
-export async function buscarClientePorId(clienteId: string): Promise<Cliente | null> {
+export async function buscarClientePorId(clienteId: string): Promise<any | null> {
   const r = await query(
-    `SELECT c.id, c.usuario_id, c.nome_completo, c.cpf, c.rg, c.cnh, c.criado_em, c.deletado_em
+    `SELECT 
+        c.id as perfil_id, 
+        c.usuario_id as id, 
+        c.nome_completo as nome, 
+        c.cpf, c.rg, c.cnh, c.criado_em,
+        u.email, u.tipo, u.imagem_url, u.preferencias
      FROM cliente c
      JOIN usuario u ON u.id = c.usuario_id
      WHERE c.id = $1 AND c.deletado_em IS NULL AND u.deletado_em IS NULL`,
     [clienteId],
   );
 
-  const row = r.rows[0];
-  if (!row) return null;
-
-  return new Cliente({
-    id: row.id,
-    usuarioId: row.usuario_id,
-    nomeCompleto: row.nome_completo,
-    cpf: row.cpf,
-    rg: row.rg,
-    cnh: row.cnh,
-    criadoEm: row.criado_em,
-    deletadoEm: row.deletado_em,
-  });
+  return r.rows[0] || null;
 }
 
 /** Busca o perfil do próprio cliente usando o usuarioId do caller. */
-export async function buscarMeuPerfilCliente(usuarioId: string): Promise<Cliente | null> {
+export async function buscarMeuPerfilCliente(usuarioId: string): Promise<any | null> {
   const r = await query(
-    `SELECT c.id, c.usuario_id, c.nome_completo, c.cpf, c.rg, c.cnh, c.criado_em, c.deletado_em
+    `SELECT 
+        c.id as perfil_id, 
+        c.usuario_id as id, 
+        c.nome_completo as nome, 
+        c.cpf, c.rg, c.cnh, c.criado_em,
+        u.email, u.tipo, u.imagem_url, u.preferencias
      FROM cliente c
      JOIN usuario u ON u.id = c.usuario_id
      WHERE c.usuario_id = $1 AND c.deletado_em IS NULL AND u.deletado_em IS NULL`,
     [usuarioId],
   );
 
-  const row = r.rows[0];
-  if (!row) return null;
-
-  return new Cliente({
-    id: row.id,
-    usuarioId: row.usuario_id,
-    nomeCompleto: row.nome_completo,
-    cpf: row.cpf,
-    rg: row.rg,
-    cnh: row.cnh,
-    criadoEm: row.criado_em,
-    deletadoEm: row.deletado_em,
-  });
+  return r.rows[0] || null;
 }
 
 interface AtualizarMeuPerfilParams {
@@ -311,7 +297,7 @@ interface AtualizarMeuPerfilParams {
 export async function atualizarMeuPerfilCliente(
   usuarioId: string,
   params: AtualizarMeuPerfilParams,
-): Promise<Cliente | null> {
+): Promise<any | null> {
   if (params.nomeCompleto) Cliente.validarNome(params.nomeCompleto);
 
   const campos: string[] = [];

@@ -155,7 +155,7 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
   Widget _buildBranchSelector({
     required String label,
     required String? value,
-    required ValueChanged<String?> onChanged,
+    required ValueChanged<String?>? onChanged,
   }) {
     return DCCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

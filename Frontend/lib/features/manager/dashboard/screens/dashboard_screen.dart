@@ -64,12 +64,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: colorScheme.primary.withOpacity(0.1),
+                              color: colorScheme.primary.withOpacity(0.14),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(Symbols.dashboard, color: colorScheme.primary, size: 22),
@@ -83,7 +83,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'Olá, $greetingName!',
                                   style: theme.textTheme.headlineSmall?.copyWith(
                                     color: colorScheme.onSurface,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -268,7 +268,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text(
                 value,
                 style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: colorScheme.onSurface,
                 ),
               ),
@@ -284,7 +284,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text(
                 footer,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.outline.withOpacity(0.8),
+                  color: colorScheme.onSurfaceVariant.withOpacity(0.85),
                   fontWeight: FontWeight.w400,
                 ),
               ),
@@ -321,18 +321,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.08),
+                  color: colorScheme.primary.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, size: 22, color: colorScheme.primary),
+                child: Icon(icon, size: 20, color: colorScheme.primary),
               ),
               const Spacer(),
               Text(
                 title,
                 style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: colorScheme.onSurface,
                 ),
               ),

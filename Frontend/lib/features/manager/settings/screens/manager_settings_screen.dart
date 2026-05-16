@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/theme_provider.dart';
 import '../../../../calls/api_core.dart';
@@ -284,8 +285,7 @@ class _ManagerSettingsScreenState extends State<ManagerSettingsScreen> {
                         onPressed: () async {
                           try {
                             await authProvider.changePassword(
-                              oldPassword: _oldPasswordController.text,
-                              newPassword: _newPasswordController.text,
+                              _newPasswordController.text,
                             );
                             if (mounted) {
                               setState(() => _isEditingPassword = false);

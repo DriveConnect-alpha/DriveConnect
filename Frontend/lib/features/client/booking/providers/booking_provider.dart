@@ -27,6 +27,8 @@ class BookingProvider extends ChangeNotifier {
   Veiculo? get selectedVehicle => _selectedVehicle;
   DateTime? get startDate => _startDate;
   DateTime? get endDate => _endDate;
+  String? get pickupBranchId => _pickupBranchId;
+  String? get returnBranchId => _returnBranchId;
   PlanoSeguro? get selectedInsurance => _selectedInsurance;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -43,6 +45,8 @@ class BookingProvider extends ChangeNotifier {
   void selectVehicle(Veiculo vehicle) {
     _selectedVehicle = vehicle;
     _occupiedDates = []; // Limpa anteriores
+    _pickupBranchId = vehicle.filialId; // Fix: Retirada obrigatória onde o carro está
+    _returnBranchId = vehicle.filialId; // Sugestão inicial: devolver no mesmo lugar
     if (vehicle.id != null) {
       loadOccupiedDates(vehicle.id!);
     }

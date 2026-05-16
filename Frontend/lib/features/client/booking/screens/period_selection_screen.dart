@@ -54,6 +54,14 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
     final theme = Theme.of(context);
     final bookingProvider = context.watch<BookingProvider>();
 
+    // Inicializa IDs locais a partir do provider se ainda não estiverem setados nesta tela
+    if (_pickupBranchId == null && bookingProvider.pickupBranchId != null) {
+      _pickupBranchId = bookingProvider.pickupBranchId;
+    }
+    if (_returnBranchId == null && bookingProvider.returnBranchId != null) {
+      _returnBranchId = bookingProvider.returnBranchId;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Período e Local'),
@@ -91,18 +99,34 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
                 ],
               ),
             ),
+            
             const SizedBox(height: 24),
             Text(
               'Onde você vai retirar e devolver?',
               style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            _buildBranchSelector(
-              label: 'Retirada',
-              value: _pickupBranchId,
-              onChanged: (val) => setState(() => _pickupBranchId = val),
+            
+            // Retirada Travada
+            Opacity(
+              opacity: 0.7,
+              child: _buildBranchSelector(
+                label: 'Retirada (Obrigatório)',
+                value: _pickupBranchId,
+                onChanged: null, // Desabilitado: carro já está lá
+              ),
             ),
-            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.only(left: 12, top: 4),
+              child: Text(
+                'Nota: A retirada deve ser feita na filial atual do veículo.',
+                style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey[600]),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Devolução Livre
             _buildBranchSelector(
               label: 'Devolução',
               value: _returnBranchId,

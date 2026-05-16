@@ -21,7 +21,8 @@ class ExploreProvider extends ChangeNotifier {
       final matchesSearch = (v.modelo?.nome?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? true) ||
                            (v.modelo?.marca?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? true);
       final matchesCategory = _selectedCategory == 'Todos' || v.modelo?.tipoCarro?.nome == _selectedCategory;
-      return matchesSearch && matchesCategory;
+      final isAvailable = v.status == 'DISPONIVEL';
+      return matchesSearch && matchesCategory && isAvailable;
     }).toList();
   }
 

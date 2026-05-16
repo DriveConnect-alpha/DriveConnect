@@ -118,7 +118,12 @@ export async function listar(req: IncomingMessage, res: ServerResponse): Promise
         const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
         const filialId = url.searchParams.get('filialId') || undefined;
 
-        const veiculos = await listarVeiculos(filialId);
+        let statusFilter = undefined;
+        if (caller.tipo === 'CLIENTE') {
+            statusFilter = 'DISPONIVEL';
+        }
+
+        const veiculos = await listarVeiculos(filialId, statusFilter);
         responder(res, 200, veiculos);
     } catch (err) {
         await tratarErro(res, err);

@@ -34,7 +34,7 @@ export async function criarVeiculo(dados: Veiculo & { itens_ids?: string[] }): P
     return veiculo;
 }
 
-export async function listarVeiculos(filialId?: string): Promise<any[]> {
+export async function listarVeiculos(filialId?: string, status?: string): Promise<any[]> {
     let queryText = `
     SELECT
         v.id, v.modelo_id, v.filial_id, v.placa, v.ano, v.cor,
@@ -86,9 +86,16 @@ export async function listarVeiculos(filialId?: string): Promise<any[]> {
     `;
 
     const values = [];
+    let paramIdx = 1;
     if (filialId) {
-        queryText += ` AND v.filial_id = $1`;
+        queryText += ` AND v.filial_id = $${paramIdx}`;
         values.push(filialId);
+        paramIdx++;
+    }
+    if (status) {
+        queryText += ` AND v.status = $${paramIdx}`;
+        values.push(status);
+        paramIdx++;
     }
     queryText += ` ORDER BY v.criado_em DESC`;
 

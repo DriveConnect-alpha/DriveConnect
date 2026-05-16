@@ -164,11 +164,12 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                         final reserva = provider.reservas[index];
                         final reservaIdShort = reserva.id.length >= 8 ? reserva.id.substring(0, 8) : reserva.id;
                         
-                        return DCCard(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: DCCard(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
@@ -189,7 +190,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                                   icon: Symbols.person,
                                   label: 'Cliente',
                                   value: reserva.cliente?.nomeCompleto ?? 'N/A',
-                                  theme: theme,
+                                  textTheme: theme.textTheme,
                                   colorScheme: colorScheme,
                                 ),
                                 const SizedBox(height: 8),
@@ -197,7 +198,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                                   icon: Symbols.directions_car,
                                   label: 'Veículo',
                                   value: '${reserva.veiculo?.modelo?.marca ?? ""} ${reserva.veiculo?.modelo?.nome ?? ""} (${reserva.veiculo?.placa ?? "N/A"})',
-                                  theme: theme,
+                                  textTheme: theme.textTheme,
                                   colorScheme: colorScheme,
                                 ),
                                 const SizedBox(height: 8),
@@ -205,7 +206,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                                   icon: Symbols.calendar_today,
                                   label: 'Período',
                                   value: '${reserva.dataInicio != null ? dateFormat.format(reserva.dataInicio!) : "N/A"} - ${reserva.dataFim != null ? dateFormat.format(reserva.dataFim!) : "N/A"}',
-                                  theme: theme,
+                                  textTheme: theme.textTheme,
                                   colorScheme: colorScheme,
                                 ),
                                 const SizedBox(height: 16),
@@ -234,6 +235,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                                 )
                               ],
                             ),
+                          ),
                           ),
                         );
                       } catch (e) {

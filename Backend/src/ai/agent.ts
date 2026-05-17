@@ -1,0 +1,562 @@
+/**
+ * AI Agent com LangChain — Orquestra tools e chamadas à IA para atender requisições complexas.
+ * Padrão: Detecção de intenção + extração de parâmetros + sugestão de ações.
+ */
+
+import 'dotenv/config';
+import { ChatOpenAI } from '@langchain/openai';
+import {
+  checkRateLimit,
+  validateAndSanitizeInput,
+  logSecurityEvent,
+  detectPromptInjection,
+} from './security.js';
+import { tool } from '@langchain/core/tools';
+import { z } from 'zod';
+import {
+  toolListarFiliais,
+  toolListarCarrosDisponiveis,
+  toolValidarDisponibilidade,
+  toolCriarReserva,
+  toolObterReserva,
+  toolObterFotosVeiculo,
+  toolRegistrarCliente,
+  TOOLS_MAP,
+  type ToolResult,
+} from './tools.js';
+
+export type HistoryMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+type AgentOptions = {
+  history?: HistoryMessage[];
+  clienteId?: string;
+  telefone?: string;
+};
+
+// ──────────────────────────────────────────────────────
+// LOGGING E AUDITORIA
+// ──────────────────────────────────────────────────────
+
+interface AuditLog {
+  timestamp: string;
+  telefone?: string;
+  cliente_id?: string;
+  intencao: string;
+  tools_chamadas: string[];
+  resposta_final: string;
+  sucesso: boolean;
+  erro?: string;
+}
+
+const auditLogs: AuditLog[] = [];
+
+function registrarAudit(log: AuditLog): void {
+  auditLogs.push(log);
+  console.log(`[AUDIT] ${log.timestamp} | ${log.intencao} | Tools: ${log.tools_chamadas.join(', ')}`);
+}
+
+export function obterAudits(limite = 100): AuditLog[] {
+  return auditLogs.slice(-limite);
+}
+
+// ──────────────────────────────────────────────────────
+// DETECÇÃO DE INTENÇÃO
+// ──────────────────────────────────────────────────────
+
+export type Intenao = 
+  | 'LISTAR_FILIAIS'
+  | 'LISTAR_CARROS'
+  | 'COTACAO'
+  | 'CRIAR_RESERVA'
+  | 'RASTREAR_RESERVA'
+  | 'VER_FOTOS'
+  | 'REGISTRAR_CLIENTE'
+  | 'GENERICO';
+
+function detectarIntencao(texto: string): Intenao {
+  const t = (texto || '').toLowerCase();
+
+  if (t.match(/filial|unidade|local|endereço|endereco|onde|localização|localizacao/)) {
+    return 'LISTAR_FILIAIS';
+  }
+
+  if (t.match(/carro|veículo|veiculo|modelo|categoria|opção|opcao|qual|quais|disponível|disponivel|frota/)) {
+    if (t.match(/reserv|alugar|locação|locacao|booking/)) {
+      return 'CRIAR_RESERVA';
+    }
+    return 'LISTAR_CARROS';
+  }
+
+  if (t.match(/preço|preco|valor|cust|cotação|cotacao|quanto/)) {
+    return 'COTACAO';
+  }
+
+  if (t.match(/reserv|pedido|booking|minha|status|acompanhar|rastrear/)) {
+    return 'RASTREAR_RESERVA';
+  }
+
+  if (t.match(/foto|imagem|foto|picture|mostrar|ver|enviar|compartilhar|compartilha|fotos|imagens/)) {
+    return 'VER_FOTOS';
+  }
+
+  if (t.match(/cpf|email|registr|cadastr|novo|cliente|conta/)) {
+    return 'REGISTRAR_CLIENTE';
+  }
+
+  return 'GENERICO';
+}
+
+// ──────────────────────────────────────────────────────
+// EXTRATOR DE PARÂMETROS
+// ──────────────────────────────────────────────────────
+
+export interface ParametrosExtraidos {
+  filial_id?: string;
+  categoria?: string;
+  data_inicio?: string;
+  data_fim?: string;
+  cliente_id?: string;
+  veiculo_id?: string;
+  reserva_id?: string;
+  nome?: string;
+  email?: string;
+  cpf?: string;
+  telefone?: string;
+}
+
+function extrairParametros(texto: string, intenao: Intenao): ParametrosExtraidos {
+  const params: ParametrosExtraidos = {};
+
+  // Datas (DD/MM/YYYY ou em português: "15 de maio")
+  const dataMatch = texto.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g);
+  if (dataMatch && dataMatch.length >= 1 && dataMatch[0]) {
+    const [dia, mes, ano] = dataMatch[0].split('/');
+    params.data_inicio = `${ano}-${mes}-${dia}`;
+  }
+  if (dataMatch && dataMatch.length >= 2 && dataMatch[1]) {
+    const [dia, mes, ano] = dataMatch[1].split('/');
+    params.data_fim = `${ano}-${mes}-${dia}`;
+  }
+
+  // Categoria
+  const categorias = ['SUV', 'Sedan', 'Econômico', 'Premium', 'Compacto', 'Utilitário'];
+  for (const cat of categorias) {
+    if (texto.toLowerCase().includes(cat.toLowerCase())) {
+      params.categoria = cat;
+      break;
+    }
+  }
+
+  // CPF
+  const cpfMatch = texto.match(/(\d{3})\.(\d{3})\.(\d{3})-(\d{2})/);
+  if (cpfMatch) {
+    params.cpf = cpfMatch[0];
+  }
+
+  // Email
+  const emailMatch = texto.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  if (emailMatch) {
+    params.email = emailMatch[0];
+  }
+
+  // Nome (se for registrar, pegue "Meu nome é..."
+  const nomeMatch = texto.match(/(?:nome|chamo|sou)\s+([A-Za-zÀ-ÿ\s]+?)(?:\.|,|$)/i);
+  if (nomeMatch && nomeMatch[1]) {
+    params.nome = nomeMatch[1].trim();
+  }
+
+  return params;
+}
+
+// ──────────────────────────────────────────────────────
+// CRIAÇÃO DO AGENT COM TOOLS
+// ──────────────────────────────────────────────────────
+
+const langchainTools = [
+  tool(
+    async (input: any) => {
+      const result = await toolListarFiliais();
+      return JSON.stringify(result);
+    },
+    {
+      name: 'listar_filiais',
+      description:
+        'Lista todas as filiais ativas com endereço, cidade e UF. Use quando cliente perguntar sobre unidades ou locais.',
+      schema: z.object({}),
+    },
+  ),
+
+  tool(
+    async (input: any) => {
+      const result = await toolListarCarrosDisponiveis(input);
+      return JSON.stringify(result);
+    },
+    {
+      name: 'listar_carros_disponiveis',
+      description:
+        'Lista carros disponíveis. Retorna APENAS veículos realmente disponíveis (sem conflitos de reserva). Parâmetros: filial_id, categoria, data_inicio, data_fim (YYYY-MM-DD).',
+      schema: z.object({
+        filial_id: z.string().optional().describe('UUID da filial'),
+        categoria: z.string().optional().describe('Econômico, SUV, Sedan, Premium, etc'),
+        data_inicio: z.string().optional().describe('YYYY-MM-DD'),
+        data_fim: z.string().optional().describe('YYYY-MM-DD'),
+      }),
+    },
+  ),
+
+  tool(
+    async (input: any) => {
+      const result = await toolValidarDisponibilidade(input);
+      return JSON.stringify(result);
+    },
+    {
+      name: 'validar_disponibilidade',
+      description:
+        'Valida se um veículo específico está disponível para um período. Use ANTES de criar reserva.',
+      schema: z.object({
+        veiculo_id: z.string().describe('UUID do veículo'),
+        data_inicio: z.string().describe('YYYY-MM-DD'),
+        data_fim: z.string().describe('YYYY-MM-DD'),
+      }),
+    },
+  ),
+
+  tool(
+    async (input: any) => {
+      const result = await toolCriarReserva(input);
+      return JSON.stringify(result);
+    },
+    {
+      name: 'criar_reserva',
+      description:
+        'Cria uma nova reserva e gera link de pagamento. Validação automática. Parâmetros obrigatórios: cliente_id, veiculo_id, filial_retirada_id, data_inicio, data_fim.',
+      schema: z.object({
+        cliente_id: z.string().describe('UUID do cliente'),
+        veiculo_id: z.string().describe('UUID do veículo'),
+        filial_retirada_id: z.string().describe('UUID da filial de retirada'),
+        filial_devolucao_id: z.string().optional().describe('UUID da filial de devolução'),
+        data_inicio: z.string().describe('YYYY-MM-DD'),
+        data_fim: z.string().describe('YYYY-MM-DD'),
+        plano_seguro_id: z.string().optional(),
+        metodo_pagamento: z.string().optional().describe('INFINITEPAY ou DINHEIRO'),
+      }),
+    },
+  ),
+
+  tool(
+    async (input: any) => {
+      const result = await toolObterReserva(input.reserva_id);
+      return JSON.stringify(result);
+    },
+    {
+      name: 'obter_reserva',
+      description: 'Obtém status e detalhes de uma reserva existente.',
+      schema: z.object({
+        reserva_id: z.string().describe('UUID da reserva'),
+      }),
+    },
+  ),
+
+  tool(
+    async (input: any) => {
+      const result = await toolRegistrarCliente(input);
+      return JSON.stringify(result);
+    },
+    {
+      name: 'registrar_cliente',
+      description:
+        'Registra um novo cliente. Use quando cliente fornecer nome, email e CPF. Parâmetros obrigatórios: nome_completo, email, cpf.',
+      schema: z.object({
+        nome_completo: z.string().describe('Nome completo'),
+        email: z.string().describe('Email'),
+        cpf: z.string().describe('CPF (XXX.XXX.XXX-XX ou 11 dígitos)'),
+        telefone: z.string().optional(),
+      }),
+    },
+  ),
+];
+
+// ──────────────────────────────────────────────────────
+// SYSTEM PROMPT (para referência)
+// ──────────────────────────────────────────────────────
+
+const systemPrompt = `Você é o assistente de atendimento da Drive Connect, locadora de veículos.
+Objetivo: ajudar clientes com cotações, reservas, rastreamento e suporte via WhatsApp.
+Estilo: cordial, direto, sem markdown, 1–3 parágrafos.
+
+Diretrizes:
+1. Use as tools disponíveis para obter informações reais (filiais, carros, preços).
+2. Nunca invente dados de disponibilidade ou preço.
+3. Para reserva: valide disponibilidade ANTES de criar.
+4. Mantenha histórico de conversa.
+5. Se faltarem dados, faça perguntas simples.
+6. Sempre confirme antes de ação irreversível.
+
+Nunca ignore erros de validação — reporte ao cliente e ofereça alternativa.`;
+
+// ──────────────────────────────────────────────────────
+// AGENT (SIMPLIFIED — DIRECT TOOL CALLING)
+// ──────────────────────────────────────────────────────
+
+// Agent simples baseado em intenção detecção + tool chamadas diretas
+const agentConfig = {
+  model: new ChatOpenAI({
+    modelName: process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini',
+    temperature: 0.3,
+    openAIApiKey: process.env.OPENAI_API_KEY || '',
+    maxTokens: 500,
+    timeout: 10000,
+  }),
+  verbose: process.env.NODE_ENV === 'development',
+};
+
+
+// ──────────────────────────────────────────────────────
+// FUNÇÃO PRINCIPAL: ATENDER CLIENTE COM AGENT
+// ──────────────────────────────────────────────────────
+
+export async function atenderClienteComAgent(
+  mensagem: string,
+  opcoes: AgentOptions = {},
+): Promise<{
+  resposta: string;
+  intencao: Intenao;
+  tools_usadas: string[];
+  cliente_id?: string;
+  fotos?: string[]; // URLs de fotos para enviar via WhatsApp
+  auditoria: AuditLog;
+}> {
+  const timestamp = new Date().toISOString();
+  const telefone = opcoes.telefone || 'unknown';
+
+  // ──────────────────────────────────────────────────────
+  // 1. VALIDAÇÃO DE SEGURANÇA
+  // ──────────────────────────────────────────────────────
+
+  // 1a. Rate limiting
+  const rateLimitCheck = checkRateLimit(telefone);
+  if (!rateLimitCheck.allowed) {
+    void logSecurityEvent({
+      tipo: 'SUSPICIOUS',
+      telefone,
+      cliente_id: opcoes.clienteId || null,
+      descricao: rateLimitCheck.reason || 'Rate limit excedido',
+      severity: 'MEDIUM',
+    });
+
+    return {
+      resposta:
+        'Você está enviando muitas mensagens. Por favor, aguarde um momento e tente novamente.',
+      intencao: 'GENERICO' as Intenao,
+      tools_usadas: [],
+      cliente_id: opcoes.clienteId || undefined,
+      auditoria: {
+        timestamp,
+        telefone: telefone || undefined,
+        cliente_id: opcoes.clienteId || undefined,
+        intencao: 'BLOCKED_BY_RATE_LIMIT',
+        tools_chamadas: [],
+        resposta_final: 'Rate limited',
+        sucesso: false,
+        erro: 'Rate limit excedido',
+      },
+    };
+  }
+
+  // 1b. Validar e sanitizar input
+  const validacao = validateAndSanitizeInput(mensagem, telefone);
+  if (!validacao.valid) {
+    void logSecurityEvent({
+      tipo: 'INJECTION_ATTEMPT',
+      telefone,
+      cliente_id: opcoes.clienteId || null,
+      descricao: validacao.reason || 'Input inválido',
+      severity: validacao.injection_detected ? 'HIGH' : 'MEDIUM',
+    });
+
+    return {
+      resposta: 'Sua mensagem contém caracteres ou padrões não permitidos. Por favor, tente novamente com uma mensagem mais simples.',
+      intencao: 'GENERICO',
+      tools_usadas: [],
+      cliente_id: opcoes.clienteId,
+      auditoria: {
+        timestamp,
+        telefone,
+        cliente_id: opcoes.clienteId,
+        intencao: 'VALIDATION_FAILED',
+        tools_chamadas: [],
+        resposta_final: 'Invalid input',
+        sucesso: false,
+        erro: validacao.reason,
+      },
+    };
+  }
+
+  const mensagemSanitizada = validacao.sanitized;
+
+  // ──────────────────────────────────────────────────────
+  // 2. DETECÇÃO DE INTENÇÃO E PARÂMETROS
+  // ──────────────────────────────────────────────────────
+
+  const intenao = detectarIntencao(mensagemSanitizada);
+  const params = extrairParametros(mensagemSanitizada, intenao);
+  const toolsUsadas: string[] = [];
+
+  try {
+    // 1. Armazenar histórico (simplificado)
+    // Mantém histórico em memória para contexto
+    const historico = opcoes.history || [];
+
+    // 2. Compilar contexto
+    const contexto = [
+      `Intenção detectada: ${intenao}`,
+      opcoes.clienteId ? `Cliente ID: ${opcoes.clienteId}` : null,
+      opcoes.telefone ? `Telefone: ${opcoes.telefone}` : null,
+      Object.entries(params).length > 0
+        ? `Parâmetros extraídos: ${JSON.stringify(params)}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    // 3. Gerar resposta baseada em intenção
+    let respostaFinal = '';
+    let fotosParaEnviar: string[] = [];
+    
+    switch (intenao) {
+      case 'LISTAR_FILIAIS': {
+        const result = await toolListarFiliais();
+        if (result.success && result.data) {
+          const filiais = result.data.slice(0, 5);
+          respostaFinal = `Encontrei ${result.data.length} filial(is):\n${filiais.map(f => `• ${f.nome} - ${f.endereco} - ${f.telefone}`).join('\n')}`;
+          toolsUsadas.push('listar_filiais');
+        } else {
+          respostaFinal = 'Desculpe, não consegui acessar a lista de filiais. Pode tentar novamente?';
+        }
+        break;
+      }
+
+      case 'LISTAR_CARROS': {
+        const result = await toolListarCarrosDisponiveis(params);
+        if (result.success && result.data && result.data.length > 0) {
+          const carros = result.data.slice(0, 5);
+          respostaFinal = `Encontrei ${result.data.length} carro(s) disponível(is):\n${carros.map((c: any) => `• ${c.modelo} ${c.marca} - R$ ${c.preco_diaria}/dia`).join('\n')}\n\nDigite "foto do [modelo]" para ver a foto de algum.`;
+          toolsUsadas.push('listar_carros_disponiveis');
+        } else {
+          respostaFinal = 'Desculpe, não encontrei carros disponíveis para esse período e categoria. Pode tentar outras datas?';
+        }
+        break;
+      }
+
+      case 'CRIAR_RESERVA': {
+        // Fluxo de criação de reserva
+        respostaFinal = 'Para criar uma reserva, preciso de alguns dados: período (datas de retirada e devolução), categoria de carro preferida e seus dados (nome, CPF, email). Pode fornecer essas informações?';
+        break;
+      }
+
+      case 'RASTREAR_RESERVA': {
+        if (params.reserva_id) {
+          const result = await toolObterReserva(params.reserva_id);
+          if (result.success && result.data) {
+            respostaFinal = `Status da sua reserva #${result.data.id}:\n• Veículo: ${result.data.modelo}\n• Período: ${result.data.data_inicio} a ${result.data.data_fim}\n• Valor: R$ ${result.data.valor_total}\n• Status: ${result.data.status}`;
+            toolsUsadas.push('obter_reserva');
+          } else {
+            respostaFinal = 'Não consegui encontrar essa reserva. Pode verificar o ID?';
+          }
+        } else {
+          respostaFinal = 'Qual é o ID da sua reserva? Você pode encontrar no email de confirmação.';
+        }
+        break;
+      }
+
+      case 'VER_FOTOS': {
+        if (params.veiculo_id) {
+          const result = await toolObterFotosVeiculo(params.veiculo_id);
+          if (result.success && result.data) {
+            // Enviar apenas a foto principal
+            const fotoPrincipal = result.data.fotos.find((f: any) => f.principal) || result.data.fotos[0];
+            if (fotoPrincipal) {
+              fotosParaEnviar = [fotoPrincipal.url]; // Apenas 1 foto
+            }
+            respostaFinal = `📸 Aqui está a foto do ${result.data.modelo} (${result.data.placa})`;
+            toolsUsadas.push('obter_fotos_veiculo');
+          } else {
+            respostaFinal = result.error || 'Desculpe, não consegui acessar a foto deste veículo.';
+          }
+        } else {
+          respostaFinal = 'Qual veículo você gostaria de ver a foto? Pode me passar o modelo ou a placa do carro.';
+        }
+        break;
+      }
+
+      case 'REGISTRAR_CLIENTE': {
+        respostaFinal = 'Ótimo! Para me registrar, preciso de: nome completo, email e CPF. Pode fornecer?';
+        break;
+      }
+
+      default:
+        // GENERICO - usar resposta genérica
+        respostaFinal = 'Como posso ajudá-lo? Posso listar nossas filiais, carros disponíveis, criar uma reserva ou responder dúvidas sobre nossa locadora.';
+    }
+
+    // Cleanup: remover markdown e logs desnecessários
+    respostaFinal = respostaFinal
+      .replace(/\*\*/g, '') // Remover **negrito**
+      .replace(/```[\s\S]*?```/g, '') // Remover code blocks
+      .replace(/\[(?:TOOL_CALLS|LOG)[\s\S]*?\]/g, ''); // Remover logs internos
+
+    // 4. Registrar auditoria
+    const audit: AuditLog = {
+      timestamp,
+      telefone: opcoes.telefone,
+      cliente_id: opcoes.clienteId,
+      intencao: intenao,
+      tools_chamadas: toolsUsadas,
+      resposta_final: respostaFinal.slice(0, 200),
+      sucesso: true,
+    };
+
+    registrarAudit(audit);
+
+    return {
+      resposta: respostaFinal,
+      intencao: intenao,
+      tools_usadas: toolsUsadas,
+      cliente_id: opcoes.clienteId,
+      fotos: fotosParaEnviar.length > 0 ? fotosParaEnviar : undefined,
+      auditoria: audit,
+    };
+  } catch (err) {
+    const erro = err instanceof Error ? err.message : 'Erro desconhecido';
+
+    const audit: AuditLog = {
+      timestamp,
+      telefone: opcoes.telefone,
+      cliente_id: opcoes.clienteId,
+      intencao: intenao,
+      tools_chamadas: toolsUsadas,
+      resposta_final: 'Erro ao processar',
+      sucesso: false,
+      erro,
+    };
+
+    registrarAudit(audit);
+
+    return {
+      resposta: `Desculpe, tive um problema ao processar sua solicitação. Pode tentar novamente em instantes?`,
+      intencao: intenao,
+      tools_usadas: toolsUsadas,
+      cliente_id: opcoes.clienteId,
+      auditoria: audit,
+    };
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// EXPORTS
+// ──────────────────────────────────────────────────────
+
+export { detectarIntencao, extrairParametros };

@@ -4,6 +4,7 @@
 
 import 'dotenv/config';
 import { answerWhatsAppMessage } from '../ai/rag.js';
+import { atenderClienteComAgent } from '../ai/agent.js';
 import { query } from '../db/index.js';
 import {
   buscarVeiculoDisponivelPorFilial,
@@ -324,7 +325,27 @@ export async function processIncomingMessage(payload: any): Promise<void> {
   }
 
   try {
-    const reply = sanitizeAiPaymentReply(await answerWhatsAppMessage(text, { history }));
+    // Usar Agent para requisições estruturadas (reserva, cotação, etc)
+    // Fallback para RAG para perguntas genéricas
+    let reply: string;
+    
+    const useAgent = process.env.WHATSAPP_USE_AGENT === 'true' || true; // Default: true
+    if (useAgent) {
+      const agentResult = await atenderClienteComAgent(text, { history });
+      reply = sanitizeAiPaymentReply(agentResult.resposta);
+      console.log(`[WhatsApp Service] Agent executado: intenção=${agentResult.intencao}, tools=${agentResult.tools_usadas.join(',')}`);
+      
+      // Enviar foto se solicitada (apenas 1 foto)
+      if (agentResult.fotos && agentResult.fotos.length > 0 && agentResult.fotos[0]) {
+        const { sendImageByUrl } = await import('./whatsapp-media.service.js');
+        void sendImageByUrl(from, agentResult.fotos[0]).catch((err) => {
+          console.error('[WhatsApp] Erro ao enviar foto:', err);
+        });
+      }
+    } else {
+      reply = sanitizeAiPaymentReply(await answerWhatsAppMessage(text, { history }));
+    }
+    
     if (placeholderTimer) clearTimeout(placeholderTimer);
 
     const replyMessageId = await sendMessage(from, reply);

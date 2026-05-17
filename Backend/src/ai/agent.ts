@@ -74,16 +74,17 @@ export type Intenao =
   | 'RASTREAR_RESERVA'
   | 'VER_FOTOS'
   | 'REGISTRAR_CLIENTE'
+  | 'SOBRE_DRIVE_CONNECT'
   | 'GENERICO';
 
 function detectarIntencao(texto: string): Intenao {
   const t = (texto || '').toLowerCase();
 
-  if (t.match(/filial|unidade|local|endereço|endereco|onde|localização|localizacao/)) {
+  if (t.match(/filial(?:is)?|unidade(?:s)?|local(?:ização|izacao)?|endereço|endereco|onde fica|onde estão|onde estao/)) {
     return 'LISTAR_FILIAIS';
   }
 
-  if (t.match(/carro|veículo|veiculo|modelo|categoria|opção|opcao|qual|quais|disponível|disponivel|frota/)) {
+  if (t.match(/carro(?:s)?|veículo(?:s)?|veiculo(?:s)?|modelo(?:s)?|categoria(?:s)?|opção(?:ões)?|opcao(?:es)?|qual(?:is)?|disponível(?:eis)?|disponivel(?:eis)?|frota/)) {
     if (t.match(/reserv|alugar|locação|locacao|booking/)) {
       return 'CRIAR_RESERVA';
     }
@@ -106,6 +107,10 @@ function detectarIntencao(texto: string): Intenao {
     return 'REGISTRAR_CLIENTE';
   }
 
+  if (t.match(/o que é|o que e|quem é|quem e|sobre|sobre a drive connect|o que é a drive connect|o que e a drive connect|drive connect/)) {
+    return 'SOBRE_DRIVE_CONNECT';
+  }
+
   return 'GENERICO';
 }
 
@@ -125,6 +130,10 @@ export interface ParametrosExtraidos {
   email?: string;
   cpf?: string;
   telefone?: string;
+}
+
+function responderSobreDriveConnect(): string {
+  return 'A Drive Connect é uma locadora de veículos com atendimento rápido e humano via WhatsApp. A gente te ajuda com cotação, reserva, disponibilidade de carros, filiais e suporte durante a locação. Se quiser, posso te mostrar as filiais, os carros disponíveis ou já iniciar uma reserva.';
 }
 
 function extrairParametros(texto: string, intenao: Intenao): ParametrosExtraidos {
@@ -285,7 +294,7 @@ const langchainTools = [
 
 const systemPrompt = `Você é o assistente de atendimento da Drive Connect, locadora de veículos.
 Objetivo: ajudar clientes com cotações, reservas, rastreamento e suporte via WhatsApp.
-Estilo: cordial, direto, sem markdown, 1–3 parágrafos.
+Estilo: cordial, natural e acolhedor, sem soar engessado. Seja direto quando necessário, mas com um toque humano. Evite markdown, use 1–3 parágrafos e, quando fizer sentido, uma saudação breve.
 
 Diretrizes:
 1. Use as tools disponíveis para obter informações reais (filiais, carros, preços).
@@ -497,9 +506,14 @@ export async function atenderClienteComAgent(
         break;
       }
 
+      case 'SOBRE_DRIVE_CONNECT': {
+        respostaFinal = responderSobreDriveConnect();
+        break;
+      }
+
       default:
-        // GENERICO - usar resposta genérica
-        respostaFinal = 'Como posso ajudá-lo? Posso listar nossas filiais, carros disponíveis, criar uma reserva ou responder dúvidas sobre nossa locadora.';
+        // GENERICO - usar resposta genérica mais informativa
+        respostaFinal = 'Claro, posso te ajudar com filiais, carros disponíveis, reservas e dúvidas sobre a Drive Connect. Se quiser, me diga o que você procura e eu sigo com você.';
     }
 
     // Cleanup: remover markdown e logs desnecessários

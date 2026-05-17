@@ -127,6 +127,7 @@ export interface ParametrosExtraidos {
   data_fim?: string;
   cliente_id?: string;
   veiculo_id?: string;
+  veiculo_ref?: string;
   reserva_id?: string;
   nome?: string;
   email?: string;
@@ -150,6 +151,122 @@ function responderDuvidaEmpresa(texto: string): string {
   }
 
   return responderSobreDriveConnect();
+}
+
+type DecisaoIA = {
+  intencao: Intenao;
+  parametros: Partial<ParametrosExtraidos>;
+  motivo?: string;
+};
+
+function extrairTextoDaResposta(resposta: unknown): string {
+  if (typeof resposta === 'string') return resposta;
+
+  if (Array.isArray(resposta)) {
+    return resposta
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'text' in item) {
+          return String((item as { text?: unknown }).text || '');
+        }
+        return '';
+      })
+      .join('');
+  }
+
+  if (resposta && typeof resposta === 'object' && 'content' in resposta) {
+    return extrairTextoDaResposta((resposta as { content?: unknown }).content);
+  }
+
+  return String(resposta || '');
+}
+
+function extrairJsonDeTexto(texto: string): string | null {
+  const clean = (texto || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  const match = clean.match(/\{[\s\S]*\}/);
+  return match ? match[0] : null;
+}
+
+function normalizarIntencao(valor: unknown): Intenao {
+  const intencao = String(valor || '').toUpperCase().trim();
+  const validas: Intenao[] = [
+    'LISTAR_FILIAIS',
+    'LISTAR_CARROS',
+    'COTACAO',
+    'CRIAR_RESERVA',
+    'RASTREAR_RESERVA',
+    'VER_FOTOS',
+    'REGISTRAR_CLIENTE',
+    'SOBRE_DRIVE_CONNECT',
+    'GENERICO',
+  ];
+
+  return validas.includes(intencao as Intenao) ? (intencao as Intenao) : 'GENERICO';
+}
+
+function formatarHistoricoParaRouter(history: HistoryMessage[]): string {
+  if (!history || history.length === 0) return 'Sem histórico.';
+
+  return history
+    .slice(-8)
+    .map((m) => `${m.role === 'assistant' ? 'Atendente' : 'Cliente'}: ${String(m.content || '').trim()}`)
+    .filter(Boolean)
+    .join('\n');
+}
+
+async function resolverIntencaoComIA(
+  mensagem: string,
+  historico: HistoryMessage[],
+): Promise<DecisaoIA> {
+  const prompt = `Você é um roteador inteligente de atendimento da Drive Connect.
+Sua tarefa é entender a intenção real do cliente pelo contexto, sem depender de palavras-chave fixas.
+
+Intenções válidas:
+- LISTAR_FILIAIS: quando quiser saber unidades, lojas, locais de atendimento ou onde fica a empresa.
+- LISTAR_CARROS: quando pedir carros disponíveis, frota, modelos, categorias ou opções.
+- COTACAO: quando perguntar preço, valor, orçamento ou estimativa.
+- CRIAR_RESERVA: quando quiser reservar, alugar ou iniciar uma reserva.
+- RASTREAR_RESERVA: quando perguntar por status, acompanhamento ou reserva existente.
+- VER_FOTOS: quando pedir foto/imagem de um veículo, por modelo, placa ou referência.
+- REGISTRAR_CLIENTE: quando quiser cadastro, registro ou fornecer nome/email/CPF.
+- SOBRE_DRIVE_CONNECT: quando perguntar o que é a empresa, se o serviço é bom, confiável, como funciona ou tempo de mercado.
+- GENERICO: quando não houver ação clara.
+
+Regras:
+- Leia também o histórico recente.
+- Extraia parâmetros úteis quando existirem.
+- Para foto, preencha veiculo_ref com o modelo ou placa mencionados, mesmo que não seja UUID.
+- Para filiais, carro, cotação e reserva, extraia data_inicio, data_fim, categoria, filial_id quando possível.
+- Responda somente com JSON válido, sem markdown e sem texto extra.
+
+Formato esperado:
+{"intencao":"GENERICO","parametros":{"categoria":"SUV","data_inicio":"2026-05-20","data_fim":"2026-05-24","veiculo_ref":"A4 Audi"},"motivo":"breve explicação"}
+
+Histórico:
+${formatarHistoricoParaRouter(historico)}
+
+Mensagem do cliente:
+${mensagem}`;
+
+  const resposta = await agentConfig.model.invoke(prompt);
+  const texto = extrairTextoDaResposta(resposta);
+  const jsonTexto = extrairJsonDeTexto(texto);
+
+  if (!jsonTexto) {
+    throw new Error(`Roteador IA sem JSON válido: ${texto}`);
+  }
+
+  const parsed = JSON.parse(jsonTexto) as {
+    intencao?: unknown;
+    parametros?: Record<string, unknown>;
+    motivo?: unknown;
+  };
+
+  return {
+    intencao: normalizarIntencao(parsed.intencao),
+    parametros: (parsed.parametros || {}) as Partial<ParametrosExtraidos>,
+    motivo: typeof parsed.motivo === 'string' ? parsed.motivo : undefined,
+  };
 }
 
 function pareceReferenciaVeiculo(texto: string): boolean {
@@ -470,14 +587,33 @@ export async function atenderClienteComAgent(
   // 2. DETECÇÃO DE INTENÇÃO E PARÂMETROS
   // ──────────────────────────────────────────────────────
 
-  const intenao = detectarIntencao(mensagemSanitizada);
-  const params = extrairParametros(mensagemSanitizada, intenao);
+  let intenao: Intenao = 'GENERICO';
+  let params: Partial<ParametrosExtraidos> = {};
   const toolsUsadas: string[] = [];
 
   try {
     // 1. Armazenar histórico (simplificado)
     // Mantém histórico em memória para contexto
     const historico = opcoes.history || [];
+
+    try {
+      const decisao = await resolverIntencaoComIA(mensagemSanitizada, historico);
+      intenao = decisao.intencao;
+      params = {
+        ...extrairParametros(mensagemSanitizada, decisao.intencao),
+        ...decisao.parametros,
+      };
+    } catch (routerError) {
+      intenao = detectarIntencao(mensagemSanitizada);
+      params = extrairParametros(mensagemSanitizada, intenao);
+      void logSecurityEvent({
+        tipo: 'SUSPICIOUS',
+        telefone,
+        cliente_id: opcoes.clienteId || null,
+        descricao: `Router IA falhou, usando fallback: ${routerError instanceof Error ? routerError.message : 'desconhecido'}`,
+        severity: 'LOW',
+      });
+    }
 
     // 2. Compilar contexto
     const contexto = [
@@ -496,10 +632,10 @@ export async function atenderClienteComAgent(
     let fotosParaEnviar: string[] = [];
 
     if (intenao === 'VER_FOTOS' && !params.veiculo_id) {
-      const referenciaVeiculo = await resolverVeiculoPorReferencia(mensagemSanitizada);
+      const referenciaVeiculo = await resolverVeiculoPorReferencia(String(params.veiculo_ref || mensagemSanitizada));
       if (referenciaVeiculo) {
         params.veiculo_id = referenciaVeiculo.id;
-      } else if (pareceReferenciaVeiculo(mensagemSanitizada)) {
+      } else if (pareceReferenciaVeiculo(String(params.veiculo_ref || mensagemSanitizada))) {
         respostaFinal = 'Achei que você quer ver uma foto, mas ainda não consegui identificar o veículo com segurança. Se puder, me mande a placa ou o nome exato do modelo, por favor.';
       }
     }
@@ -580,7 +716,14 @@ export async function atenderClienteComAgent(
       }
 
       case 'SOBRE_DRIVE_CONNECT': {
-        respostaFinal = responderDuvidaEmpresa(mensagemSanitizada);
+        try {
+          respostaFinal = await answerWhatsAppMessage(mensagemSanitizada, { history: historico });
+          if (!respostaFinal || respostaFinal.length < 20) {
+            respostaFinal = responderDuvidaEmpresa(mensagemSanitizada);
+          }
+        } catch {
+          respostaFinal = responderDuvidaEmpresa(mensagemSanitizada);
+        }
         break;
       }
 

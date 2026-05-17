@@ -13,6 +13,8 @@ import {
 } from './security.js';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
+import { query } from '../db/index.js';
+import { answerWhatsAppMessage } from './rag.js';
 import {
   toolListarFiliais,
   toolListarCarrosDisponiveis,
@@ -80,7 +82,7 @@ export type Intenao =
 function detectarIntencao(texto: string): Intenao {
   const t = (texto || '').toLowerCase();
 
-  if (t.match(/filial(?:is)?|unidade(?:s)?|local(?:ização|izacao)?|endereço|endereco|onde fica|onde estão|onde estao/)) {
+  if (t.match(/\bfilial\b|\bfiliais\b|\bunidade\b|\bunidades\b|local(?:ização|izacao)?|endereço|endereco|onde fica|onde estão|onde estao/)) {
     return 'LISTAR_FILIAIS';
   }
 
@@ -107,7 +109,7 @@ function detectarIntencao(texto: string): Intenao {
     return 'REGISTRAR_CLIENTE';
   }
 
-  if (t.match(/o que é|o que e|quem é|quem e|sobre|sobre a drive connect|o que é a drive connect|o que e a drive connect|drive connect/)) {
+  if (t.match(/o que é|o que e|quem é|quem e|sobre|servi[cç]o|atendimento|qualidade|mercado|tempo de mercado|confiável|bom|empresa|drive connect/)) {
     return 'SOBRE_DRIVE_CONNECT';
   }
 
@@ -134,6 +136,64 @@ export interface ParametrosExtraidos {
 
 function responderSobreDriveConnect(): string {
   return 'A Drive Connect é uma locadora de veículos com atendimento rápido e humano via WhatsApp. A gente te ajuda com cotação, reserva, disponibilidade de carros, filiais e suporte durante a locação. Se quiser, posso te mostrar as filiais, os carros disponíveis ou já iniciar uma reserva.';
+}
+
+function responderDuvidaEmpresa(texto: string): string {
+  const t = (texto || '').toLowerCase();
+
+  if (t.includes('mercado') || t.includes('tempo')) {
+    return 'Eu não tenho aqui a confirmação exata de há quanto tempo a Drive Connect está no mercado. O que eu posso te dizer com segurança é que o atendimento é focado em rapidez, clareza e suporte humano via WhatsApp. Se quiser, posso te mostrar as filiais e os carros disponíveis para você conhecer melhor a operação.';
+  }
+
+  if (t.includes('bom') || t.includes('qualidade') || t.includes('servi') || t.includes('atendimento') || t.includes('confiável')) {
+    return 'A ideia da Drive Connect é oferecer um atendimento rápido e humano, com suporte durante a locação e informações claras sobre filiais, carros e reservas. Se você quiser avaliar melhor, posso te mostrar as filiais e os veículos disponíveis agora.';
+  }
+
+  return responderSobreDriveConnect();
+}
+
+function pareceReferenciaVeiculo(texto: string): boolean {
+  const t = (texto || '').trim();
+  if (!t) return false;
+
+  if (/^[A-Z]{3}\d[A-Z0-9]\d{2}$/i.test(t.replace(/\s+/g, ''))) return true;
+  if (/^[A-Z]{3}-?\d{4}$/i.test(t.replace(/\s+/g, ''))) return true;
+  if (/\b[a-z0-9]+\s+[a-z0-9]+\b/i.test(t) && t.length <= 40) return true;
+
+  return false;
+}
+
+async function resolverVeiculoPorReferencia(referencia: string): Promise<{ id: string; placa: string; modelo: string } | null> {
+  const termo = (referencia || '')
+    .toLowerCase()
+    .replace(/foto(s)?\s+(do|da|de|dos|das)\s+/g, '')
+    .replace(/[^a-z0-9]+/gi, ' ')
+    .trim();
+
+  if (!termo) return null;
+
+  const tokens = termo.split(/\s+/).filter((token) => token.length > 1);
+  const result = await query(
+    `SELECT v.id, v.placa, m.nome AS modelo, m.marca
+     FROM veiculo v
+     JOIN modelo m ON m.id = v.modelo_id
+     WHERE v.deletado_em IS NULL
+     ORDER BY v.id DESC
+     LIMIT 200`,
+  );
+
+  const candidatos = result.rows.map((row) => ({
+    id: String(row.id),
+    placa: String(row.placa || ''),
+    modelo: `${row.marca || ''} ${row.modelo || ''}`.trim(),
+  }));
+
+  const encontrado = candidatos.find((item) => {
+    const alvo = `${item.placa} ${item.modelo}`.toLowerCase();
+    return tokens.every((token) => alvo.includes(token));
+  });
+
+  return encontrado || null;
 }
 
 function extrairParametros(texto: string, intenao: Intenao): ParametrosExtraidos {
@@ -434,6 +494,15 @@ export async function atenderClienteComAgent(
     // 3. Gerar resposta baseada em intenção
     let respostaFinal = '';
     let fotosParaEnviar: string[] = [];
+
+    if (intenao === 'VER_FOTOS' && !params.veiculo_id) {
+      const referenciaVeiculo = await resolverVeiculoPorReferencia(mensagemSanitizada);
+      if (referenciaVeiculo) {
+        params.veiculo_id = referenciaVeiculo.id;
+      } else if (pareceReferenciaVeiculo(mensagemSanitizada)) {
+        respostaFinal = 'Achei que você quer ver uma foto, mas ainda não consegui identificar o veículo com segurança. Se puder, me mande a placa ou o nome exato do modelo, por favor.';
+      }
+    }
     
     switch (intenao) {
       case 'LISTAR_FILIAIS': {
@@ -482,6 +551,10 @@ export async function atenderClienteComAgent(
       }
 
       case 'VER_FOTOS': {
+        if (!params.veiculo_id && respostaFinal) {
+          break;
+        }
+
         if (params.veiculo_id) {
           const result = await toolObterFotosVeiculo(params.veiculo_id);
           if (result.success && result.data) {
@@ -507,13 +580,16 @@ export async function atenderClienteComAgent(
       }
 
       case 'SOBRE_DRIVE_CONNECT': {
-        respostaFinal = responderSobreDriveConnect();
+        respostaFinal = responderDuvidaEmpresa(mensagemSanitizada);
         break;
       }
 
       default:
-        // GENERICO - usar resposta genérica mais informativa
-        respostaFinal = 'Claro, posso te ajudar com filiais, carros disponíveis, reservas e dúvidas sobre a Drive Connect. Se quiser, me diga o que você procura e eu sigo com você.';
+        try {
+          respostaFinal = await answerWhatsAppMessage(mensagemSanitizada, { history: historico });
+        } catch {
+          respostaFinal = 'Claro, posso te ajudar com filiais, carros disponíveis, reservas e dúvidas sobre a Drive Connect. Se quiser, me diga o que você procura e eu sigo com você.';
+        }
     }
 
     // Cleanup: remover markdown e logs desnecessários

@@ -38,9 +38,8 @@ export async function toolListarFiliais(): Promise<ToolResult<FilialInfo[]>> {
   try {
     const result = await query(
       `SELECT 
-        id, nome, cidade, uf, 
+        id, nome, cidade, uf,
         CONCAT(rua, ', ', numero, ' - ', bairro) AS endereco,
-        (data_atualizado_em)::text AS horario,
         ativo
        FROM filial 
        WHERE deletado_em IS NULL AND ativo = TRUE
@@ -53,6 +52,7 @@ export async function toolListarFiliais(): Promise<ToolResult<FilialInfo[]>> {
       cidade: String(r.cidade),
       uf: String(r.uf),
       endereco: String(r.endereco || ''),
+      telefone: r.telefone ? String(r.telefone) : undefined,
       ativo: Boolean(r.ativo),
     }));
 

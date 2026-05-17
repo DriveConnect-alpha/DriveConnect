@@ -153,6 +153,24 @@ function responderDuvidaEmpresa(texto: string): string {
   return responderSobreDriveConnect();
 }
 
+function forcarIntencaoObvia(mensagem: string, intencao: Intenao): Intenao {
+  const t = (mensagem || '').toLowerCase();
+
+  if (t.includes('foto') || t.includes('imagem') || t.includes('ver a foto') || t.includes('fotos')) {
+    return 'VER_FOTOS';
+  }
+
+  if (t.includes('filial') || t.includes('filiais') || t.includes('unidade') || t.includes('unidades')) {
+    return 'LISTAR_FILIAIS';
+  }
+
+  if ((t.includes('carro') || t.includes('carros') || t.includes('frota') || t.includes('dispon')) && intencao === 'GENERICO') {
+    return 'LISTAR_CARROS';
+  }
+
+  return intencao;
+}
+
 type DecisaoIA = {
   intencao: Intenao;
   parametros: Partial<ParametrosExtraidos>;
@@ -221,6 +239,13 @@ async function resolverIntencaoComIA(
   const prompt = `Você é um roteador inteligente de atendimento da Drive Connect.
 Sua tarefa é entender a intenção real do cliente pelo contexto, sem depender de palavras-chave fixas.
 
+Prioridade de entendimento:
+1. Se o cliente pedir foto, imagem, mostrar ou ver um veículo, a intenção é VER_FOTOS.
+2. Se o cliente pedir filiais/unidades/locais, a intenção é LISTAR_FILIAIS.
+3. Se o cliente pedir carros disponíveis/frota/modelos, a intenção é LISTAR_CARROS.
+4. Se o cliente perguntar sobre a empresa, qualidade, serviço, como funciona ou tempo de mercado, a intenção é SOBRE_DRIVE_CONNECT.
+5. Só use CRIAR_RESERVA quando a pessoa realmente quiser reservar/alugar/iniciar uma reserva.
+
 Intenções válidas:
 - LISTAR_FILIAIS: quando quiser saber unidades, lojas, locais de atendimento ou onde fica a empresa.
 - LISTAR_CARROS: quando pedir carros disponíveis, frota, modelos, categorias ou opções.
@@ -234,9 +259,12 @@ Intenções válidas:
 
 Regras:
 - Leia também o histórico recente.
+- Não transforme pergunta de foto em reserva.
+- Não transforme pergunta institucional em reserva.
 - Extraia parâmetros úteis quando existirem.
 - Para foto, preencha veiculo_ref com o modelo ou placa mencionados, mesmo que não seja UUID.
 - Para filiais, carro, cotação e reserva, extraia data_inicio, data_fim, categoria, filial_id quando possível.
+- Se a mensagem estiver ambígua, prefira GENERICO ou SOBRE_DRIVE_CONNECT em vez de CRIAR_RESERVA.
 - Responda somente com JSON válido, sem markdown e sem texto extra.
 
 Formato esperado:
@@ -598,13 +626,14 @@ export async function atenderClienteComAgent(
 
     try {
       const decisao = await resolverIntencaoComIA(mensagemSanitizada, historico);
-      intenao = decisao.intencao;
+      intenao = forcarIntencaoObvia(mensagemSanitizada, decisao.intencao);
       params = {
         ...extrairParametros(mensagemSanitizada, decisao.intencao),
         ...decisao.parametros,
       };
     } catch (routerError) {
       intenao = detectarIntencao(mensagemSanitizada);
+      intenao = forcarIntencaoObvia(mensagemSanitizada, intenao);
       params = extrairParametros(mensagemSanitizada, intenao);
       void logSecurityEvent({
         tipo: 'SUSPICIOUS',
@@ -645,10 +674,14 @@ export async function atenderClienteComAgent(
         const result = await toolListarFiliais();
         if (result.success && result.data) {
           const filiais = result.data.slice(0, 5);
-          respostaFinal = `Encontrei ${result.data.length} filial(is):\n${filiais.map(f => `• ${f.nome} - ${f.endereco} - ${f.telefone}`).join('\n')}`;
+          if (filiais.length > 0) {
+            respostaFinal = `Encontrei ${result.data.length} filial(is):\n${filiais.map(f => `• ${f.nome} - ${f.endereco}${f.telefone ? ` - ${f.telefone}` : ''}`).join('\n')}`;
+          } else {
+            respostaFinal = await answerWhatsAppMessage('Quais são as filiais da Drive Connect?', { history: historico });
+          }
           toolsUsadas.push('listar_filiais');
         } else {
-          respostaFinal = 'Desculpe, não consegui acessar a lista de filiais. Pode tentar novamente?';
+          respostaFinal = await answerWhatsAppMessage('Quais são as filiais da Drive Connect?', { history: historico });
         }
         break;
       }
@@ -660,7 +693,7 @@ export async function atenderClienteComAgent(
           respostaFinal = `Encontrei ${result.data.length} carro(s) disponível(is):\n${carros.map((c: any) => `• ${c.modelo} ${c.marca} - R$ ${c.preco_diaria}/dia`).join('\n')}\n\nDigite "foto do [modelo]" para ver a foto de algum.`;
           toolsUsadas.push('listar_carros_disponiveis');
         } else {
-          respostaFinal = 'Desculpe, não encontrei carros disponíveis para esse período e categoria. Pode tentar outras datas?';
+          respostaFinal = await answerWhatsAppMessage(mensagemSanitizada, { history: historico });
         }
         break;
       }

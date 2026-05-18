@@ -122,6 +122,7 @@ function detectarIntencao(texto: string): Intenao {
 
 export interface ParametrosExtraidos {
   filial_id?: string;
+  filial_ref?: string;
   categoria?: string;
   data_inicio?: string;
   data_fim?: string;
@@ -151,24 +152,6 @@ function responderDuvidaEmpresa(texto: string): string {
   }
 
   return responderSobreDriveConnect();
-}
-
-function forcarIntencaoObvia(mensagem: string, intencao: Intenao): Intenao {
-  const t = (mensagem || '').toLowerCase();
-
-  if (t.includes('foto') || t.includes('imagem') || t.includes('ver a foto') || t.includes('fotos')) {
-    return 'VER_FOTOS';
-  }
-
-  if (t.includes('filial') || t.includes('filiais') || t.includes('unidade') || t.includes('unidades')) {
-    return 'LISTAR_FILIAIS';
-  }
-
-  if ((t.includes('carro') || t.includes('carros') || t.includes('frota') || t.includes('dispon')) && intencao === 'GENERICO') {
-    return 'LISTAR_CARROS';
-  }
-
-  return intencao;
 }
 
 type DecisaoIA = {
@@ -236,41 +219,28 @@ async function resolverIntencaoComIA(
   mensagem: string,
   historico: HistoryMessage[],
 ): Promise<DecisaoIA> {
-  const prompt = `Você é um roteador inteligente de atendimento da Drive Connect.
-Sua tarefa é entender a intenção real do cliente pelo contexto, sem depender de palavras-chave fixas.
+  const prompt = `Você é um planejador flexível de atendimento da Drive Connect.
+Seu objetivo é decidir, com bom senso, se a mensagem precisa de uma tool ou se pode ser respondida diretamente.
 
-Prioridade de entendimento:
-1. Se o cliente pedir foto, imagem, mostrar ou ver um veículo, a intenção é VER_FOTOS.
-2. Se o cliente pedir filiais/unidades/locais, a intenção é LISTAR_FILIAIS.
-3. Se o cliente pedir carros disponíveis/frota/modelos, a intenção é LISTAR_CARROS.
-4. Se o cliente perguntar sobre a empresa, qualidade, serviço, como funciona ou tempo de mercado, a intenção é SOBRE_DRIVE_CONNECT.
-5. Só use CRIAR_RESERVA quando a pessoa realmente quiser reservar/alugar/iniciar uma reserva.
+Se a mensagem for conversa natural, dúvida aberta, explicação, comparação, elogio, opinião ou pergunta institucional, prefira GENERICO.
+Use tool apenas quando houver necessidade real de consultar dado estruturado.
+Se houver incerteza, prefira GENERICO.
 
 Intenções válidas:
-- LISTAR_FILIAIS: quando quiser saber unidades, lojas, locais de atendimento ou onde fica a empresa.
-- LISTAR_CARROS: quando pedir carros disponíveis, frota, modelos, categorias ou opções.
-- COTACAO: quando perguntar preço, valor, orçamento ou estimativa.
-- CRIAR_RESERVA: quando quiser reservar, alugar ou iniciar uma reserva.
-- RASTREAR_RESERVA: quando perguntar por status, acompanhamento ou reserva existente.
-- VER_FOTOS: quando pedir foto/imagem de um veículo, por modelo, placa ou referência.
-- REGISTRAR_CLIENTE: quando quiser cadastro, registro ou fornecer nome/email/CPF.
-- SOBRE_DRIVE_CONNECT: quando perguntar o que é a empresa, se o serviço é bom, confiável, como funciona ou tempo de mercado.
-- GENERICO: quando não houver ação clara.
+- LISTAR_FILIAIS
+- LISTAR_CARROS
+- COTACAO
+- CRIAR_RESERVA
+- RASTREAR_RESERVA
+- VER_FOTOS
+- REGISTRAR_CLIENTE
+- SOBRE_DRIVE_CONNECT
+- GENERICO
 
-Regras:
-- Leia também o histórico recente.
-- Não transforme pergunta de foto em reserva.
-- Não transforme pergunta institucional em reserva.
-- Extraia parâmetros úteis quando existirem.
-- Para foto, preencha veiculo_ref com o modelo ou placa mencionados, mesmo que não seja UUID.
-- Para filiais, carro, cotação e reserva, extraia data_inicio, data_fim, categoria, filial_id quando possível.
-- Se a mensagem estiver ambígua, prefira GENERICO ou SOBRE_DRIVE_CONNECT em vez de CRIAR_RESERVA.
-- Responda somente com JSON válido, sem markdown e sem texto extra.
+Responda somente com JSON válido e neste formato:
+{"intencao":"GENERICO","parametros":{},"motivo":"breve explicação"}
 
-Formato esperado:
-{"intencao":"GENERICO","parametros":{"categoria":"SUV","data_inicio":"2026-05-20","data_fim":"2026-05-24","veiculo_ref":"A4 Audi"},"motivo":"breve explicação"}
-
-Histórico:
+Histórico recente:
 ${formatarHistoricoParaRouter(historico)}
 
 Mensagem do cliente:
@@ -626,14 +596,13 @@ export async function atenderClienteComAgent(
 
     try {
       const decisao = await resolverIntencaoComIA(mensagemSanitizada, historico);
-      intenao = forcarIntencaoObvia(mensagemSanitizada, decisao.intencao);
+      intenao = decisao.intencao;
       params = {
         ...extrairParametros(mensagemSanitizada, decisao.intencao),
         ...decisao.parametros,
       };
     } catch (routerError) {
       intenao = detectarIntencao(mensagemSanitizada);
-      intenao = forcarIntencaoObvia(mensagemSanitizada, intenao);
       params = extrairParametros(mensagemSanitizada, intenao);
       void logSecurityEvent({
         tipo: 'SUSPICIOUS',
@@ -668,6 +637,34 @@ export async function atenderClienteComAgent(
         respostaFinal = 'Achei que você quer ver uma foto, mas ainda não consegui identificar o veículo com segurança. Se puder, me mande a placa ou o nome exato do modelo, por favor.';
       }
     }
+
+    if (intenao === 'LISTAR_CARROS' && !params.filial_id) {
+      const referenciaFilial = String(params.filial_ref || mensagemSanitizada);
+      const filialRes = await query(
+        `SELECT id, nome, cidade, uf
+         FROM filial
+         WHERE deletado_em IS NULL AND ativo = TRUE
+         ORDER BY cidade, nome`,
+      );
+
+      const termo = referenciaFilial.toLowerCase().replace(/[^a-z0-9]+/gi, ' ').trim();
+      const tokens = termo.split(/\s+/).filter((token) => token.length > 1);
+      const filialEncontrada = filialRes.rows
+        .map((row) => ({
+          id: String(row.id),
+          nome: String(row.nome || ''),
+          cidade: String(row.cidade || ''),
+          uf: String(row.uf || ''),
+        }))
+        .find((filial) => {
+          const alvo = `${filial.nome} ${filial.cidade} ${filial.uf}`.toLowerCase();
+          return tokens.some((token) => alvo.includes(token));
+        });
+
+      if (filialEncontrada) {
+        params.filial_id = filialEncontrada.id;
+      }
+    }
     
     switch (intenao) {
       case 'LISTAR_FILIAIS': {
@@ -675,7 +672,7 @@ export async function atenderClienteComAgent(
         if (result.success && result.data) {
           const filiais = result.data.slice(0, 5);
           if (filiais.length > 0) {
-            respostaFinal = `Encontrei ${result.data.length} filial(is):\n${filiais.map(f => `• ${f.nome} - ${f.endereco}${f.telefone ? ` - ${f.telefone}` : ''}`).join('\n')}`;
+            respostaFinal = `Encontrei ${result.data.length} filial(is):\n${filiais.map(f => `• ${f.nome} - ${f.endereco}`).join('\n')}`;
           } else {
             respostaFinal = await answerWhatsAppMessage('Quais são as filiais da Drive Connect?', { history: historico });
           }

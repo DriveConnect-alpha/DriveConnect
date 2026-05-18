@@ -46,15 +46,22 @@ export async function toolListarFiliais(): Promise<ToolResult<FilialInfo[]>> {
        ORDER BY cidade, nome`,
     );
 
-    const filiais = result.rows.map((r) => ({
-      id: String(r.id),
-      nome: String(r.nome),
-      cidade: String(r.cidade),
-      uf: String(r.uf),
-      endereco: String(r.endereco || ''),
-      telefone: r.telefone ? String(r.telefone) : undefined,
-      ativo: Boolean(r.ativo),
-    }));
+    const seen = new Set<string>();
+    const filiais = result.rows
+      .map((r) => ({
+        id: String(r.id),
+        nome: String(r.nome),
+        cidade: String(r.cidade),
+        uf: String(r.uf),
+        endereco: String(r.endereco || ''),
+        ativo: Boolean(r.ativo),
+      }))
+      .filter((filial) => {
+        const chave = `${filial.nome}::${filial.cidade}::${filial.uf}::${filial.endereco}`.toLowerCase();
+        if (seen.has(chave)) return false;
+        seen.add(chave);
+        return true;
+      });
 
     return {
       success: true,
@@ -573,7 +580,7 @@ export async function toolObterFotosVeiculo(
     const fotosRes = await query(
       `SELECT filename, is_principal FROM veiculo_imagem 
        WHERE veiculo_id = $1 
-       ORDER BY is_principal DESC, created_at ASC`,
+       ORDER BY is_principal DESC, criado_em ASC`,
       [veiculo_id],
     );
 

@@ -431,7 +431,7 @@ async function getVeiculoFotos(modeloName: string): Promise<string[]> {
       FROM veiculo_imagem vi
       JOIN veiculo v ON v.id = vi.veiculo_id
       JOIN modelo m ON m.id = v.modelo_id
-      WHERE m.nome ILIKE $1
+      WHERE (m.nome ILIKE $1 OR (m.nome || ' ' || COALESCE(m.marca, '')) ILIKE $1)
         AND vi.filename IS NOT NULL
         AND v.deletado_em IS NULL
         AND v.status != 'MANUTENCAO'
@@ -451,18 +451,71 @@ async function getVeiculoFotos(modeloName: string): Promise<string[]> {
 }
 
 /**
- * Detectar modelo mencionado na mensagem
+ * Detectar modelo mencionado na mensagem ou no histórico recente
  */
-function detectModeloMencionado(messageText: string): string | null {
+function detectModeloMencionado(messageText: string, history?: HistoryMessage[]): string | null {
   const t = normalizeText(messageText);
-  const modelos = ['hb20', 'gol', 'onix', 'kicks', 'tracker', 'corolla', 'tiguan', 'sportage'];
-  
-  for (const modelo of modelos) {
-    if (t.includes(modelo)) {
-      return modelo.charAt(0).toUpperCase() + modelo.slice(1);
+  const recentText = normalizeText((history || []).slice(-5).map((m) => m.content).join(' '));
+  const combined = `${t} ${recentText}`.trim();
+
+  const hasPronounReference = /\b(dele|dela|deles|dela|esse|essa|esse carro|esse veiculo|esse veículo|o carro|a foto dele|a foto dela)\b/.test(t);
+
+  const exactModels = [
+    'hb20',
+    'gol',
+    'onix',
+    'kicks',
+    'tracker',
+    'corolla',
+    'tiguan',
+    'sportage',
+    'a4 audi',
+    'a3 audi',
+    'a6 audi',
+    'q3 audi',
+    'q5 audi',
+    'q7 audi',
+  ];
+
+  const formatKnownModel = (model: string): string => {
+    if (model.includes('audi')) {
+      const parts = model.split(/\s+/).filter(Boolean);
+      if (parts.length >= 2) {
+        const first = parts[0]!.toUpperCase();
+        return `${first} Audi`;
+      }
+      return 'Audi';
+    }
+    return model.charAt(0).toUpperCase() + model.slice(1);
+  };
+
+  for (const modelo of exactModels) {
+    if (combined.includes(modelo)) {
+      return formatKnownModel(modelo);
     }
   }
-  
+
+  const audiMatch = combined.match(/\b([asq]\d)\s+audi\b/);
+  if (audiMatch?.[1]) {
+    return `${audiMatch[1].toUpperCase()} Audi`;
+  }
+
+  if (hasPronounReference) {
+    const historyMatch = (history || [])
+      .slice(-5)
+      .reverse()
+      .map((m) => normalizeText(m.content))
+      .find((content) => exactModels.some((modelo) => content.includes(modelo)) || /\b([asq]\d)\s+audi\b/.test(content));
+
+    if (historyMatch) {
+      const fromExact = exactModels.find((modelo) => historyMatch.includes(modelo));
+      if (fromExact) return formatKnownModel(fromExact);
+
+      const historyAudi = historyMatch.match(/\b([asq]\d)\s+audi\b/);
+      if (historyAudi?.[1]) return `${historyAudi[1].toUpperCase()} Audi`;
+    }
+  }
+
   return null;
 }
 function extractFilialFromHistory(history?: HistoryMessage[]): string | null {
@@ -1198,9 +1251,9 @@ export async function atenderClienteComAgent(
     let fotos: string[] | undefined;
 
     // Checar se cliente está pedindo foto de um veículo específico
-    if ((textoLower.includes('foto') || textoLower.includes('imagem') || textoLower.includes('mostre')) && 
-        (textoLower.includes('do ') || textoLower.includes('da '))) {
-      const modeloMencionado = detectModeloMencionado(mensagem);
+    if ((textoLower.includes('foto') || textoLower.includes('imagem') || textoLower.includes('mostre')) &&
+        (textoLower.includes('do ') || textoLower.includes('da ') || textoLower.includes('dele') || textoLower.includes('dela') || textoLower.includes('desse') || textoLower.includes('dessa') || textoLower.includes('ele') || textoLower.includes('ela'))) {
+      const modeloMencionado = detectModeloMencionado(mensagem, options.history || []);
       if (modeloMencionado) {
         const fotosEncontradas = await getVeiculoFotos(modeloMencionado);
         if (fotosEncontradas.length > 0) {
@@ -1284,7 +1337,7 @@ export async function atenderClienteComAgent(
     });
 
     // Detectar intenção baseado no conteúdo
-    if (textoLower.includes('foto') || textoLower.includes('imagem')) {
+    if (textoLower.includes('foto') || textoLower.includes('imagem') || textoLower.includes('mostre')) {
       intencao = 'VER_FOTOS';
       tools_usadas.push('obter_fotos_veiculo');
     } else if (textoLower.includes('dispon') || textoLower.includes('modelo') || textoLower.includes('carro')) {

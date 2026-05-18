@@ -708,7 +708,7 @@ export async function atenderClienteComAgent(
 
         const result = await toolListarCarrosDisponiveis(params);
         if (result.success && result.data && result.data.length > 0) {
-          const carros = result.data.slice(0, 5);
+          const carros = result.data;
           respostaFinal = `Encontrei ${result.data.length} carro(s) disponível(is):\n${carros.map((c: any) => `• ${c.modelo} ${c.marca} - R$ ${c.preco_diaria}/dia`).join('\n')}\n\nDigite "foto do [modelo]" para ver a foto de algum.`;
           toolsUsadas.push('listar_carros_disponiveis');
         } else {

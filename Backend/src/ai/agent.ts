@@ -19,6 +19,11 @@ let vectorStore: PGVectorStore | null = null;
 let retriever: ReturnType<PGVectorStore['asRetriever']> | null = null;
 let chain: RunnableSequence | null = null;
 
+// Cache de filiais com TTL
+let filiaisCache: Array<{ id: string; nome: string; cidade: string; uf: string }> | null = null;
+let filialsCacheTime = 0;
+const FILIAIS_CACHE_TTL = 60 * 60 * 1000; // 1 hora
+
 const TEMPLATE = `Você é um assistente virtual de atendimento da Drive Connect, locadora de carros.
 Objetivo: ajudar clientes no processo de locação (cotações, categorias, regras, requisitos, retirada/devolução, adicionais e políticas).
 Estilo: WhatsApp (curto, direto, cordial), com tom humano e acolhedor. Sempre em português.
@@ -234,6 +239,22 @@ function parseDateToIso(text: string | null): string | null {
   return null;
 }
 
+function isValidDate(dateStr: string): boolean {
+  const date = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return !isNaN(date.getTime()) && date >= today;
+}
+
+function isValidDateRange(startDate: string | null, endDate: string | null): boolean {
+  if (!startDate || !endDate) return false;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const maxDays = 30;
+  const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  return start < end && daysDiff > 0 && daysDiff <= maxDays;
+}
+
 function normalizeText(text: string): string {
   return (text || '')
     .toLowerCase()
@@ -344,6 +365,64 @@ function shouldUseLocalDb(messageText: string): boolean {
   );
 }
 
+/**
+ * Obter filiais com cache
+ */
+async function getFiliais(): Promise<Array<{ id: string; nome: string; cidade: string; uf: string }>> {
+  const now = Date.now();
+  if (filiaisCache && now - filialsCacheTime < FILIAIS_CACHE_TTL) {
+    return filiaisCache;
+  }
+
+  try {
+    const res = await query(
+      `SELECT id, nome, cidade, uf FROM filial WHERE deletado_em IS NULL AND ativo = TRUE ORDER BY nome`,
+    );
+    filiaisCache = res.rows.map((row) => ({
+      id: String(row.id),
+      nome: String(row.nome || ''),
+      cidade: String(row.cidade || ''),
+      uf: String(row.uf || ''),
+    }));
+    filialsCacheTime = now;
+    return filiaisCache;
+  } catch (err) {
+    console.error('[Cache] Erro ao obter filiais:', err);
+    return filiaisCache || [];
+  }
+}
+
+/**
+ * Extrair filial do histórico de mensagens
+ */
+function extractFilialFromHistory(history?: HistoryMessage[]): string | null {
+  if (!history || history.length === 0 || !filiaisCache) return null;
+  const recentMessages = history.slice(-5).map((m) => m.content).join(' ');
+  const t = normalizeText(recentMessages || '');
+  if (!t) return null;
+
+  try {
+    const filiais = filiaisCache;
+    if (!filiais || filiais.length === 0) return null;
+    
+    if (filiais.length === 1) return String(filiais[0]!.id);
+
+    for (const filial of filiais) {
+      const nome = normalizeText(String(filial.nome || ''));
+      const cidade = normalizeText(String(filial.cidade || ''));
+      const uf = normalizeText(String(filial.uf || ''));
+
+      if (nome && t.includes(nome)) return String(filial.id);
+      if (cidade && t.includes(cidade)) return String(filial.id);
+      if (uf && containsWord(t, uf)) return String(filial.id);
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 async function detectFilialId(messageText: string): Promise<string | null> {
   const t = normalizeText(messageText || '');
   if (!t) return null;
@@ -414,6 +493,12 @@ function formatCurrency(value: number | null | undefined): string | null {
   }).format(Number(value));
 }
 
+function getMonthName(dateStr: string): string {
+  const months = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const date = new Date(dateStr);
+  return months[date.getMonth()] || '';
+}
+
 // ──────────────────────────────────────────────────────
 // TOOLS ADICIONAIS PARA O ASSISTENTE
 // ──────────────────────────────────────────────────────
@@ -473,6 +558,50 @@ Confirme com o atendente antes de cancelar.`;
 /**
  * Tool: Sugerir alternativas de carro baseado em preferência
  */
+async function suggestAlternativeDates(
+  startDate: string,
+  endDate: string,
+  filialId: string,
+): Promise<{ dates: Array<{ start: string; end: string }>; reason: string }> {
+  const alternatives: Array<{ start: string; end: string }> = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const duration = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+
+  for (let i = 1; i <= 3; i++) {
+    const newStart = new Date(start);
+    newStart.setDate(newStart.getDate() + i * 7);
+    const newEnd = new Date(newStart);
+    newEnd.setDate(newEnd.getDate() + duration);
+
+    const newStartStr = newStart.toISOString().split('T')[0] || '';
+    const newEndStr = newEnd.toISOString().split('T')[0] || '';
+
+    try {
+      const result = await query(
+        `SELECT COUNT(*) as count FROM veiculo v
+         WHERE v.filial_id = $1::uuid AND v.deletado_em IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM reserva r
+           WHERE r.veiculo_id = v.id AND r.status IN ('PENDENTE_PAGAMENTO', 'RESERVADA', 'ATIVA')
+           AND r.deletado_em IS NULL AND r.data_inicio < ($3::date + interval '1 day') AND r.data_fim > $2::date
+         )`,
+        [filialId, newStartStr, newEndStr],
+      );
+      if (Number(result.rows[0]?.count || 0) > 0) {
+        alternatives.push({ start: newStartStr, end: newEndStr });
+      }
+    } catch {
+      // Skip
+    }
+  }
+
+  return {
+    dates: alternatives,
+    reason: alternatives.length > 0 ? 'Essas datas têm melhor disponibilidade' : 'Tente outra unidade',
+  };
+}
+
 async function suggestAlternativeVehicles(
   filialId: string,
   preferredCategory: string,
@@ -621,12 +750,19 @@ async function generateAvailabilitySummary(filialId: string): Promise<string> {
   }
 }
 
-async function buildLocalContext(messageText: string): Promise<string> {
+async function buildLocalContext(
+  messageText: string,
+  history?: HistoryMessage[],
+): Promise<string> {
   if (!shouldUseLocalDb(messageText)) return '';
 
   const { startDate, endDate } = extractDateRange(messageText);
   const category = await detectCategory(messageText);
-  const filialId = await detectFilialId(messageText);
+  // Tentar detectar filial na mensagem atual, senão usar do histórico
+  let filialId = await detectFilialId(messageText);
+  if (!filialId) {
+    filialId = extractFilialFromHistory(history) || null;
+  }
 
   if (startDate && endDate) {
     try {
@@ -660,7 +796,17 @@ async function buildLocalContext(messageText: string): Promise<string> {
       );
 
       if (rows.rowCount === 0) {
-        return `Consulta do sistema: não encontrei veículos disponíveis${category ? ` na categoria ${category}` : ''}${filialId ? ' na unidade solicitada' : ''} para ${startDate} a ${endDate}.`;
+        // Sugerir datas alternativas
+        const alternatives = await suggestAlternativeDates(startDate, endDate, filialId!);
+        let suggestion = '';
+        if (alternatives.dates.length > 0) {
+          const altDates = alternatives.dates
+            .slice(0, 2)
+            .map((d) => `${d.start.split('-')[2]} a ${d.end.split('-')[2]} de ${getMonthName(d.start)}`)
+            .join(' ou ');
+          suggestion = `\n\nAlternativa: temos disponibilidade em ${altDates}. Interesse?`;
+        }
+        return `Consulta do sistema: não encontrei veículos disponíveis${category ? ` na categoria ${category}` : ''}${filialId ? ' na unidade solicitada' : ''} para ${startDate} a ${endDate}.${suggestion}`;
       }
 
       const lines = rows.rows.map((r) => {
@@ -748,7 +894,7 @@ export async function answerWhatsAppMessage(messageText: string, options: RagOpt
   }
 
   const historyText = normalizeHistory(options.history);
-  const localContextText = await buildLocalContext(safeMessage);
+  const localContextText = await buildLocalContext(safeMessage, options.history);
 
   const r = await getRetriever();
   const docs = await r.invoke(safeMessage);

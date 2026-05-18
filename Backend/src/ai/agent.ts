@@ -215,6 +215,15 @@ function formatarHistoricoParaRouter(history: HistoryMessage[]): string {
     .join('\n');
 }
 
+function normalizarTextoBusca(texto: string): string {
+  return (texto || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/gi, ' ')
+    .trim();
+}
+
 async function resolverIntencaoComIA(
   mensagem: string,
   historico: HistoryMessage[],
@@ -279,11 +288,7 @@ function pareceReferenciaVeiculo(texto: string): boolean {
 }
 
 async function resolverVeiculoPorReferencia(referencia: string): Promise<{ id: string; placa: string; modelo: string } | null> {
-  const termo = (referencia || '')
-    .toLowerCase()
-    .replace(/foto(s)?\s+(do|da|de|dos|das)\s+/g, '')
-    .replace(/[^a-z0-9]+/gi, ' ')
-    .trim();
+  const termo = normalizarTextoBusca((referencia || '').replace(/foto(s)?\s+(do|da|de|dos|das)\s+/gi, ''));
 
   if (!termo) return null;
 
@@ -304,7 +309,7 @@ async function resolverVeiculoPorReferencia(referencia: string): Promise<{ id: s
   }));
 
   const encontrado = candidatos.find((item) => {
-    const alvo = `${item.placa} ${item.modelo}`.toLowerCase();
+    const alvo = normalizarTextoBusca(`${item.placa} ${item.modelo}`);
     return tokens.every((token) => alvo.includes(token));
   });
 
@@ -629,6 +634,12 @@ export async function atenderClienteComAgent(
     let respostaFinal = '';
     let fotosParaEnviar: string[] = [];
 
+    const textoPedeFoto = /\bfoto(s)?\b|\bimagem(ns)?\b|\bver\s+a\s+foto\b|\bmostrar\s+a\s+foto\b/i.test(mensagemSanitizada);
+
+    if (textoPedeFoto) {
+      intenao = 'VER_FOTOS';
+    }
+
     if (intenao === 'VER_FOTOS' && !params.veiculo_id) {
       const referenciaVeiculo = await resolverVeiculoPorReferencia(String(params.veiculo_ref || mensagemSanitizada));
       if (referenciaVeiculo) {
@@ -639,7 +650,7 @@ export async function atenderClienteComAgent(
     }
 
     if (intenao === 'LISTAR_CARROS' && !params.filial_id) {
-      const referenciaFilial = String(params.filial_ref || mensagemSanitizada);
+      const referenciaFilial = normalizarTextoBusca(String(params.filial_ref || mensagemSanitizada));
       const filialRes = await query(
         `SELECT id, nome, cidade, uf
          FROM filial
@@ -647,8 +658,7 @@ export async function atenderClienteComAgent(
          ORDER BY cidade, nome`,
       );
 
-      const termo = referenciaFilial.toLowerCase().replace(/[^a-z0-9]+/gi, ' ').trim();
-      const tokens = termo.split(/\s+/).filter((token) => token.length > 1);
+      const tokens = referenciaFilial.split(/\s+/).filter((token) => token.length > 1);
       const filialEncontrada = filialRes.rows
         .map((row) => ({
           id: String(row.id),
@@ -657,7 +667,7 @@ export async function atenderClienteComAgent(
           uf: String(row.uf || ''),
         }))
         .find((filial) => {
-          const alvo = `${filial.nome} ${filial.cidade} ${filial.uf}`.toLowerCase();
+          const alvo = normalizarTextoBusca(`${filial.nome} ${filial.cidade} ${filial.uf}`);
           return tokens.some((token) => alvo.includes(token));
         });
 
@@ -670,7 +680,7 @@ export async function atenderClienteComAgent(
       case 'LISTAR_FILIAIS': {
         const result = await toolListarFiliais();
         if (result.success && result.data) {
-          const filiais = result.data.slice(0, 5);
+          const filiais = result.data;
           if (filiais.length > 0) {
             respostaFinal = `Encontrei ${result.data.length} filial(is):\n${filiais.map(f => `• ${f.nome} - ${f.endereco}`).join('\n')}`;
           } else {
@@ -684,6 +694,18 @@ export async function atenderClienteComAgent(
       }
 
       case 'LISTAR_CARROS': {
+        if (!params.filial_id) {
+          const filiaisResult = await toolListarFiliais();
+          if (filiaisResult.success && filiaisResult.data && filiaisResult.data.length > 0) {
+            const filiais = filiaisResult.data;
+            respostaFinal = `Claro — me diga de qual filial você quer ver os carros. Aqui estão todas as filiais ativas:\n${filiais.map((f) => `• ${f.nome} - ${f.endereco}`).join('\n')}`;
+          } else {
+            respostaFinal = 'Claro — me diga de qual filial você quer ver os carros. Não consegui carregar a lista de filiais agora, mas posso tentar de novo se você quiser.';
+          }
+          toolsUsadas.push('listar_filiais');
+          break;
+        }
+
         const result = await toolListarCarrosDisponiveis(params);
         if (result.success && result.data && result.data.length > 0) {
           const carros = result.data.slice(0, 5);

@@ -419,8 +419,52 @@ async function getFiliais(): Promise<Array<{ id: string; nome: string; cidade: s
 }
 
 /**
- * Extrair filial do histórico de mensagens
+ * Buscar fotos de um veículo por modelo
  */
+async function getVeiculoFotos(modeloName: string): Promise<string[]> {
+  try {
+    if (!modeloName) return [];
+
+    const res = await query(
+      `
+      SELECT vi.filename
+      FROM veiculo_imagem vi
+      JOIN veiculo v ON v.id = vi.veiculo_id
+      JOIN modelo m ON m.id = v.modelo_id
+      WHERE m.nome ILIKE $1
+        AND vi.filename IS NOT NULL
+        AND v.deletado_em IS NULL
+        AND v.status != 'MANUTENCAO'
+      ORDER BY vi.is_principal DESC, vi.ordem ASC
+      LIMIT 5
+      `,
+      [`%${modeloName}%`],
+    );
+
+    // Retornar URLs das fotos (assumindo que ficam em pasta pública)
+    const baseUrl = process.env.UPLOAD_URL || 'https://driveconnect.com/uploads/carros';
+    return res.rows.map((row) => `${baseUrl}/${String(row.filename || '')}`);
+  } catch (err) {
+    console.error('[Agent] Erro ao buscar fotos do veículo:', err);
+    return [];
+  }
+}
+
+/**
+ * Detectar modelo mencionado na mensagem
+ */
+function detectModeloMencionado(messageText: string): string | null {
+  const t = normalizeText(messageText);
+  const modelos = ['hb20', 'gol', 'onix', 'kicks', 'tracker', 'corolla', 'tiguan', 'sportage'];
+  
+  for (const modelo of modelos) {
+    if (t.includes(modelo)) {
+      return modelo.charAt(0).toUpperCase() + modelo.slice(1);
+    }
+  }
+  
+  return null;
+}
 function extractFilialFromHistory(history?: HistoryMessage[]): string | null {
   if (!history || history.length === 0 || !filiaisCache) return null;
   const recentMessages = history.slice(-5).map((m) => m.content).join(' ');
@@ -1151,6 +1195,30 @@ export async function atenderClienteComAgent(
     let intencao = 'GENERICO';
     const tools_usadas: string[] = [];
     let paymentLink: string | undefined;
+    let fotos: string[] | undefined;
+
+    // Checar se cliente está pedindo foto de um veículo específico
+    if ((textoLower.includes('foto') || textoLower.includes('imagem') || textoLower.includes('mostre')) && 
+        (textoLower.includes('do ') || textoLower.includes('da '))) {
+      const modeloMencionado = detectModeloMencionado(mensagem);
+      if (modeloMencionado) {
+        const fotosEncontradas = await getVeiculoFotos(modeloMencionado);
+        if (fotosEncontradas.length > 0) {
+          fotos = fotosEncontradas;
+          intencao = 'VER_FOTOS';
+          tools_usadas.push('obter_fotos_veiculo');
+          
+          const resposta = `Aqui está a foto do ${modeloMencionado}! 📸`;
+          return {
+            resposta,
+            intencao,
+            tools_usadas,
+            fotos,
+            clienteId: options.clienteId,
+          };
+        }
+      }
+    }
 
     // Checar se é confirmação de reserva
     if (isReservationConfirmation(mensagem) && (options.history?.length || 0) > 0) {
@@ -1233,6 +1301,7 @@ export async function atenderClienteComAgent(
       resposta,
       intencao,
       tools_usadas,
+      fotos,
       clienteId: options.clienteId,
     };
   } catch (err) {

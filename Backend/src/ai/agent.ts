@@ -441,9 +441,16 @@ async function getVeiculoFotos(modeloName: string): Promise<string[]> {
       [`%${modeloName}%`],
     );
 
-    // Retornar URLs das fotos (assumindo que ficam em pasta pública)
-    const baseUrl = process.env.UPLOAD_URL || 'https://driveconnect.com/uploads/carros';
-    return res.rows.map((row) => `${baseUrl}/${String(row.filename || '')}`);
+    const publicBaseUrl = (
+      process.env.PUBLIC_STORAGE_URL ||
+      process.env.BACKEND_PUBLIC_URL ||
+      process.env.BACKEND_URL ||
+      process.env.API_URL ||
+      process.env.APP_URL ||
+      'https://driveconnect.com'
+    ).replace(/\/$/, '');
+
+    return res.rows.map((row) => `${publicBaseUrl}/storage/carros/${encodeURIComponent(String(row.filename || ''))}`);
   } catch (err) {
     console.error('[Agent] Erro ao buscar fotos do veículo:', err);
     return [];
@@ -458,7 +465,7 @@ function detectModeloMencionado(messageText: string, history?: HistoryMessage[])
   const recentText = normalizeText((history || []).slice(-5).map((m) => m.content).join(' '));
   const combined = `${t} ${recentText}`.trim();
 
-  const hasPronounReference = /\b(dele|dela|deles|dela|esse|essa|esse carro|esse veiculo|esse veículo|o carro|a foto dele|a foto dela)\b/.test(t);
+  const hasPronounReference = /\b(dele|dela|deles|esse|essa|esse carro|esse veiculo|esse veículo|o carro|a foto dele|a foto dela|desse|deste|daquele|daquela)\b/.test(t);
 
   const exactModels = [
     'hb20',

@@ -338,9 +338,18 @@ export async function processIncomingMessage(payload: any): Promise<void> {
       // Enviar foto se solicitada (apenas 1 foto)
       if (agentResult.fotos && agentResult.fotos.length > 0 && agentResult.fotos[0]) {
         const { sendImageByUrl } = await import('./whatsapp-media.service.js');
-        void sendImageByUrl(from, agentResult.fotos[0]).catch((err) => {
+        const messageId = await sendImageByUrl(from, agentResult.fotos[0]).catch((err) => {
           console.error('[WhatsApp] Erro ao enviar foto:', err);
+          return null;
         });
+
+        if (!messageId) {
+          const fallbackPhotoLink = agentResult.fotos[0];
+          const fallbackText = `Não consegui enviar a imagem diretamente agora, mas aqui está o link: ${fallbackPhotoLink}`;
+          await sendMessage(from, fallbackText).catch((err) => {
+            console.error('[WhatsApp] Erro enviando fallback da foto:', err);
+          });
+        }
       }
     } else {
       reply = sanitizeAiPaymentReply(await answerWhatsAppMessage(text, { history }));

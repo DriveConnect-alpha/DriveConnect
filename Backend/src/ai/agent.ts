@@ -525,6 +525,23 @@ function detectModeloMencionado(messageText: string, history?: HistoryMessage[])
 
   return null;
 }
+
+function isPhotoRequest(messageText: string): boolean {
+  const t = normalizeText(messageText);
+  return (
+    t.includes('foto') ||
+    t.includes('imagem') ||
+    t.includes('mostre') ||
+    t.includes('mostrar') ||
+    t.includes('ver a foto') ||
+    t.includes('mandar foto') ||
+    t.includes('enviar foto') ||
+    t.includes('foto desse') ||
+    t.includes('foto deste') ||
+    t.includes('foto da') ||
+    t.includes('foto do')
+  );
+}
 function extractFilialFromHistory(history?: HistoryMessage[]): string | null {
   if (!history || history.length === 0 || !filiaisCache) return null;
   const recentMessages = history.slice(-5).map((m) => m.content).join(' ');
@@ -1256,10 +1273,10 @@ export async function atenderClienteComAgent(
     const tools_usadas: string[] = [];
     let paymentLink: string | undefined;
     let fotos: string[] | undefined;
+    const photoRequest = isPhotoRequest(mensagem);
 
     // Checar se cliente está pedindo foto de um veículo específico
-    if ((textoLower.includes('foto') || textoLower.includes('imagem') || textoLower.includes('mostre')) &&
-        (textoLower.includes('do ') || textoLower.includes('da ') || textoLower.includes('dele') || textoLower.includes('dela') || textoLower.includes('desse') || textoLower.includes('dessa') || textoLower.includes('ele') || textoLower.includes('ela'))) {
+    if (photoRequest) {
       const modeloMencionado = detectModeloMencionado(mensagem, options.history || []);
       if (modeloMencionado) {
         const fotosEncontradas = await getVeiculoFotos(modeloMencionado);
@@ -1277,7 +1294,20 @@ export async function atenderClienteComAgent(
             clienteId: options.clienteId,
           };
         }
+        return {
+          resposta: `Encontrei o ${modeloMencionado}, mas não consegui localizar uma foto disponível no momento. Se quiser, posso te passar os detalhes dele ou tentar outra imagem.`,
+          intencao: 'VER_FOTOS',
+          tools_usadas: ['obter_fotos_veiculo'],
+          clienteId: options.clienteId,
+        };
       }
+
+      return {
+        resposta: 'Consigo te enviar a foto, mas preciso identificar qual veículo você quer. Pode me mandar o modelo, por exemplo: "foto do A4 Audi".',
+        intencao: 'VER_FOTOS',
+        tools_usadas: ['obter_fotos_veiculo'],
+        clienteId: options.clienteId,
+      };
     }
 
     // Checar se é confirmação de reserva
@@ -1307,7 +1337,7 @@ export async function atenderClienteComAgent(
     }
 
     // Flow padrão: coletar dados e propor confirmação
-    if (textoLower.includes('reserv') || textoLower.includes('alugar') || textoLower.includes('quero')) {
+    if (!photoRequest && (textoLower.includes('reserv') || textoLower.includes('alugar') || textoLower.includes('quero'))) {
       // Extrair dados da reserva
       const reservationData = await extractReservationDataFromHistory(mensagem, options.history || []);
       

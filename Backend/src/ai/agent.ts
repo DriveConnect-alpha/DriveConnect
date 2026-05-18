@@ -780,17 +780,34 @@ async function buildLocalContext(
   messageText: string,
   history?: HistoryMessage[],
 ): Promise<string> {
-  if (!shouldUseLocalDb(messageText)) return '';
+  // Verificar se precisa usar BD local
+  const useLocalDb = shouldUseLocalDb(messageText);
+  
+  // Extrair datas da mensagem atual ou histórico
+  let { startDate, endDate } = extractDateRange(messageText);
+  if (!startDate || !endDate) {
+    // Tentar extrair do histórico se não acharam na mensagem atual
+    const historyText = (history || []).map(m => m.content).join(' ');
+    const historyDates = extractDateRange(historyText);
+    if (historyDates.startDate && historyDates.endDate) {
+      startDate = historyDates.startDate;
+      endDate = historyDates.endDate;
+    }
+  }
 
-  const { startDate, endDate } = extractDateRange(messageText);
-  const category = await detectCategory(messageText);
-  // Tentar detectar filial na mensagem atual, senão usar do histórico
+  // Extrair filial (sempre tenta histórico como fallback)
   let filialId = await detectFilialId(messageText);
   if (!filialId) {
     filialId = extractFilialFromHistory(history) || null;
   }
 
-  if (startDate && endDate) {
+  // Extrair categoria
+  const category = await detectCategory(messageText);
+
+  // Se tem datas E filial E mensagem menciona veículo/disponibilidade, SEMPRE busca BD
+  const shouldQueryDb = useLocalDb && (startDate && endDate && filialId);
+
+  if (shouldQueryDb && filialId) {
     try {
       const rows = await query(
         `
@@ -823,16 +840,19 @@ async function buildLocalContext(
 
       if (rows.rowCount === 0) {
         // Sugerir datas alternativas
-        const alternatives = await suggestAlternativeDates(startDate, endDate, filialId!);
-        let suggestion = '';
-        if (alternatives.dates.length > 0) {
-          const altDates = alternatives.dates
-            .slice(0, 2)
-            .map((d) => `${d.start.split('-')[2]} a ${d.end.split('-')[2]} de ${getMonthName(d.start)}`)
-            .join(' ou ');
-          suggestion = `\n\nAlternativa: temos disponibilidade em ${altDates}. Interesse?`;
+        if (startDate && endDate) {
+          const alternatives = await suggestAlternativeDates(startDate, endDate, filialId as string);
+          let suggestion = '';
+          if (alternatives.dates.length > 0) {
+            const altDates = alternatives.dates
+              .slice(0, 2)
+              .map((d) => `${d.start.split('-')[2]} a ${d.end.split('-')[2]} de ${getMonthName(d.start)}`)
+              .join(' ou ');
+            suggestion = `\n\nAlternativa: temos disponibilidade em ${altDates}. Interesse?`;
+          }
+          return `Consulta do sistema: não encontrei veículos disponíveis${category ? ` na categoria ${category}` : ''} na unidade solicitada para ${startDate} a ${endDate}.${suggestion}`;
         }
-        return `Consulta do sistema: não encontrei veículos disponíveis${category ? ` na categoria ${category}` : ''}${filialId ? ' na unidade solicitada' : ''} para ${startDate} a ${endDate}.${suggestion}`;
+        return `Consulta do sistema: não encontrei veículos disponíveis${category ? ` na categoria ${category}` : ''} para as datas solicitadas.`;
       }
 
       const lines = rows.rows.map((r) => {
@@ -854,6 +874,9 @@ ${lines.join('\n')}`;
       return 'Consulta do sistema indisponível no momento para disponibilidade. Pode informar unidade e datas novamente?';
     }
   }
+
+  // Se não tem datas/filial, mostrar catálogo genérico
+  if (!useLocalDb) return '';
 
   let categorias;
   let modelos;

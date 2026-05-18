@@ -221,6 +221,7 @@ function normalizarTextoBusca(texto: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/gi, ' ')
+    .replace(/\b(?:r|rs|reais|dia|diaria|diario|por|foto|fotos|imagem|imagens|do|da|de|dos|das|o|a|um|uma|esse|essa|ai|aí)\b/g, ' ')
     .trim();
 }
 
@@ -288,7 +289,13 @@ function pareceReferenciaVeiculo(texto: string): boolean {
 }
 
 async function resolverVeiculoPorReferencia(referencia: string): Promise<{ id: string; placa: string; modelo: string } | null> {
-  const termo = normalizarTextoBusca((referencia || '').replace(/foto(s)?\s+(do|da|de|dos|das)\s+/gi, ''));
+  const semPreco = (referencia || '')
+    .replace(/r\$\s*\d+[\d.,]*/gi, ' ')
+    .replace(/\d+[\d.,]*/g, ' ')
+    .replace(/\/dia|por\s+dia|diária|diaria/gi, ' ')
+    .replace(/foto(s)?\s+(do|da|de|dos|das)\s+/gi, ' ');
+
+  const termo = normalizarTextoBusca(semPreco);
 
   if (!termo) return null;
 
@@ -308,12 +315,28 @@ async function resolverVeiculoPorReferencia(referencia: string): Promise<{ id: s
     modelo: `${row.marca || ''} ${row.modelo || ''}`.trim(),
   }));
 
-  const encontrado = candidatos.find((item) => {
+  const pontuado = candidatos
+    .map((item) => {
+      const alvo = normalizarTextoBusca(`${item.placa} ${item.modelo}`);
+      const score = tokens.reduce((total, token) => total + (alvo.includes(token) ? 1 : 0), 0);
+      const matchExato = alvo === termo ? 3 : 0;
+      return { item, score: score + matchExato };
+    })
+    .filter((candidate) => candidate.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  const encontrado = pontuado[0]?.item || null;
+
+  if (encontrado) {
+    return encontrado;
+  }
+
+  const porModeloUnico = candidatos.find((item) => {
     const alvo = normalizarTextoBusca(`${item.placa} ${item.modelo}`);
-    return tokens.every((token) => alvo.includes(token));
+    return tokens.some((token) => alvo.includes(token));
   });
 
-  return encontrado || null;
+  return porModeloUnico || null;
 }
 
 function extrairParametros(texto: string, intenao: Intenao): ParametrosExtraidos {

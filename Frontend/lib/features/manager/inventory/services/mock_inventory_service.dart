@@ -30,7 +30,7 @@ class MockInventoryService implements IInventoryService {
   }
 
   @override
-  Future<void> updateVehicle(String id, {int? modeloId, String? filialId, String? placa, int? ano, String? cor, String? status}) async {
+  Future<void> updateVehicle(String id, {int? modeloId, String? filialId, String? placa, int? ano, String? cor, String? status, XFile? image, bool? removerImagem}) async {
     await Future.delayed(const Duration(seconds: 1));
   }
 }

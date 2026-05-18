@@ -3,12 +3,128 @@
  * Integração com agent para enviar fotos de veículos
  */
 
+import fs from 'fs';
+import path from 'path';
+
 function mustGetEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
     throw new Error(`Environment variable ${name} is required`);
   }
   return value;
+}
+
+function getMimeTypeFromFilename(filename: string): string {
+  const ext = path.extname(filename).toLowerCase();
+  if (ext === '.png') return 'image/png';
+  if (ext === '.webp') return 'image/webp';
+  if (ext === '.gif') return 'image/gif';
+  if (ext === '.bmp') return 'image/bmp';
+  return 'image/jpeg';
+}
+
+function deriveLocalStoragePath(imageUrl: string): string | null {
+  try {
+    const parsed = new URL(imageUrl);
+    const pathname = parsed.pathname || '';
+    const storagePrefix = '/storage/carros/';
+    const uploadsPrefix = '/uploads/carros/';
+
+    let filename = '';
+    if (pathname.startsWith(storagePrefix)) {
+      filename = pathname.slice(storagePrefix.length);
+    } else if (pathname.startsWith(uploadsPrefix)) {
+      filename = pathname.slice(uploadsPrefix.length);
+    }
+
+    if (!filename) return null;
+    return path.join(process.cwd(), 'uploads', 'carros', decodeURIComponent(filename));
+  } catch {
+    return null;
+  }
+}
+
+async function sendImageFromLocalFile(
+  to: string,
+  localFilePath: string,
+  caption?: string,
+): Promise<string | null> {
+  const graphApiVersion = process.env.WHATSAPP_GRAPH_API_VERSION ?? process.env.GRAPH_API_VERSION ?? 'v19.0';
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN ?? process.env.ACCESS_TOKEN ?? mustGetEnv('WHATSAPP_ACCESS_TOKEN');
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID ?? process.env.PHONE_NUMBER_ID ?? mustGetEnv('WHATSAPP_PHONE_NUMBER_ID');
+
+  if (!fs.existsSync(localFilePath)) {
+    return null;
+  }
+
+  const fileBuffer = fs.readFileSync(localFilePath);
+  const mimeType = getMimeTypeFromFilename(localFilePath);
+  const fileName = path.basename(localFilePath);
+
+  try {
+    const form = new FormData();
+    form.append('messaging_product', 'whatsapp');
+    form.append('type', 'image');
+    form.append('file', new Blob([fileBuffer], { type: mimeType }), fileName);
+
+    const uploadResponse = await fetch(
+      `https://graph.facebook.com/${graphApiVersion}/${phoneNumberId}/media`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: form,
+      },
+    );
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      console.error(`[WhatsApp] Erro ao enviar mídia local: ${uploadResponse.status} - ${errorText}`);
+      return null;
+    }
+
+    const uploadData = (await uploadResponse.json()) as { id?: string };
+    const mediaId = uploadData?.id;
+    if (!mediaId) return null;
+
+    const payload: any = {
+      messaging_product: 'whatsapp',
+      to,
+      type: 'image',
+      image: {
+        id: mediaId,
+      },
+    };
+
+    if (caption) {
+      payload.image.caption = caption;
+    }
+
+    const sendResponse = await fetch(
+      `https://graph.facebook.com/${graphApiVersion}/${phoneNumberId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+
+    if (!sendResponse.ok) {
+      const errorText = await sendResponse.text();
+      console.error(`[WhatsApp] Erro ao disparar imagem por mídia: ${sendResponse.status} - ${errorText}`);
+      return null;
+    }
+
+    const responseData = (await sendResponse.json()) as { messages?: { id: string }[] };
+    return responseData?.messages?.[0]?.id || null;
+  } catch (err) {
+    console.error('[WhatsApp] Erro ao enviar imagem por mídia local:', err);
+    return null;
+  }
 }
 
 /**
@@ -68,11 +184,27 @@ export async function sendImageByUrl(
     } else {
       const errorText = await response.text();
       console.error(`[WhatsApp] Erro ao enviar imagem: ${response.status} - ${errorText}`);
+      const localPath = deriveLocalStoragePath(imageUrl);
+      if (localPath) {
+        const fallbackId = await sendImageFromLocalFile(to, localPath, caption);
+        if (fallbackId) {
+          console.log(`[WhatsApp] Imagem enviada via mídia local para ${to} | ID: ${fallbackId}`);
+          return fallbackId;
+        }
+      }
       return null;
     }
   } catch (err) {
     clearTimeout(timeout);
     console.error(`[WhatsApp] Erro ao enviar imagem:`, err);
+    const localPath = deriveLocalStoragePath(imageUrl);
+    if (localPath) {
+      const fallbackId = await sendImageFromLocalFile(to, localPath, caption);
+      if (fallbackId) {
+        console.log(`[WhatsApp] Imagem enviada via mídia local para ${to} | ID: ${fallbackId}`);
+        return fallbackId;
+      }
+    }
     return null;
   }
 }

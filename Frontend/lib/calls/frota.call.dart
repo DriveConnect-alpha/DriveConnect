@@ -252,22 +252,49 @@ class FrotaCall {
     int? ano,
     String? cor,
     String? status,
+    XFile? imagem,
+    bool? removerImagem,
     required void Function(Map<String, dynamic> data) onSuccess,
     required void Function(String message) onError,
   }) async {
     try {
-      final response = await dioClient.put<Map<String, dynamic>>(
-        '/veiculos/$id',
-        data: {
+      // If an image is provided or the caller requests image removal, use FormData.
+      if (imagem != null || removerImagem == true) {
+        final Map<String, dynamic> map = {
           if (modeloId != null) 'modelo_id': modeloId,
           if (filialId != null) 'filial_id': filialId,
           if (placa != null) 'placa': placa,
           if (ano != null) 'ano': ano,
           if (cor != null) 'cor': cor,
           if (status != null) 'status': status,
-        },
-      );
-      onSuccess(response.data!);
+          if (removerImagem == true) 'remover_imagem': true,
+        };
+
+        if (imagem != null) {
+          final bytes = await imagem.readAsBytes();
+          final filename = imagem.name.isNotEmpty ? imagem.name : imagem.path.split('/').last;
+          map['imagem'] = MultipartFile.fromBytes(bytes, filename: filename);
+        }
+
+        final response = await dioClient.put<Map<String, dynamic>>(
+          '/veiculos/$id',
+          data: FormData.fromMap(map, ListFormat.multiCompatible),
+        );
+        onSuccess(response.data!);
+      } else {
+        final response = await dioClient.put<Map<String, dynamic>>(
+          '/veiculos/$id',
+          data: {
+            if (modeloId != null) 'modelo_id': modeloId,
+            if (filialId != null) 'filial_id': filialId,
+            if (placa != null) 'placa': placa,
+            if (ano != null) 'ano': ano,
+            if (cor != null) 'cor': cor,
+            if (status != null) 'status': status,
+          },
+        );
+        onSuccess(response.data!);
+      }
     } on DioException catch (e) {
       handleApiError(e, onError);
     } catch (e) {

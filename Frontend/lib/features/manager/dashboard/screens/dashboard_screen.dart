@@ -192,6 +192,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     _buildActionCard(context, 'Reservas', Symbols.list_alt, '/manager/reservations'),
                     _buildActionCard(context, 'Inventário', Symbols.inventory_2, '/manager/inventory'),
                     _buildActionCard(context, 'Clientes', Symbols.group, '/manager/clients'),
+                    _buildActionCard(context, 'Filiais', Symbols.store, '/manager/filiais'),
                     _buildActionCard(context, 'Seguros', Symbols.shield, '/manager/insurance'),
                     if (authProvider.isAdmin)
                       _buildActionCard(context, 'Usuários', Symbols.admin_panel_settings, '/manager/admin/users'),

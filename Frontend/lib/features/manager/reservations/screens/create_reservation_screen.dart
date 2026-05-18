@@ -307,7 +307,7 @@ class _CreateReservationScreenState extends State<CreateReservationScreen> {
           fetchData: (onSuccess, onError) => GerenteCall.listarClientes(onSuccess: onSuccess, onError: onError),
           itemBuilder: (item) => ListTile(
             title: Text(item['nome_completo']),
-            subtitle: Text(item['cpf']),
+            subtitle: Text(item['usuario']?['email'] ?? 'Sem e-mail'),
             onTap: () {
               setState(() => _selectedClient = item);
               Navigator.pop(context);

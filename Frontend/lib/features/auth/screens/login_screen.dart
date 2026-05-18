@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/widgets/dc_button.dart';
 import '../../../core/widgets/dc_text_field.dart';
 import '../../../core/providers/auth_provider.dart';
@@ -67,10 +68,13 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 60),
-                Icon(
-                  Icons.directions_car_filled,
-                  size: 80,
-                  color: theme.colorScheme.primary,
+                SvgPicture.asset(
+                  'assets/logodrive.svg',
+                  height: 80,
+                  colorFilter: ColorFilter.mode(
+                    theme.colorScheme.primary,
+                    BlendMode.srcIn,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Text(

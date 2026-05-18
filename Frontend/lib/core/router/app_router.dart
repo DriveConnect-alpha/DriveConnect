@@ -24,6 +24,7 @@ import '../../features/manager/inventory/screens/edit_vehicle_screen.dart';
 import '../../features/manager/clients/screens/clients_screen.dart';
 import '../../features/manager/insurance/screens/insurance_screen.dart';
 import '../../features/manager/settings/screens/manager_settings_screen.dart';
+import '../../features/manager/filiais/screens/filiais_screen.dart';
 import '../../features/admin/screens/admin_users_screen.dart';
 import '../../features/admin/screens/admin_create_manager_screen.dart';
 import '../../features/admin/screens/admin_whatsapp_conversations_screen.dart';
@@ -130,6 +131,10 @@ class AppRouter {
           GoRoute(
             path: 'admin/atendimentos',
             builder: (context, state) => const AdminWhatsAppConversationsScreen(),
+          ),
+          GoRoute(
+            path: 'filiais',
+            builder: (context, state) => const FiliaisScreen(),
           ),
         ],
       ),

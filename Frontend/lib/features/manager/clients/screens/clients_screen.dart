@@ -38,9 +38,8 @@ class _ClientsScreenState extends State<ClientsScreen> {
     final query = _searchQuery.toLowerCase();
     return clientes.where((cliente) {
       final name = cliente.nomeCompleto.toLowerCase();
-      final cpf = cliente.cpf.toLowerCase();
       final email = cliente.usuario?.email.toLowerCase() ?? '';
-      return name.contains(query) || cpf.contains(query) || email.contains(query);
+      return name.contains(query) || email.contains(query);
     }).toList();
   }
 
@@ -111,7 +110,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                                 style: const TextStyle(fontSize: 14),
                                 decoration: InputDecoration(
                                   labelText: 'Buscar clientes',
-                                  hintText: 'Nome, CPF ou E-mail',
+                                  hintText: 'Nome ou E-mail',
                                   isDense: true,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                   prefixIcon: const Icon(Symbols.search, size: 20),
@@ -195,13 +194,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                                   child: imageUrl == null ? const Icon(Symbols.person) : null,
                                 ),
                                 title: Text(cliente.nomeCompleto),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(cliente.usuario?.email ?? 'Sem e-mail'),
-                                    Text('CPF: ${cliente.cpf}'),
-                                  ],
-                                ),
+                                subtitle: Text(cliente.usuario?.email ?? 'Sem e-mail'),
                                 trailing: const Icon(Symbols.chevron_right),
                                 onTap: () {
                                   context.push(

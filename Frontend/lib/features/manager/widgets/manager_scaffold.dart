@@ -36,6 +36,7 @@ class ManagerScaffold extends StatelessWidget {
         {'icon': Symbols.chat, 'label': 'Atendimentos', 'path': '/manager/admin/atendimentos'},
       {'icon': Symbols.book_online, 'label': 'Reservas', 'path': '/manager/reservations'},
       {'icon': Symbols.inventory_2, 'label': 'Inventário', 'path': '/manager/inventory'},
+      {'icon': Symbols.store, 'label': 'Filiais', 'path': '/manager/filiais'},
       {'icon': Symbols.group, 'label': 'Clientes', 'path': '/manager/clients'},
       {'icon': Symbols.shield, 'label': 'Seguros', 'path': '/manager/insurance'},
       {'icon': Symbols.settings, 'label': 'Ajustes', 'path': '/manager/settings'},

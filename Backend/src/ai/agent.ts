@@ -768,6 +768,63 @@ export async function answerWhatsAppMessage(messageText: string, options: RagOpt
   return (responseText || '').toString().trim();
 }
 
+/**
+ * Função principal: Atender mensagem do cliente via RAG + tools
+ */
+export async function atenderClienteComAgent(
+  mensagem: string,
+  options: { history?: HistoryMessage[]; clienteId?: string; telefone?: string } = {},
+): Promise<{
+  resposta: string;
+  intencao: string;
+  tools_usadas: string[];
+  fotos?: string[];
+  clienteId?: string;
+}> {
+  try {
+    // Usa a função RAG com histórico
+    const resposta = await answerWhatsAppMessage(mensagem, {
+      history: options.history || [],
+    });
+
+    // Detectar intenção baseado no conteúdo
+    const textoLower = mensagem.toLowerCase();
+    let intencao = 'GENERICO';
+    const tools_usadas: string[] = [];
+
+    if (textoLower.includes('foto') || textoLower.includes('imagem')) {
+      intencao = 'VER_FOTOS';
+      tools_usadas.push('obter_fotos_veiculo');
+    } else if (textoLower.includes('dispon') || textoLower.includes('modelo') || textoLower.includes('carro')) {
+      intencao = 'LISTAR_CARROS';
+      tools_usadas.push('listar_carros_disponiveis');
+    } else if (textoLower.includes('filial') || textoLower.includes('unidade') || textoLower.includes('local')) {
+      intencao = 'LISTAR_FILIAIS';
+      tools_usadas.push('listar_filiais');
+    } else if (textoLower.includes('preço') || textoLower.includes('preco') || textoLower.includes('valor')) {
+      intencao = 'COTACAO';
+    } else if (textoLower.includes('reserv') || textoLower.includes('alugar')) {
+      intencao = 'CRIAR_RESERVA';
+      tools_usadas.push('criar_reserva');
+    }
+
+    return {
+      resposta,
+      intencao,
+      tools_usadas,
+      clienteId: options.clienteId,
+    };
+  } catch (err) {
+    console.error('[Agent] Erro ao atender cliente:', err);
+    return {
+      resposta: 'Desculpe, tive um problema ao processar sua solicitação. Pode tentar novamente em instantes?',
+      intencao: 'ERROR',
+      tools_usadas: [],
+      clienteId: options.clienteId,
+    };
+  }
+}
+
 // EXPORTS
 export {
   validateClientExists,

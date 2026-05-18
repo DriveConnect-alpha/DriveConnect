@@ -300,35 +300,51 @@ function extractPtBrLongDates(messageText: string): { startDate: string | null; 
     const yyyy = String(yyyyRaw);
     if (!mm) return null;
     if (!/^\d{2}$/.test(dd) || !/^\d{2}$/.test(mm) || !/^20\d{2}$/.test(yyyy)) return null;
-    return `${yyyy}-${mm}-${dd}`;
+    const result = `${yyyy}-${mm}-${dd}`;
+    return isValidDate(result) ? result : null;
   };
 
-  // "15 a 16 de maio de 2026"
-  const range = t.match(/\b(\d{1,2})\s*(?:a|ate|até|e|-|–|—)\s*(\d{1,2})\s*de\s*(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*de\s*(20\d{2})\b/);
+  // Padrão 1: "15 a 16 de maio de 2026"
+  const range = t.match(/\b(\d{1,2})\s*(?:a|ate|até|-|–|—)\s*(\d{1,2})\s*de\s*(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*(?:de\s*)?(20\d{2})?\b/);
   if (range) {
     const ddStart = range[1];
     const ddEnd = range[2];
     const monthName = range[3];
-    const yyyy = range[4];
-    if (!ddStart || !ddEnd || !monthName || !yyyy) return { startDate: null, endDate: null };
+    const yyyy = range[4] || String(new Date().getFullYear());
+    if (!ddStart || !ddEnd || !monthName) return { startDate: null, endDate: null };
     return {
       startDate: toIso(ddStart, monthName, yyyy),
       endDate: toIso(ddEnd, monthName, yyyy),
     };
   }
 
-  // duas datas completas no texto
-  const regex = /\b(\d{1,2})\s*(?:de\s*)?(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*(?:de\s*)?(20\d{2})\b/g;
+  // Padrão 2: "retirada 18 de maio de 2026 e devolução 20 de maio de 2026"
+  const twoFullPattern = t.match(/(?:retirada|saida)?\s*(\d{1,2})\s*de\s*(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*de\s*(20\d{2})\s+(?:e|devolucao|devolvao|retorno)+\s+(\d{1,2})\s*de\s*(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*(?:de\s*)?(20\d{2})?/);
+  if (twoFullPattern) {
+    const ddStart = twoFullPattern[1]!;
+    const monthStart = twoFullPattern[2]!;
+    const yyyyStart = twoFullPattern[3]!;
+    const ddEnd = twoFullPattern[4]!;
+    const monthEnd = twoFullPattern[5]!;
+    const yyyyEnd = twoFullPattern[6] || yyyyStart;
+    
+    const startDate = toIso(ddStart, monthStart, yyyyStart);
+    const endDate = toIso(ddEnd, monthEnd, yyyyEnd);
+    if (startDate && endDate) {
+      return { startDate, endDate };
+    }
+  }
+
+  // Padrão 3: Duas datas completas no texto (fallback)
+  const regex = /\b(\d{1,2})\s*de\s*(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*de\s*(20\d{2})\b/g;
   const dates: string[] = [];
   for (const m of t.matchAll(regex)) {
     const iso = toIso(String(m[1]), String(m[2]), String(m[3]));
     if (iso) dates.push(iso);
-    if (dates.length >= 2) break;
   }
-  if (dates.length >= 1) {
-    const startDate = dates[0] ?? null;
-    const endDate = (dates[1] ?? dates[0]) ?? null;
-    return { startDate, endDate };
+  
+  if (dates.length >= 2) {
+    return { startDate: dates[0]!, endDate: dates[1]! };
   }
 
   return { startDate: null, endDate: null };
@@ -336,14 +352,24 @@ function extractPtBrLongDates(messageText: string): { startDate: string | null; 
 
 function extractDateRange(messageText: string): { startDate: string | null; endDate: string | null } {
   const raw = messageText || '';
+  
+  // Tentar formato numérico primeiro (DD/MM/YYYY ou YYYY-MM-DD)
   const matches = raw.match(/\b(\d{1,2}\/\d{1,2}\/20\d{2}|20\d{2}-\d{2}-\d{2})\b/g);
-  if (matches && matches.length > 0) {
+  if (matches && matches.length >= 2) {
     const startDate = parseDateToIso(matches[0]);
-    const endDate = parseDateToIso(matches[1] || matches[0]);
-    return { startDate, endDate };
+    const endDate = parseDateToIso(matches[1] || null);
+    if (startDate && endDate) {
+      return { startDate, endDate };
+    }
   }
+  
+  // Tentar formato em português (dia mês ano)
   const long = extractPtBrLongDates(raw);
-  if (long.startDate || long.endDate) return long;
+  if (long.startDate && long.endDate) {
+    return long;
+  }
+  
+  // Se só encontrou uma data, retorna null para forçar pedido de confirmação
   return { startDate: null, endDate: null };
 }
 
@@ -879,6 +905,175 @@ ${lines.join('\n')}`;
   return `Consulta do sistema:\n${parts.join('\n\n')}`;
 }
 
+/**
+ * Tipo para rastrear dados coletados durante o flow de reserva
+ */
+type ReservationData = {
+  filialId?: string;
+  filialNome?: string;
+  modeloId?: string;
+  modeloNome?: string;
+  startDate?: string;
+  endDate?: string;
+  clienteNome?: string;
+  clienteCpf?: string;
+  clienteEmail?: string;
+  clientePhone?: string;
+  precoTotal?: number;
+  confirmacaoAguardando?: boolean;
+};
+
+/**
+ * Extrai dados de reserva do histórico e mensagem atual
+ */
+async function extractReservationDataFromHistory(
+  currentMessage: string,
+  history: HistoryMessage[] = [],
+): Promise<ReservationData> {
+  const data: ReservationData = {};
+
+  // Verificar últimas mensagens para coletar dados
+  const allMessages = [...(history || []), { role: 'user' as const, content: currentMessage }];
+  const messagesToCheck = allMessages.slice(-10); // Últimas 10 mensagens
+
+  // Procurar filial mencionada
+  for (const msg of messagesToCheck) {
+    if (msg.role === 'user') {
+      const t = normalizeText(msg.content);
+      
+      // Detectar filial
+      if (!data.filialId) {
+        const filialInfo = await detectFilialId(msg.content);
+        if (filialInfo) {
+          data.filialId = filialInfo;
+        }
+      }
+
+      // Detectar modelo/veículo
+      if (!data.modeloNome) {
+        if (t.includes('hb20')) data.modeloNome = 'HB20';
+        else if (t.includes('gol')) data.modeloNome = 'Gol';
+        else if (t.includes('onix')) data.modeloNome = 'Onix';
+        else if (t.includes('kicks')) data.modeloNome = 'Kicks';
+        else if (t.includes('tracker')) data.modeloNome = 'Tracker';
+      }
+
+      // Detectar datas
+      if (!data.startDate || !data.endDate) {
+        const dates = extractDateRange(msg.content);
+        if (dates.startDate && dates.endDate) {
+          data.startDate = dates.startDate;
+          data.endDate = dates.endDate;
+        }
+      }
+
+      // Detectar cliente (CPF, email, phone)
+      if (!data.clienteCpf) {
+        const cpfMatch = msg.content.match(/\b(\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{11})\b/);
+        if (cpfMatch) data.clienteCpf = cpfMatch[1];
+      }
+
+      if (!data.clienteEmail) {
+        const emailMatch = msg.content.match(/([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i);
+        if (emailMatch) data.clienteEmail = emailMatch[1];
+      }
+
+      if (!data.clientePhone) {
+        const phoneMatch = msg.content.match(/(?:\+55|0)?[\s.-]?(\d{2})[\s.-]?(\d{4,5})[\s.-]?(\d{4})/);
+        if (phoneMatch) data.clientePhone = msg.content.match(/[\d\s\-().+]+/)?.[0] || '';
+      }
+
+      // Detectar nome
+      if (!data.clienteNome) {
+        const palavras = msg.content.split(/\s+/);
+        for (const p of palavras) {
+          if (p.length > 3 && /^[A-Za-zÀ-ÿ]+$/i.test(p)) {
+            data.clienteNome = p;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return data;
+}
+
+/**
+ * Formata dados de reserva para confirmação visual
+ */
+async function formatReservationConfirmation(data: ReservationData): Promise<string> {
+  const partes: string[] = ['*Confirmação da sua reserva:*'];
+
+  if (data.filialNome) {
+    partes.push(`📍 Unidade: ${data.filialNome}`);
+  }
+
+  if (data.modeloNome) {
+    partes.push(`🚗 Veículo: ${data.modeloNome}`);
+  }
+
+  if (data.startDate && data.endDate) {
+    const start = new Date(data.startDate);
+    const end = new Date(data.endDate);
+    const dias = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    partes.push(
+      `📅 Período: ${start.toLocaleDateString('pt-BR')} até ${end.toLocaleDateString('pt-BR')} (${dias} dia${dias > 1 ? 's' : ''})`,
+    );
+  }
+
+  if (data.precoTotal) {
+    partes.push(`💰 Valor total: R$ ${(data.precoTotal / 100).toFixed(2).replace('.', ',')}`);
+  }
+
+  if (data.clienteNome || data.clienteCpf || data.clienteEmail) {
+    const cliente = [data.clienteNome, data.clienteCpf, data.clienteEmail].filter(Boolean).join(' / ');
+    if (cliente) {
+      partes.push(`👤 Dados: ${cliente}`);
+    }
+  }
+
+  partes.push('\nResponda com *SIM* ou *CONFIRMAR* para prosseguir com o pagamento.');
+
+  return partes.join('\n');
+}
+
+/**
+ * Verifica se mensagem é confirmação de reserva
+ */
+function isReservationConfirmation(messageText: string): boolean {
+  const t = normalizeText(messageText);
+  return (
+    t.includes('sim') ||
+    t.includes('confirmar') ||
+    t.includes('pronto') ||
+    t.includes('ok') ||
+    t.includes('pode ser') ||
+    t.includes('pode prosseguir') ||
+    t.includes('segue') ||
+    t.includes('blz')
+  );
+}
+
+/**
+ * Gera link de pagamento para reserva
+ */
+async function generatePaymentLink(data: ReservationData, clienteId?: string): Promise<string> {
+  try {
+    // Aqui você integraria com seu sistema de pagamento (Stripe, MercadoPago, etc)
+    // Por exemplo, salvando a reserva e gerando um link de checkout
+    
+    // Placeholder: simular link de pagamento
+    const reservaId = clienteId || 'RES_' + Date.now();
+    const paymentLink = `${process.env.APP_URL || 'https://driveconnect.com'}/checkout/${reservaId}`;
+    
+    return paymentLink;
+  } catch (err) {
+    console.error('[Agent] Erro ao gerar link de pagamento:', err);
+    return '';
+  }
+}
+
 export async function answerWhatsAppMessage(messageText: string, options: RagOptions = {}): Promise<string> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY não configurada.');
@@ -926,18 +1121,78 @@ export async function atenderClienteComAgent(
   tools_usadas: string[];
   fotos?: string[];
   clienteId?: string;
+  paymentLink?: string;
 }> {
   try {
-    // Usa a função RAG com histórico
+    const textoLower = mensagem.toLowerCase();
+    let intencao = 'GENERICO';
+    const tools_usadas: string[] = [];
+    let paymentLink: string | undefined;
+
+    // Checar se é confirmação de reserva
+    if (isReservationConfirmation(mensagem) && (options.history?.length || 0) > 0) {
+      // Procurar se há uma reserva em confirmação no histórico
+      const ultimasAssistente = options.history?.filter(m => m.role === 'assistant').slice(-1)[0];
+      if (ultimasAssistente && ultimasAssistente.content.includes('Confirmação da sua reserva')) {
+        // Extrair dados da reserva anterior
+        const reservationData = await extractReservationDataFromHistory(mensagem, options.history || []);
+        
+        // Gerar link de pagamento
+        if (reservationData.startDate && reservationData.endDate && reservationData.modeloNome) {
+          paymentLink = await generatePaymentLink(reservationData, options.clienteId);
+          intencao = 'CONFIRMAR_RESERVA';
+          tools_usadas.push('gerar_link_pagamento');
+          
+          const resposta = `Ótimo! 🎉 Sua reserva foi confirmada!\n\n*Link de pagamento:*\n${paymentLink}\n\nClique no link para finalizar o pagamento. Qualquer dúvida, pode contar comigo!`;
+          return {
+            resposta,
+            intencao,
+            tools_usadas,
+            clienteId: options.clienteId,
+            paymentLink,
+          };
+        }
+      }
+    }
+
+    // Flow padrão: coletar dados e propor confirmação
+    if (textoLower.includes('reserv') || textoLower.includes('alugar') || textoLower.includes('quero')) {
+      // Extrair dados da reserva
+      const reservationData = await extractReservationDataFromHistory(mensagem, options.history || []);
+      
+      // Se temos dados suficientes, propor confirmação
+      if (reservationData.modeloNome && reservationData.startDate && reservationData.endDate) {
+        // Buscar preço se não temos
+        if (!reservationData.precoTotal && reservationData.startDate && reservationData.endDate && reservationData.modeloNome) {
+          // Calcular dias
+          const start = new Date(reservationData.startDate);
+          const end = new Date(reservationData.endDate);
+          const dias = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          
+          // Buscar preço diário do modelo (placeholder)
+          reservationData.precoTotal = dias * 15000; // R$ 150/dia (em centavos)
+        }
+
+        // Montar confirmação
+        const confirmacao = await formatReservationConfirmation(reservationData);
+        intencao = 'AWAITING_CONFIRMATION';
+        tools_usadas.push('propor_confirmacao_reserva');
+
+        return {
+          resposta: confirmacao,
+          intencao,
+          tools_usadas,
+          clienteId: options.clienteId,
+        };
+      }
+    }
+
+    // Fall-back para RAG normal
     const resposta = await answerWhatsAppMessage(mensagem, {
       history: options.history || [],
     });
 
     // Detectar intenção baseado no conteúdo
-    const textoLower = mensagem.toLowerCase();
-    let intencao = 'GENERICO';
-    const tools_usadas: string[] = [];
-
     if (textoLower.includes('foto') || textoLower.includes('imagem')) {
       intencao = 'VER_FOTOS';
       tools_usadas.push('obter_fotos_veiculo');
@@ -949,9 +1204,6 @@ export async function atenderClienteComAgent(
       tools_usadas.push('listar_filiais');
     } else if (textoLower.includes('preço') || textoLower.includes('preco') || textoLower.includes('valor')) {
       intencao = 'COTACAO';
-    } else if (textoLower.includes('reserv') || textoLower.includes('alugar')) {
-      intencao = 'CRIAR_RESERVA';
-      tools_usadas.push('criar_reserva');
     }
 
     return {

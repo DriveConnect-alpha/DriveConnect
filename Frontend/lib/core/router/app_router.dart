@@ -16,6 +16,7 @@ import '../../features/client/profile/screens/profile_screen.dart';
 import '../../features/client/profile/screens/settings_screen.dart';
 import '../models/reserva.dart';
 import '../../features/manager/dashboard/screens/dashboard_screen.dart';
+import '../../features/manager/analytics/screens/analytics_screen.dart';
 import '../../features/manager/reservations/screens/reservations_screen.dart';
 import '../../features/manager/reservations/screens/create_reservation_screen.dart';
 import '../../features/manager/inventory/screens/inventory_screen.dart';
@@ -137,6 +138,10 @@ class AppRouter {
         path: '/manager',
         builder: (context, state) => const DashboardScreen(),
         routes: [
+          GoRoute(
+            path: 'analytics',
+            builder: (context, state) => const AnalyticsScreen(),
+          ),
           // Sub-rotas de Admin (dentro de /manager para manter o Scaffold)
           GoRoute(
             path: 'admin/users',

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import './app.dart';
 import './services/fcm_service.dart';
 import './core/feedback/app_feedback.dart';
@@ -14,6 +15,7 @@ Future<void> main() async {
   };
 
   await runZonedGuarded(() async {
+    await initializeDateFormatting('pt_BR');
     // Carrega variáveis de ambiente
     try {
       await dotenv.load(fileName: ".env");

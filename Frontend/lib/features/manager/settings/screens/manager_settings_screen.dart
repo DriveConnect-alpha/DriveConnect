@@ -106,6 +106,7 @@ class _ManagerSettingsScreenState extends State<ManagerSettingsScreen> {
     final authProvider = context.watch<AuthProvider>();
     final themeProvider = context.watch<ThemeProvider>();
     final user = authProvider.user;
+    final prefs = user?.preferencias ?? {};
 
     return ManagerScaffold(
       title: 'Configurações',
@@ -225,11 +226,54 @@ class _ManagerSettingsScreenState extends State<ManagerSettingsScreen> {
               title: const Text('Notificações Push'),
               subtitle: const Text('Receber alertas de novas reservas'),
               trailing: Switch(
-                value: authProvider.user?.preferencias['notificacoes'] ?? true,
+                value: prefs['notificacoes'] ?? true,
                 onChanged: (val) {
                   authProvider.updatePreferences({'notificacoes': val});
                 },
               ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+              child: Text(
+                'Tipos de notificação',
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            SwitchListTile(
+              title: const Text('Novas reservas'),
+              subtitle: const Text('Quando uma reserva é criada'),
+              value: prefs['notificacao_reserva_nova'] ?? true,
+              onChanged: (val) => authProvider.updatePreferences({'notificacao_reserva_nova': val}),
+            ),
+            SwitchListTile(
+              title: const Text('Cancelamentos'),
+              subtitle: const Text('Quando uma reserva é cancelada'),
+              value: prefs['notificacao_reserva_cancelada'] ?? true,
+              onChanged: (val) => authProvider.updatePreferences({'notificacao_reserva_cancelada': val}),
+            ),
+            SwitchListTile(
+              title: const Text('Pagamentos confirmados'),
+              subtitle: const Text('Quando um pagamento é aprovado'),
+              value: prefs['notificacao_pagamento_aprovado'] ?? true,
+              onChanged: (val) => authProvider.updatePreferences({'notificacao_pagamento_aprovado': val}),
+            ),
+            SwitchListTile(
+              title: const Text('Mensagens do WhatsApp'),
+              subtitle: const Text('Novas mensagens de clientes'),
+              value: prefs['notificacao_whatsapp'] ?? true,
+              onChanged: (val) => authProvider.updatePreferences({'notificacao_whatsapp': val}),
+            ),
+            SwitchListTile(
+              title: const Text('Atrasos'),
+              subtitle: const Text('Reservas com devolução em atraso'),
+              value: prefs['notificacao_atraso'] ?? true,
+              onChanged: (val) => authProvider.updatePreferences({'notificacao_atraso': val}),
+            ),
+            SwitchListTile(
+              title: const Text('Manutenção de veículos'),
+              subtitle: const Text('Mudança para status de manutenção'),
+              value: prefs['notificacao_manutencao'] ?? true,
+              onChanged: (val) => authProvider.updatePreferences({'notificacao_manutencao': val}),
             ),
             const Divider(),
 

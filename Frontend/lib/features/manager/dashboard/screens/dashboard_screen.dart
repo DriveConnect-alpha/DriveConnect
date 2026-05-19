@@ -120,14 +120,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final crossAxisCount = 2;
-                final aspectRatio = constraints.maxWidth < 420 ? 1.0 : 1.3;
+                final aspectRatio = constraints.maxWidth > 700 ? 1.35 : 1.1;
 
                 return GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   crossAxisCount: crossAxisCount,
-                  mainAxisSpacing: 14,
-                  crossAxisSpacing: 14,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
                   childAspectRatio: aspectRatio,
                   children: [
                     _buildStatCard(
@@ -194,6 +194,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     _buildActionCard(context, 'Clientes', Symbols.group, '/manager/clients'),
                     _buildActionCard(context, 'Filiais', Symbols.store, '/manager/filiais'),
                     _buildActionCard(context, 'Seguros', Symbols.shield, '/manager/insurance'),
+                    _buildActionCard(context, 'Análises', Symbols.analytics, '/manager/analytics'),
                     if (authProvider.isAdmin)
                       _buildActionCard(context, 'Usuários', Symbols.admin_panel_settings, '/manager/admin/users'),
                   ],

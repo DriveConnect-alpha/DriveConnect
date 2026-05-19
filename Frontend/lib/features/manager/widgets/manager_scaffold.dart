@@ -30,6 +30,7 @@ class ManagerScaffold extends StatelessWidget {
 
     final List<Map<String, dynamic>> menuItems = [
       {'icon': Symbols.dashboard, 'label': 'Dashboard', 'path': '/manager'},
+      {'icon': Symbols.analytics, 'label': 'Análises', 'path': '/manager/analytics'},
       if (authProvider.isAdmin)
         {'icon': Symbols.admin_panel_settings, 'label': 'Usuários', 'path': '/manager/admin/users'},
       if (authProvider.isAdmin)

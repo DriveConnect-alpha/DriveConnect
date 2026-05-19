@@ -178,4 +178,70 @@ class UserCall {
       onError(e.toString());
     }
   }
+
+  /// Atualiza a foto de perfil do usuário logado.
+  /// ROUTE: POST /usuarios/me/foto
+  static Future<void> atualizarFotoPerfil({
+    required dynamic imageFile,
+    required void Function(String imageUrl) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      // Como não sabemos o tipo exato (XFile ou File), tratamos como dynamic
+      // mas o Dio espera MultipartFile.fromFile ou similar.
+      // Se for Web, o tratamento é diferente.
+      
+      final formData = FormData.fromMap({
+        'foto': await MultipartFile.fromFile(imageFile.path, filename: 'profile.jpg'),
+      });
+
+      final response = await dioClient.post<Map<String, dynamic>>(
+        '/usuarios/me/foto',
+        data: formData,
+      );
+
+      final imgName = response.data!['imagem_url'] as String;
+      onSuccess(imgName);
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
+
+  /// Atualiza as preferências (notificações, tema) do usuário logado.
+  /// ROUTE: PATCH /usuarios/me/preferencias
+  static Future<void> atualizarPreferencias({
+    required Map<String, dynamic> preferencias,
+    required void Function(void) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      await dioClient.patch(
+        '/usuarios/me/preferencias',
+        data: preferencias,
+      );
+      onSuccess(null);
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
+
+  /// Remove a foto de perfil do usuário logado.
+  /// ROUTE: DELETE /usuarios/me/foto
+  static Future<void> removerFotoPerfil({
+    required void Function(void) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    try {
+      await dioClient.delete('/usuarios/me/foto');
+      onSuccess(null);
+    } on DioException catch (e) {
+      handleApiError(e, onError);
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
 }

@@ -23,7 +23,7 @@ export type WhatsappConversationSummary = {
   paused: boolean;
 };
 
-export async function ensureConversation(phone: string): Promise<{ id: string } | null> {
+export async function ensureConversation(phone: string): Promise<{ id: string; created?: boolean } | null> {
   if (!phone) return null;
 
   const existing = await query(
@@ -36,7 +36,7 @@ export async function ensureConversation(phone: string): Promise<{ id: string } 
       'UPDATE whatsapp_conversation SET last_message_at = NOW() WHERE id = $1',
       [existing.rows[0].id],
     );
-    return { id: existing.rows[0].id };
+    return { id: existing.rows[0].id, created: false };
   }
 
   const created = await query(
@@ -44,7 +44,7 @@ export async function ensureConversation(phone: string): Promise<{ id: string } 
     [phone, 'OPEN'],
   );
 
-  return created.rows[0]?.id ? { id: created.rows[0].id } : null;
+  return created.rows[0]?.id ? { id: created.rows[0].id, created: true } : null;
 }
 
 export async function storeMessage(params: {

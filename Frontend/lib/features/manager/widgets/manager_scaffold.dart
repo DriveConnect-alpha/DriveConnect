@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../calls/api_core.dart';
 
 class ManagerScaffold extends StatelessWidget {
   final Widget child;
@@ -28,12 +30,14 @@ class ManagerScaffold extends StatelessWidget {
 
     final List<Map<String, dynamic>> menuItems = [
       {'icon': Symbols.dashboard, 'label': 'Dashboard', 'path': '/manager'},
+      {'icon': Symbols.analytics, 'label': 'Análises', 'path': '/manager/analytics'},
       if (authProvider.isAdmin)
         {'icon': Symbols.admin_panel_settings, 'label': 'Usuários', 'path': '/manager/admin/users'},
       if (authProvider.isAdmin)
         {'icon': Symbols.chat, 'label': 'Atendimentos', 'path': '/manager/admin/atendimentos'},
       {'icon': Symbols.book_online, 'label': 'Reservas', 'path': '/manager/reservations'},
       {'icon': Symbols.inventory_2, 'label': 'Inventário', 'path': '/manager/inventory'},
+      {'icon': Symbols.store, 'label': 'Filiais', 'path': '/manager/filiais'},
       {'icon': Symbols.group, 'label': 'Clientes', 'path': '/manager/clients'},
       {'icon': Symbols.shield, 'label': 'Seguros', 'path': '/manager/insurance'},
       {'icon': Symbols.settings, 'label': 'Ajustes', 'path': '/manager/settings'},
@@ -62,10 +66,27 @@ class ManagerScaffold extends StatelessWidget {
               child: Column(
                 children: [
                   UserAccountsDrawerHeader(
-                    accountName: Text(authProvider.user?.email.split('@')[0] ?? 'Gerente'),
-                    accountEmail: Text(authProvider.user?.email ?? ''),
-                    currentAccountPicture: const CircleAvatar(child: Icon(Symbols.person)),
-                    decoration: BoxDecoration(color: theme.colorScheme.primary),
+                    accountName: Text(
+                      authProvider.user?.email.split('@')[0] ?? 'Gerente',
+                      style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+                    ),
+                    accountEmail: Text(
+                      authProvider.user?.email ?? '',
+                      style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+                    ),
+                    currentAccountPicture: CircleAvatar(
+                      backgroundColor: theme.colorScheme.onPrimaryContainer,
+                      backgroundImage: authProvider.user?.imagemUrl != null
+                          ? CachedNetworkImageProvider(
+                              '$apiBaseUrl/usuarios/me/foto?v=${authProvider.user!.imagemUrl}',
+                              headers: authHeaders,
+                            )
+                          : null,
+                      child: authProvider.user?.imagemUrl == null
+                          ? Icon(Symbols.person, color: theme.colorScheme.primary)
+                          : null,
+                    ),
+                    decoration: BoxDecoration(color: theme.colorScheme.primaryContainer),
                   ),
                   ...menuItems.map((item) => ListTile(
                         leading: Icon(item['icon']),
@@ -132,13 +153,13 @@ class ManagerScaffold extends StatelessWidget {
                       ))
                   .toList(),
             ),
-          const VerticalDivider(thickness: 1, width: 1),
+          if (useSideRail) const VerticalDivider(thickness: 1, width: 1),
           Expanded(child: child),
         ],
       ),
       bottomNavigationBar: !useSideRail
           ? BottomNavigationBar(
-              currentIndex: currentIndex >= 4 ? 0 : currentIndex, // Ajuste simples
+              currentIndex: currentIndex >= 4 ? 0 : currentIndex,
               onTap: (index) => context.go(menuItems[index]['path']),
               type: BottomNavigationBarType.fixed,
               items: menuItems.take(4).map((item) => BottomNavigationBarItem(

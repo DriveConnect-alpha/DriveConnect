@@ -43,7 +43,7 @@ class AuthProvider extends ChangeNotifier {
           perfilId: _user!.perfilId,
           filialId: _user!.filialId,
         );
-        await FcmService().flushPendingToken();
+        await FcmService().onUserAuthenticated();
       } catch (_) {
         _token = null;
         _user = null;
@@ -70,7 +70,7 @@ class AuthProvider extends ChangeNotifier {
       await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
       
       // Note: setIdentity is already called inside UserCall.login
-      await FcmService().flushPendingToken();
+      await FcmService().onUserAuthenticated();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -106,6 +106,8 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Remove FCM token BEFORE clearing identity (needs auth headers)
+    await FcmService().onUserLogout();
     _token = null;
     _user = null;
     clearIdentity(); // Clear JWT from api_core
@@ -133,6 +135,114 @@ class AuthProvider extends ChangeNotifier {
       );
       
       // Update persisted user data
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> changePassword(String newPassword) async {
+    if (_user == null) return;
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _authService.changePassword(id: _user!.id, newPassword: newPassword);
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateProfilePhoto(dynamic imageFile) async {
+    if (_user == null) return;
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final newPhotoUrl = await _authService.updateProfilePhoto(id: _user!.id, imageFile: imageFile);
+      
+      // Atualiza o objeto do usuário localmente
+      _user = Usuario(
+        id: _user!.id,
+        email: _user!.email,
+        nome: _user!.nome,
+        tipo: _user!.tipo,
+        perfilId: _user!.perfilId,
+        filialId: _user!.filialId,
+        imagemUrl: newPhotoUrl,
+        preferencias: _user!.preferencias,
+        criadoEm: _user!.criadoEm,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeProfilePhoto() async {
+    if (_user == null) return;
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _authService.removeProfilePhoto(id: _user!.id);
+      
+      // Atualiza o objeto do usuário localmente retirando a foto
+      _user = Usuario(
+        id: _user!.id,
+        email: _user!.email,
+        nome: _user!.nome,
+        tipo: _user!.tipo,
+        perfilId: _user!.perfilId,
+        filialId: _user!.filialId,
+        imagemUrl: null,
+        preferencias: _user!.preferencias,
+        criadoEm: _user!.criadoEm,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updatePreferences(Map<String, dynamic> newPrefs) async {
+    if (_user == null) return;
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _authService.updatePreferences(id: _user!.id, preferences: newPrefs);
+      
+      // Atualiza o objeto do usuário localmente
+      _user = Usuario(
+        id: _user!.id,
+        email: _user!.email,
+        nome: _user!.nome,
+        tipo: _user!.tipo,
+        perfilId: _user!.perfilId,
+        filialId: _user!.filialId,
+        imagemUrl: _user!.imagemUrl,
+        preferencias: newPrefs,
+        criadoEm: _user!.criadoEm,
+      );
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(AppConstants.userKey, jsonEncode(_user!.toJson()));
     } catch (e) {

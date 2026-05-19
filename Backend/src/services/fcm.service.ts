@@ -97,12 +97,12 @@ export async function saveFcmToken(params: {
   );
 }
 
-export async function deleteFcmToken(params: { usuarioId: string; token: string }): Promise<void> {
-  const { usuarioId, token } = params;
-  if (!usuarioId || !token) return;
+export async function deleteFcmToken(params: { usuarioId?: string; token: string }): Promise<void> {
+  const { token } = params;
+  if (!token) return;
   await query(
-    `DELETE FROM fcm_token WHERE usuario_id = $1 AND token = $2`,
-    [usuarioId, token],
+    `DELETE FROM fcm_token WHERE token = $1`,
+    [token],
   );
 }
 
@@ -159,6 +159,85 @@ async function listTokensForAllManagers(): Promise<string[]> {
   return result.rows.map((row) => String(row.token)).filter(Boolean);
 }
 
+export async function notifyNovoCliente(params: {
+  clienteId: string;
+  clienteNome?: string;
+  origem?: string;
+}): Promise<void> {
+  const { clienteId, clienteNome, origem } = params;
+  const tokens = await listTokensForAllManagers();
+  console.log(`[FCM] Tokens para novo cliente: ${tokens.length}`);
+
+  await sendMulticastNotification({
+    tokens,
+    notification: {
+      title: 'Novo cliente cadastrado',
+      body: clienteNome ? `Cliente: ${clienteNome}` : 'Um novo cliente foi cadastrado no sistema.',
+    },
+    data: {
+      tipo: 'NOVO_CLIENTE',
+      clienteId,
+      clienteNome: clienteNome ?? null,
+      origem: origem ?? 'BACKEND',
+    },
+  });
+}
+
+export async function notifyNovaConversa(params: {
+  phone: string;
+  conversationId?: string | null;
+  message?: string | null;
+  origem?: string;
+}): Promise<void> {
+  const { phone, conversationId, message, origem } = params;
+  const tokens = await listTokensForAllManagers();
+  console.log(`[FCM] Tokens para nova conversa: ${tokens.length}`);
+
+  const preview = (message || '').slice(0, 120);
+
+  await sendMulticastNotification({
+    tokens,
+    notification: {
+      title: 'Nova conversa (WhatsApp)',
+      body: preview || `Nova conversa iniciada por ${phone}`,
+    },
+    data: {
+      tipo: 'NOVA_CONVERSA',
+      phone,
+      conversationId: conversationId ?? null,
+      mensagem_preview: preview || null,
+      origem: origem ?? 'WHATSAPP',
+    },
+  });
+}
+
+export async function notifyNovaMensagemAtendimento(params: {
+  phone: string;
+  conversationId?: string | null;
+  message?: string | null;
+  origem?: string;
+}): Promise<void> {
+  const { phone, conversationId, message, origem } = params;
+  const tokens = await listTokensForAllManagers();
+  console.log(`[FCM] Tokens para nova mensagem atendimento: ${tokens.length}`);
+
+  const preview = (message || '').slice(0, 120);
+  await sendMulticastNotification({
+    tokens,
+    notification: {
+      title: 'Nova mensagem de atendimento',
+      body: preview || `Mensagem recebida de ${phone}`,
+    },
+    data: {
+      tipo: 'NOVA_MENSAGEM_ATENDIMENTO',
+      phone,
+      conversationId: conversationId ?? null,
+      mensagem_preview: preview || null,
+      origem: origem ?? 'WHATSAPP',
+    },
+  });
+}
+
 async function resolveUsuarioIdFromClienteOrUsuarioId(id: string): Promise<string | null> {
   if (!id) return null;
 
@@ -202,9 +281,9 @@ async function sendMulticastNotification(params: {
 
   console.log(
     `[FCM] Enviando: title="${notification.title}" tipo="${tipo}" tokens=${tokens.length}` +
-      `${reservaId ? ` reservaId=${reservaId}` : ''}` +
-      `${filialId ? ` filialId=${filialId}` : ''}` +
-      `${origem ? ` origem=${origem}` : ''}`,
+    `${reservaId ? ` reservaId=${reservaId}` : ''}` +
+    `${filialId ? ` filialId=${filialId}` : ''}` +
+    `${origem ? ` origem=${origem}` : ''}`,
   );
 
   const multicastMessage: MulticastMessage = {

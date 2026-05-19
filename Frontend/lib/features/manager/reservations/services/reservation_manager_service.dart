@@ -62,4 +62,65 @@ class ReservationManagerService implements IReservationManagerService {
 
     return completer.future;
   }
+
+  @override
+  Future<Map<String, dynamic>> createReservation({
+    required String veiculoId,
+    required String clienteId,
+    required String filialRetiradaId,
+    required String filialDevolucaoId,
+    required String dataInicio,
+    required String dataFim,
+    String? planoSeguroId,
+    String? metodoPagamento,
+  }) async {
+    final completer = Completer<Map<String, dynamic>>();
+
+    await ReservaCall.registrarReserva(
+      veiculoId: veiculoId,
+      clienteId: clienteId,
+      filialRetiradaId: filialRetiradaId,
+      filialDevolucaoId: filialDevolucaoId,
+      dataInicio: dataInicio,
+      dataFim: dataFim,
+      planoSeguroId: planoSeguroId,
+      metodoPagamento: metodoPagamento,
+      onSuccess: (data) => completer.complete(data),
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    return completer.future;
+  }
+
+  @override
+  Future<void> cancelReservation({
+    required String reservaId,
+    required void Function() onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    await ReservaCall.cancelar(
+      reservaId: reservaId,
+      onSuccess: (_) => onSuccess(),
+      onError: (msg) => onError(msg),
+    );
+  }
+
+  @override
+  Future<void> updateReservation({
+    required String reservaId,
+    String? veiculoId,
+    String? dataInicio,
+    String? dataFim,
+    required void Function(Map<String, dynamic> data) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    await ReservaCall.atualizarReserva(
+      reservaId: reservaId,
+      veiculoId: veiculoId,
+      dataInicio: dataInicio,
+      dataFim: dataFim,
+      onSuccess: onSuccess,
+      onError: onError,
+    );
+  }
 }

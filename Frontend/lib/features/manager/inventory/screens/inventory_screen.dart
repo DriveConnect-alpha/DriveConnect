@@ -6,6 +6,8 @@ import '../providers/inventory_provider.dart';
 import '../../widgets/manager_scaffold.dart';
 import '../../../../core/widgets/dc_status_badge.dart';
 import '../../../../calls/api_core.dart';
+import '../../../../core/feedback/app_feedback.dart';
+import '../../../../core/widgets/dc_feedback_message.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -38,7 +40,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
           }
 
           if (provider.error != null) {
-            return Center(child: Text(provider.error!));
+            return Center(
+              child: DCFeedbackMessage(
+                message: provider.error!,
+                type: AppFeedbackType.error,
+              ),
+            );
           }
 
           return ListView.builder(
@@ -114,9 +121,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final success = await context.read<InventoryProvider>().updateVehicleStatus(id, status);
     if (mounted) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(success ? 'Status atualizado' : 'Erro ao atualizar')),
-      );
+      if (success) {
+        AppFeedback.showSuccess('Status atualizado');
+      } else {
+        AppFeedback.showError('Erro ao atualizar status.');
+      }
     }
   }
 }

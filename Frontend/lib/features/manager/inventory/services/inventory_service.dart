@@ -56,7 +56,7 @@ class InventoryService implements IInventoryService {
   }
 
   @override
-  Future<void> updateVehicle(String id, {int? modeloId, String? filialId, String? placa, int? ano, String? cor, String? status}) async {
+  Future<void> updateVehicle(String id, {int? modeloId, String? filialId, String? placa, int? ano, String? cor, String? status, XFile? image, bool? removerImagem}) async {
     final completer = Completer<void>();
 
     await FrotaCall.atualizarVeiculo(
@@ -67,6 +67,8 @@ class InventoryService implements IInventoryService {
       ano: ano,
       cor: cor,
       status: status,
+      imagem: image,
+      removerImagem: removerImagem,
       onSuccess: (_) => completer.complete(),
       onError: (msg) => completer.completeError(Exception(msg)),
     );

@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/providers/auth_provider.dart';
+import 'core/providers/theme_provider.dart';
+import 'core/feedback/app_feedback.dart';
+import 'core/widgets/app_loading_overlay.dart';
 import 'package:go_router/go_router.dart';
 import 'calls/api_core.dart';
 import 'features/client/explore/providers/explore_provider.dart';
@@ -53,6 +56,28 @@ import 'features/admin/providers/admin_provider.dart';
 import 'features/admin/services/iadmin_service.dart';
 import 'features/admin/services/admin_service.dart';
 import 'features/admin/services/mock_admin_service.dart';
+
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
+  }
+
+  @override
+  Widget buildScrollbar(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
+  }
+}
 
 class DriveConnectApp extends StatelessWidget {
   const DriveConnectApp({super.key});
@@ -129,12 +154,22 @@ class DriveConnectApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MyReservationsProvider(bookingService)),
         ChangeNotifierProvider(create: (_) => DashboardProvider(dashboardService)),
         ChangeNotifierProvider(create: (_) => AdminProvider(adminService)),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
-      child: MaterialApp.router(
-        title: 'Drive Connect',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        routerConfig: AppRouter.router,
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp.router(
+            title: 'Drive Connect',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: themeProvider.themeMode,
+            scrollBehavior: const AppScrollBehavior(),
+            scaffoldMessengerKey: AppFeedback.messengerKey,
+            builder: (context, child) => AppLoadingOverlay(child: child ?? const SizedBox.shrink()),
+            routerConfig: AppRouter.router,
+          );
+        },
       ),
     );
   }

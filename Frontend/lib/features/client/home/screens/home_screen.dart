@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../calls/api_core.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../explore/providers/explore_provider.dart';
@@ -82,10 +83,21 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: theme.colorScheme.primaryContainer,
-                        child: Icon(Symbols.person, color: theme.colorScheme.onPrimaryContainer),
+                      GestureDetector(
+                        onTap: () => context.push('/profile'),
+                        child: CircleAvatar(
+                          radius: 24,
+                          backgroundColor: theme.colorScheme.primaryContainer,
+                          backgroundImage: user?.imagemUrl != null
+                              ? CachedNetworkImageProvider(
+                                  '$apiBaseUrl/usuarios/me/foto?v=${user!.imagemUrl}',
+                                  headers: authHeaders,
+                                )
+                              : null,
+                          child: user?.imagemUrl == null
+                              ? Icon(Symbols.person, color: theme.colorScheme.onPrimaryContainer)
+                              : null,
+                        ),
                       ),
                     ],
                   ),
@@ -144,16 +156,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     SizedBox(
-                      height: 100,
+                      height: 110,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         children: [
-                          _buildCategoryItem(context, 'SUV', Symbols.directions_car),
-                          _buildCategoryItem(context, 'Sedan', Symbols.minor_crash),
-                          _buildCategoryItem(context, 'Hatch', Symbols.airport_shuttle),
-                          _buildCategoryItem(context, 'Luxo', Symbols.diamond),
-                          _buildCategoryItem(context, 'Econômico', Symbols.eco),
+                          _buildCategoryItem(context, exploreProvider, 'Todos', Symbols.grid_view),
+                          _buildCategoryItem(context, exploreProvider, 'SUV', Symbols.directions_car),
+                          _buildCategoryItem(context, exploreProvider, 'Sedan', Symbols.minor_crash),
+                          _buildCategoryItem(context, exploreProvider, 'Hatch', Symbols.airport_shuttle),
+                          _buildCategoryItem(context, exploreProvider, 'Luxo', Symbols.diamond),
+                          _buildCategoryItem(context, exploreProvider, 'Econômico', Symbols.eco),
                         ],
                       ),
                     ),
@@ -224,30 +237,40 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCategoryItem(BuildContext context, String label, IconData icon) {
+  Widget _buildCategoryItem(BuildContext context, ExploreProvider provider, String label, IconData icon) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+      child: GestureDetector(
+        onTap: () {
+          provider.setCategory(label);
+          context.push('/explore');
+        },
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  width: 1,
                 ),
-              ],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Icon(icon, color: theme.colorScheme.primary),
             ),
-            child: Icon(icon, color: theme.colorScheme.primary),
-          ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-        ],
+            const SizedBox(height: 8),
+            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+          ],
+        ),
       ),
     );
   }
@@ -273,11 +296,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       fit: BoxFit.cover,
                     )
-                  : const DecorationImage(
-                      image: NetworkImage('https://placehold.co/600x400/png?text=Veiculo'),
-                      fit: BoxFit.cover,
-                    ),
+                  : null,
             ),
+            child: veiculo.imagemUrl == null
+                ? Center(
+                    child: Icon(Symbols.directions_car, size: 48, color: Colors.grey[400]),
+                  )
+                : null,
           ),
           Padding(
             padding: const EdgeInsets.all(12.0),

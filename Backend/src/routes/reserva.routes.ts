@@ -6,6 +6,7 @@ import {
   verificarDisponibilidadeRetirada,
   criarReservaPendente,
   estenderReserva,
+  atualizarReservaPendente,
 } from '../services/reserva.service.js';
 import { requireCaller, requireTipo } from '../middlewares/auth.js';
 import { atualizarStatusVeiculoPorReservaE_Notificar } from '../services/veiculo.service.js';
@@ -31,9 +32,10 @@ function mapearErro(err: unknown): { status: number; mensagem: string } {
   const mensagem = err instanceof Error ? err.message : 'Erro interno.';
   const status = mensagem.includes('inválid') || mensagem.includes('obrigatório') || mensagem.includes('ausente') ? 400
     : mensagem.includes('não encontrad') ? 404
-      : mensagem.includes('Não autorizado') ? 401
-        : mensagem.includes('Sem permissão') ? 403
-          : 500;
+      : mensagem.includes('disponível') || mensagem.includes('conflito') ? 409
+        : mensagem.includes('Não autorizado') ? 401
+          : mensagem.includes('Sem permissão') ? 403
+            : 500;
   return { status, mensagem };
 }
 
@@ -78,21 +80,62 @@ export async function checarDisponibilidade(req: IncomingMessage, res: ServerRes
 export async function registrarReserva(req: IncomingMessage, res: ServerResponse) {
   try {
     const caller = requireCaller(req);
-    requireTipo(caller, 'CLIENTE');
+    requireTipo(caller, 'CLIENTE', 'GERENTE', 'ADMIN');
 
     const corpo = await lerCorpo(req) as Record<string, string>;
 
-    const { veiculo_id, filial_retirada_id, filial_devolucao_id, data_inicio, data_fim, plano_seguro_id, metodo_pagamento } = corpo;
+    const {
+      veiculo_id,
+      filial_retirada_id,
+      filial_devolucao_id,
+      data_inicio,
+      data_fim,
+      plano_seguro_id,
+      metodo_pagamento,
+      cliente_id
+    } = corpo;
 
     if (!veiculo_id || !filial_retirada_id || !filial_devolucao_id || !data_inicio || !data_fim) {
       responder(res, 400, { erro: 'Parâmetros obrigatórios ausentes.' });
       return;
     }
 
-    // Busca dados complementares do cliente e veículo
-    const clienteResult = await query('SELECT nome_completo, email, telefone FROM cliente WHERE id = $1', [caller.usuarioId]);
+    // Busca dados complementares do cliente
+    let queryCliente: string;
+    let paramsCliente: any[];
+
+    if (caller.tipo === 'CLIENTE') {
+      queryCliente = `
+        SELECT c.id, c.nome_completo, u.email, c.telefone 
+        FROM cliente c
+        JOIN usuario u ON u.id = c.usuario_id
+        WHERE c.usuario_id = $1
+      `;
+      paramsCliente = [caller.usuarioId];
+    } else {
+      if (!cliente_id) {
+        responder(res, 400, { erro: 'cliente_id é obrigatório para reservas criadas por gerentes.' });
+        return;
+      }
+      queryCliente = `
+        SELECT c.id, c.nome_completo, u.email, c.telefone 
+        FROM cliente c
+        JOIN usuario u ON u.id = c.usuario_id
+        WHERE c.id = $1
+      `;
+      paramsCliente = [cliente_id];
+
+      // Se for gerente, validar se a filial de retirada pertence a ele (opcional)
+      if (caller.tipo === 'GERENTE' && caller.filialId && caller.filialId !== filial_retirada_id) {
+        responder(res, 403, { erro: 'Gerente só pode criar reserva para sua própria filial.' });
+        return;
+      }
+    }
+
+    const clienteResult = await query(queryCliente, paramsCliente);
     if (!clienteResult.rows[0]) throw new Error('Cliente não encontrado.');
     const cliente = clienteResult.rows[0];
+    const finalClienteId = cliente.id;
 
     const veiculoResult = await query(`
       SELECT v.modelo_id, m.nome || ' ' || m.marca AS descricao_modelo
@@ -113,7 +156,7 @@ export async function registrarReserva(req: IncomingMessage, res: ServerResponse
 
     // Cria a reserva chamando o service que integra com InfinitePay
     const paramsReserva: any = {
-      clienteId: caller.usuarioId,
+      clienteId: finalClienteId,
       veiculoId: veiculo_id,
       filialRetiradaId: filial_retirada_id,
       filialDevolucaoId: filial_devolucao_id,
@@ -131,7 +174,7 @@ export async function registrarReserva(req: IncomingMessage, res: ServerResponse
 
     const reserva = await criarReservaPendente({
       ...paramsReserva,
-      origem: 'APP',
+      origem: caller.tipo === 'CLIENTE' ? 'APP' : 'GERENTE_APP',
     });
 
     responder(res, 201, reserva);
@@ -256,6 +299,34 @@ export async function manualConfirmarPagamento(req: IncomingMessage, res: Server
     );
 
     responder(res, 200, { mensagem: 'Pagamento confirmado manualmente. Reserva agora está RESERVADA.' });
+  } catch (err) {
+    const { status, mensagem } = mapearErro(err);
+    responder(res, status, { erro: mensagem });
+  }
+}
+
+// ──────────────────────────────────────────────
+// PATCH /reservas/:id
+// Atualiza uma reserva pendente (veículo e datas)
+// Acesso: CLIENTE (própria), GERENTE (filial própria) | ADMIN
+// ──────────────────────────────────────────────
+export async function atualizarReservaHandler(req: IncomingMessage, res: ServerResponse, reservaId: string) {
+  try {
+    const caller = requireCaller(req);
+    const corpo = await lerCorpo(req) as Record<string, string>;
+
+    const params: {
+      veiculoId?: string;
+      dataInicio?: Date;
+      dataFim?: Date;
+    } = {};
+
+    if (corpo.veiculo_id) params.veiculoId = corpo.veiculo_id;
+    if (corpo.data_inicio) params.dataInicio = new Date(corpo.data_inicio);
+    if (corpo.data_fim) params.dataFim = new Date(corpo.data_fim);
+
+    const resultado = await atualizarReservaPendente(reservaId, params, caller);
+    responder(res, 200, resultado);
   } catch (err) {
     const { status, mensagem } = mapearErro(err);
     responder(res, status, { erro: mensagem });

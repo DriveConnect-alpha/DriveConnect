@@ -27,185 +27,313 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final authProvider = context.watch<AuthProvider>();
+    final stats = context.watch<DashboardProvider>().stats;
 
     return ManagerScaffold(
       title: 'Dashboard',
-      child: Consumer<DashboardProvider>(
-        builder: (context, provider, child) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final stats = provider.stats;
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                if (authProvider.isAdmin) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.secondaryContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Symbols.admin_panel_settings, color: theme.colorScheme.onSecondaryContainer),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Você está na Visão de Gerente.',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        TextButton.icon(
-                          onPressed: () => context.go('/manager/admin/users'),
-                          icon: const Icon(Symbols.arrow_forward),
-                          label: const Text('Ir para Painel Admin'),
-                        ),
-                      ],
-                    ),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(height: 24),
-                ],
-                Text(
-                  'Olá, ${authProvider.user?.email.split('@')[0] ?? 'Gerente'}!',
-                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                  child: const Icon(Symbols.dashboard, size: 22),
                 ),
-                const SizedBox(height: 24),
-                
-                // Cards de Resumo
-                LayoutBuilder(builder: (context, constraints) {
-                  int crossAxisCount = constraints.maxWidth > 800 ? 4 : (constraints.maxWidth > 500 ? 2 : 1);
-                  return GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 1.5,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildStatCard(context, 'Reservas Ativas', stats?.activeReservations.toString() ?? '-', Symbols.book_online, Colors.blue),
-                      _buildStatCard(context, 'Veículos Disp.', stats?.availableVehicles.toString() ?? '-', Symbols.directions_car, Colors.green),
-                      _buildStatCard(context, 'Receita (Mês)', 'R\$ ${stats?.monthlyRevenue.toStringAsFixed(0) ?? '-'}', Symbols.payments, Colors.orange),
-                      _buildStatCard(context, 'Novos Clientes', stats?.newClients.toString() ?? '-', Symbols.person_add, Colors.purple),
+                      Text(
+                        'Visão geral',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Sua visão geral operacional em tempo real',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
                     ],
-                  );
-                }),
-                
-                const SizedBox(height: 32),
-                Text('Ações Rápidas', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                
-                LayoutBuilder(builder: (context, constraints) {
-                   int crossAxisCount = constraints.maxWidth > 800 ? 4 : 2;
-                   return GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.2,
-                    children: [
-                      _buildActionCard(context, 'Gestão de Reservas', Symbols.list_alt, '/manager/reservations'),
-                      _buildActionCard(context, 'Inventário', Symbols.inventory_2, '/manager/inventory'),
-                      _buildActionCard(context, 'Clientes', Symbols.group, '/manager/clients'),
-                      _buildActionCard(context, 'Seguros', Symbols.shield, '/manager/insurance'),
-                      if (authProvider.isAdmin)
-                        _buildActionCard(context, 'Gestão de Usuários', Symbols.admin_panel_settings, '/manager/admin/users'),
-                    ],
-                  );
-                }),
+                  ),
+                ),
               ],
             ),
-          );
-        },
+            const SizedBox(height: 20),
+
+            if (authProvider.isAdmin) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: colorScheme.secondary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Symbols.admin_panel_settings, color: colorScheme.secondary, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Modo administrador ativo',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.secondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => context.go('/manager/admin/users'),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 0),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'Abrir',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.secondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final crossAxisCount = 2;
+                final aspectRatio = constraints.maxWidth > 700 ? 1.35 : 1.1;
+
+                return GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: crossAxisCount,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: aspectRatio,
+                  children: [
+                    _buildStatCard(
+                      context,
+                      title: 'Reservas ativas',
+                      value: stats?.activeReservations.toString() ?? '-',
+                      icon: Symbols.book_online,
+                      accent: const Color(0xFF2563EB),
+                      footer: 'Em andamento agora',
+                    ),
+                    _buildStatCard(
+                      context,
+                      title: 'Veículos disponíveis',
+                      value: stats?.availableVehicles.toString() ?? '-',
+                      icon: Symbols.directions_car,
+                      accent: const Color(0xFF16A34A),
+                      footer: 'Prontos para locação',
+                    ),
+                    _buildStatCard(
+                      context,
+                      title: 'Receita do mês',
+                      value: stats == null ? '-' : 'R\$ ${stats.monthlyRevenue.toStringAsFixed(0)}',
+                      icon: Symbols.payments,
+                      accent: const Color(0xFFF59E0B),
+                      footer: 'Faturamento acumulado',
+                    ),
+                    _buildStatCard(
+                      context,
+                      title: 'Novos clientes',
+                      value: stats?.newClients.toString() ?? '-',
+                      icon: Symbols.person_add,
+                      accent: const Color(0xFFDB2777),
+                      footer: 'Entradas recentes',
+                    ),
+                  ],
+                );
+              },
+            ),
+
+            const SizedBox(height: 24),
+            Text(
+              'Ações rápidas',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final crossAxisCount = constraints.maxWidth > 900 ? 4 : 2;
+
+                return GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: crossAxisCount,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: constraints.maxWidth > 700 ? 1.35 : 1.1,
+                  children: [
+                    _buildActionCard(context, 'Reservas', Symbols.list_alt, '/manager/reservations'),
+                    _buildActionCard(context, 'Inventário', Symbols.inventory_2, '/manager/inventory'),
+                    _buildActionCard(context, 'Clientes', Symbols.group, '/manager/clients'),
+                    _buildActionCard(context, 'Filiais', Symbols.store, '/manager/filiais'),
+                    _buildActionCard(context, 'Seguros', Symbols.shield, '/manager/insurance'),
+                    _buildActionCard(context, 'Análises', Symbols.analytics, '/manager/analytics'),
+                    if (authProvider.isAdmin)
+                      _buildActionCard(context, 'Usuários', Symbols.admin_panel_settings, '/manager/admin/users'),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+    BuildContext context, {
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color accent,
+    required String footer,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return DCCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(4),
+      elevation: 2.0,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: colorScheme.outline.withOpacity(0.12),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withAlpha(26),
+                  color: accent.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: color, size: 24),
+                child: Icon(icon, color: accent, size: 20),
               ),
-              Icon(Symbols.trending_up, color: Colors.green.shade400, size: 20),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value, style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF1A1A1A))),
-              Text(title, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 4),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  value,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,    
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  footer,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant.withOpacity(0.85),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildActionCard(BuildContext context, String title, IconData icon, String route) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return InkWell(
       onTap: () => context.go(route),
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primary,
-              Theme.of(context).colorScheme.primary.withBlue(200),
+          color: colorScheme.surface,
+          border: Border.all(
+            color: colorScheme.primary.withOpacity(0.14),
+            width: 1.2,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, size: 20, color: colorScheme.primary),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Abrir módulo',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.outline.withOpacity(0.7),
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
             ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Theme.of(context).colorScheme.primary.withAlpha(50),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(50),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 32, color: Colors.white),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Colors.white,
-              ),
-            ),
-          ],
         ),
       ),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/constants/app_constants.dart';
@@ -48,11 +49,11 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Placeholder para Logo
-            const Icon(
-              Icons.directions_car_filled,
-              size: 100,
-              color: Color(0xFF00628b),
+            // Logo (SVG asset)
+            SvgPicture.asset(
+              'assets/logodrive.svg',
+              width: 120,
+              height: 120,
             ),
             const SizedBox(height: 24),
             Text(

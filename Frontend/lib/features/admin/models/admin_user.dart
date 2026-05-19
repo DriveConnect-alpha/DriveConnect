@@ -4,6 +4,7 @@ class AdminUser {
   final String tipo;
   final String criadoEm;
   final String nome;
+  final String? imagemUrl;
   final Map<String, dynamic> detalhes;
 
   AdminUser({
@@ -12,6 +13,7 @@ class AdminUser {
     required this.tipo,
     required this.criadoEm,
     required this.nome,
+    this.imagemUrl,
     required this.detalhes,
   });
 
@@ -22,7 +24,8 @@ class AdminUser {
       tipo: (json['tipo'] ?? 'CLIENTE').toString(),
       criadoEm: (json['criado_em'] ?? json['criadoEm'] ?? '').toString(),
       nome: (json['nome'] ?? json['nome_completo'] ?? json['nomeCompleto'] ?? 'Usuário sem nome').toString(),
-      detalhes: json, // Pass the whole map as details for flexibility
+      imagemUrl: json['imagemUrl'] as String?,
+      detalhes: json,
     );
   }
 }

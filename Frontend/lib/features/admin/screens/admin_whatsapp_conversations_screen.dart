@@ -7,6 +7,24 @@ import '../../../calls/gerente.call.dart';
 import '../../manager/widgets/manager_scaffold.dart';
 import '../models/whatsapp_conversation.dart';
 import '../models/whatsapp_message.dart';
+import '../widgets/chat_bubble.dart';
+import '../../../core/feedback/app_feedback.dart';
+
+String _formatPhoneLabel(String value) {
+  final digits = value.replaceAll(RegExp(r'\D'), '');
+  if (digits.startsWith('55') && digits.length >= 12) {
+    final local = digits.substring(2);
+    final ddd = local.substring(0, 2);
+    final last8 = local.substring(local.length - 8);
+    return '+55 ($ddd) ${last8.substring(0, 4)}-${last8.substring(4)}';
+  }
+  if (digits.length >= 10) {
+    final ddd = digits.substring(0, 2);
+    final last8 = digits.substring(digits.length - 8);
+    return '+55 ($ddd) ${last8.substring(0, 4)}-${last8.substring(4)}';
+  }
+  return value;
+}
 
 class AdminWhatsAppConversationsScreen extends StatefulWidget {
   const AdminWhatsAppConversationsScreen({super.key});
@@ -124,171 +142,347 @@ class _AdminWhatsAppConversationsScreenState extends State<AdminWhatsAppConversa
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredConversations();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final pausedCount = _conversations.where((conversation) => conversation.paused).length;
 
     return ManagerScaffold(
       title: 'Atendimentos',
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Column(
-              children: [
-                Row(
+      child: Container(
+        color: colorScheme.surface,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      colorScheme.primary,
+                      Color.lerp(colorScheme.primary, colorScheme.primaryContainer, 0.28)!,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 2.8,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _phoneFilterController,
-                        decoration: const InputDecoration(
-                          labelText: 'Filtrar por telefone',
-                          hintText: 'Ex.: 5511999999999',
-                          prefixIcon: Icon(Symbols.search),
-                          border: OutlineInputBorder(),
-                        ),
-                        onSubmitted: (_) => _loadConversations(),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: _isLoading ? null : _loadConversations,
-                      icon: const Icon(Symbols.search),
-                      label: const Text('Buscar'),
-                    ),
+                    _SummaryChip(label: 'Total', value: _conversations.length.toString(), icon: Symbols.chat),
+                    _SummaryChip(label: 'Pausados', value: pausedCount.toString(), icon: Symbols.pause_circle),
                   ],
                 ),
-                const SizedBox(height: 10),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: Card(
+                elevation: 0,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Column(
                     children: [
-                      DropdownButton<String>(
-                        value: _statusFilter,
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() => _statusFilter = value);
-                        },
-                        items: const [
-                          DropdownMenuItem(value: 'ALL', child: Text('Status: Todos')),
-                          DropdownMenuItem(value: 'OPEN', child: Text('Status: Abertos')),
-                          DropdownMenuItem(value: 'CLOSED', child: Text('Status: Fechados')),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _phoneFilterController,
+                              style: const TextStyle(fontSize: 14),
+                              decoration: InputDecoration(
+                                labelText: 'Telefone',
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                prefixIcon: const Icon(Symbols.search, size: 20),
+                                filled: true,
+                                fillColor: theme.colorScheme.surfaceContainerHighest,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                              onSubmitted: (_) => _loadConversations(),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton(
+                            onPressed: _isLoading ? null : _loadConversations,
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              minimumSize: const Size(0, 40),
+                            ),
+                            child: const Text('Buscar'),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _statusFilter = 'ALL';
+                                _directionFilter = 'ALL';
+                                _periodFilter = 'ALL';
+                                _phoneFilterController.clear();
+                              });
+                              _loadConversations();
+                            },
+                            icon: const Icon(Symbols.filter_alt_off, size: 18),
+                            tooltip: 'Limpar filtros',
+                            style: IconButton.styleFrom(
+                              backgroundColor: colorScheme.surfaceVariant,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
                         ],
-                      ),
-                      const SizedBox(width: 12),
-                      DropdownButton<String>(
-                        value: _directionFilter,
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() => _directionFilter = value);
-                        },
-                        items: const [
-                          DropdownMenuItem(value: 'ALL', child: Text('Última msg: Todas')),
-                          DropdownMenuItem(value: 'IN', child: Text('Última msg: Cliente')),
-                          DropdownMenuItem(value: 'OUT', child: Text('Última msg: Bot')),
-                        ],
-                      ),
-                      const SizedBox(width: 12),
-                      DropdownButton<String>(
-                        value: _periodFilter,
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() => _periodFilter = value);
-                        },
-                        items: const [
-                          DropdownMenuItem(value: 'ALL', child: Text('Período: Todos')),
-                          DropdownMenuItem(value: 'TODAY', child: Text('Período: Hoje')),
-                          DropdownMenuItem(value: '7D', child: Text('Período: 7 dias')),
-                          DropdownMenuItem(value: '30D', child: Text('Período: 30 dias')),
-                        ],
-                      ),
-                      const SizedBox(width: 12),
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _statusFilter = 'ALL';
-                            _directionFilter = 'ALL';
-                            _periodFilter = 'ALL';
-                            _phoneFilterController.clear();
-                          });
-                          _loadConversations();
-                        },
-                        icon: const Icon(Symbols.filter_alt_off),
-                        label: const Text('Limpar filtros'),
                       ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-          if (_isLoading)
-            const Expanded(child: Center(child: CircularProgressIndicator()))
-          else if (_error != null)
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Erro ao carregar atendimentos: $_error', textAlign: TextAlign.center),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: _loadConversations,
-                      icon: const Icon(Symbols.refresh),
-                      label: const Text('Tentar novamente'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else if (filtered.isEmpty)
-            const Expanded(
-              child: Center(
-                child: Text('Nenhum atendimento encontrado com os filtros atuais.'),
-              ),
-            )
-          else
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _loadConversations,
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final conversation = filtered[index];
-                    final isIncoming = conversation.lastMessageDirection == 'IN';
-                    return Card(
-                      child: ListTile(
-                        onTap: () => _openConversation(conversation),
-                        leading: CircleAvatar(
-                          child: Icon(isIncoming ? Symbols.call_received : Symbols.smart_toy),
-                        ),
-                        title: Text(conversation.phone),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 4),
-                            Text(
-                              conversation.lastMessageText?.trim().isNotEmpty == true
-                                  ? conversation.lastMessageText!
-                                  : 'Sem mensagem de texto',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 6),
-                            Text('Última atividade: ${_formatDate(conversation.lastMessageAt)}'),
-                          ],
-                        ),
-                        trailing: const Icon(Symbols.chevron_right),
+            if (_isLoading)
+              const Expanded(child: Center(child: CircularProgressIndicator()))
+            else if (_error != null)
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Symbols.warning, size: 42, color: theme.colorScheme.error),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Erro ao carregar atendimentos',
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                       ),
-                    );
-                  },
+                      const SizedBox(height: 6),
+                      Text(
+                        _error ?? 'Falha inesperada',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _loadConversations,
+                        icon: const Icon(Symbols.refresh),
+                        label: const Text('Tentar novamente'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else if (filtered.isEmpty)
+              const Expanded(
+                child: Center(
+                  child: Text('Nenhum atendimento encontrado com os filtros atuais.'),
+                ),
+              )
+            else
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _loadConversations,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final conversation = filtered[index];
+                      final isIncoming = conversation.lastMessageDirection == 'IN';
+                      final messagePreview = conversation.lastMessageText?.trim().isNotEmpty == true
+                          ? conversation.lastMessageText!.trim()
+                          : 'Sem mensagem de texto';
+
+                      return Card(
+                        elevation: 0,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => _openConversation(conversation),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                Stack(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 20,
+                                      backgroundColor: isIncoming
+                                          ? colorScheme.secondaryContainer
+                                          : colorScheme.primaryContainer,
+                                      child: Icon(
+                                        isIncoming ? Symbols.call_received : Symbols.smart_toy,
+                                        size: 20,
+                                        color: isIncoming
+                                            ? colorScheme.onSecondaryContainer
+                                            : colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                    Positioned(
+                                      right: 0,
+                                      bottom: 0,
+                                      child: Container(
+                                        width: 10,
+                                        height: 10,
+                                        decoration: BoxDecoration(
+                                          color: conversation.paused ? colorScheme.tertiary : colorScheme.primary,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: colorScheme.surface, width: 1.5),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              _formatPhoneLabel(conversation.phone),
+                                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                            ),
+                                          ),
+                                          _StatusPill(
+                                            label: conversation.paused 
+                                                ? 'Pausado' 
+                                                : (conversation.status.toUpperCase() == 'OPEN' 
+                                                    ? 'IA Ativa' 
+                                                    : (conversation.status.toUpperCase() == 'CLOSED' ? 'Finalizado' : conversation.status)),
+                                            color: conversation.paused ? colorScheme.tertiary : colorScheme.primary,
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        messagePreview,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        children: [
+                                          Icon(Symbols.schedule, size: 16, color: colorScheme.outline),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Última atividade: ${_formatDate(conversation.lastMessageAt)}',
+                                            style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.outline),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(Symbols.chevron_right, color: colorScheme.outline),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _SummaryChip({required this.label, required this.value, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: colorScheme.onPrimary),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: colorScheme.onPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                label,
+                style: TextStyle(
+                  color: colorScheme.onPrimary.withOpacity(0.84),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
+
+class _StatusPill extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Color? backgroundColor;
+  final Color? textColor;
+
+  const _StatusPill({
+    required this.label,
+    required this.color,
+    this.backgroundColor,
+    this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: backgroundColor ?? color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: textColor ?? color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+
 
 class _ConversationMessagesSheet extends StatefulWidget {
   final WhatsAppConversation conversation;
@@ -304,40 +498,70 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
   String? _error;
   List<WhatsAppMessage> _messages = const [];
   bool _isActionLoading = false;
+  bool _isLoadingMore = false;
+  bool _hasMoreMessages = true;
+  bool _showJumpToBottom = false;
+  int _currentOffset = 0;
+  static const int _pageSize = 50; // Carregar 50 mensagens por página
   final ScrollController _messagesScrollController = ScrollController();
+  final TextEditingController _messageInputController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadMessages();
+    _messagesScrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _messagesScrollController.removeListener(_onScroll);
     _messagesScrollController.dispose();
+    _messageInputController.dispose();
     super.dispose();
   }
 
   void _scrollToLatest() {
     if (!_messagesScrollController.hasClients) return;
-
-    final target = _messagesScrollController.position.maxScrollExtent;
-    if (target <= 0) return;
-
-    _messagesScrollController.jumpTo(target);
+    _messagesScrollController.jumpTo(0);
   }
 
-  Future<void> _loadMessages() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  void _onScroll() {
+    // Se scrollou para bem perto do topo e tem mais mensagens
+    if (_messagesScrollController.position.pixels >=
+            _messagesScrollController.position.maxScrollExtent - 100 &&
+        !_isLoadingMore &&
+        _hasMoreMessages &&
+        !_isLoading) {
+      _loadMoreMessages();
+    }
+
+    if (_messagesScrollController.hasClients) {
+      final shouldShow = _messagesScrollController.position.pixels > 160;
+      if (shouldShow != _showJumpToBottom) {
+        setState(() => _showJumpToBottom = shouldShow);
+      }
+    }
+  }
+
+  Future<void> _loadMoreMessages() async {
+    if (_isLoadingMore || !_hasMoreMessages) return;
+
+    final oldMaxExtent = _messagesScrollController.hasClients
+      ? _messagesScrollController.position.maxScrollExtent
+      : 0.0;
+    final oldOffset = _messagesScrollController.hasClients
+      ? _messagesScrollController.position.pixels
+      : 0.0;
+
+    setState(() => _isLoadingMore = true);
 
     final completer = Completer<List<Map<String, dynamic>>>();
 
     await GerenteCall.listarMensagensWhatsapp(
       conversationId: widget.conversation.id,
-      limit: 200,
+      limit: _pageSize,
+      offset: _currentOffset + _pageSize,
       onSuccess: completer.complete,
       onError: (msg) => completer.completeError(Exception(msg)),
     );
@@ -345,10 +569,81 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
     try {
       final raw = await completer.future;
       if (!mounted) return;
+
+      if (raw.isEmpty) {
+        // Nenhuma mensagem nova = chegou ao fim
+        setState(() {
+          _hasMoreMessages = false;
+          _isLoadingMore = false;
+        });
+        return;
+      }
+
+      final newMessages = raw.map(WhatsAppMessage.fromJson).toList()
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+      setState(() {
+        // Adicionar no início (mensagens mais antigas)
+        _messages = [...newMessages, ..._messages];
+        _currentOffset += _pageSize;
+        _isLoadingMore = false;
+
+        // Se carregou menos que o esperado = fim das mensagens
+        if (raw.length < _pageSize) {
+          _hasMoreMessages = false;
+        }
+      });
+
+      // Manter scroll position após carregar mais
+      if (_messagesScrollController.hasClients) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_messagesScrollController.hasClients && mounted) {
+            final newMaxExtent = _messagesScrollController.position.maxScrollExtent;
+            final delta = newMaxExtent - oldMaxExtent;
+            _messagesScrollController.jumpTo(oldOffset + delta);
+          }
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingMore = false;
+      });
+      AppFeedback.showError(e, fallback: 'Erro ao carregar mensagens antigas.');
+    }
+  }
+
+  Future<void> _loadMessages() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _currentOffset = 0;
+      _hasMoreMessages = true;
+      _showJumpToBottom = false;
+    });
+
+    final completer = Completer<List<Map<String, dynamic>>>();
+
+    await GerenteCall.listarMensagensWhatsapp(
+      conversationId: widget.conversation.id,
+      limit: _pageSize,
+      offset: 0,
+      onSuccess: completer.complete,
+      onError: (msg) => completer.completeError(Exception(msg)),
+    );
+
+    try {
+      final raw = await completer.future;
+      if (!mounted) return;
+
       final sorted = raw.map(WhatsAppMessage.fromJson).toList()
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
       setState(() {
         _messages = sorted;
+        _currentOffset = _pageSize;
+        // Se carregou menos que o esperado = não há mais mensagens
+        _hasMoreMessages = raw.length >= _pageSize;
       });
     } catch (e) {
       if (!mounted) return;
@@ -382,18 +677,14 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
         onSuccess: (data) {
           if (mounted) {
             setState(() => _isActionLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Atendimento retomado.')),
-            );
+            AppFeedback.showSuccess('Atendimento retomado.');
             Navigator.of(context).pop();
           }
         },
         onError: (msg) {
           if (mounted) {
             setState(() => _isActionLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Erro ao retomar: $msg')),
-            );
+            AppFeedback.showError(msg, fallback: 'Erro ao retomar atendimento.');
           }
         },
       );
@@ -403,78 +694,27 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
         onSuccess: (data) {
           if (mounted) {
             setState(() => _isActionLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Atendimento pausado. O bot não responderá.')),
-            );
+            AppFeedback.showWarning('Atendimento pausado. O bot não responderá.');
             Navigator.of(context).pop();
           }
         },
         onError: (msg) {
           if (mounted) {
             setState(() => _isActionLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Erro ao pausar: $msg')),
-            );
+            AppFeedback.showError(msg, fallback: 'Erro ao pausar atendimento.');
           }
         },
       );
     }
   }
 
-  void _showSendMessageDialog() {
-    final textController = TextEditingController();
-    bool isSubmitting = false;
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Enviar Mensagem'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              TextField(
-                controller: textController,
-                decoration: const InputDecoration(
-                  hintText: 'Digite a mensagem...',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-                enabled: !isSubmitting,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: isSubmitting ? null : () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: isSubmitting ? null : () => _sendMessage(textController, ctx),
-              child: isSubmitting
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Enviar'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _sendMessage(TextEditingController controller, BuildContext dialogContext) async {
-    final text = controller.text.trim();
+  Future<void> _sendMessageFromInput() async {
+    final text = _messageInputController.text.trim();
     if (text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Digite uma mensagem.')),
-      );
       return;
     }
 
-    // Update dialog state
-    if (mounted) {
-      (dialogContext as Element).markNeedsBuild();
-    }
+    setState(() => _isActionLoading = true);
 
     await GerenteCall.sendManagerMessage(
       conversationId: widget.conversation.id,
@@ -482,78 +722,169 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
       phone: widget.conversation.phone,
       onSuccess: (data) {
         if (mounted) {
-          Navigator.of(dialogContext).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Mensagem enviada com sucesso.')),
-          );
-          _loadMessages(); // Reload messages to show the new one
+          _messageInputController.clear();
+          setState(() => _isActionLoading = false);
+          _loadMessages();
+          // Scroll para o final após enviar mensagem
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _scrollToLatest();
+            }
+          });
+          AppFeedback.showSuccess('Mensagem enviada com sucesso.');
         }
       },
       onError: (msg) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao enviar: $msg')),
-          );
+          setState(() => _isActionLoading = false);
+          AppFeedback.showError(msg, fallback: 'Erro ao enviar mensagem.');
         }
       },
     );
   }
 
-  String _formatTime(DateTime date) {
-    final local = date.toLocal();
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${two(local.day)}/${two(local.month)} ${two(local.hour)}:${two(local.minute)}';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
     final conversation = widget.conversation;
-    
-    return SafeArea(
-      child: SizedBox(
-        height: media.size.height * 0.86,
-        child: Column(
-          children: [
-            ListTile(
-              leading: const Icon(Symbols.chat),
-              title: Text('Atendimento: ${conversation.phone}'),
-              subtitle: Text('Status: ${conversation.status}${conversation.paused ? ' (PAUSADO)' : ''}'),
-              trailing: IconButton(
-                icon: const Icon(Symbols.close),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ),
-            const Divider(height: 1),
-            // Action buttons
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: Row(
-                children: [
-                  FilledButton.icon(
-                    onPressed: _isActionLoading ? null : _togglePauseResume,
-                    icon: Icon(conversation.paused ? Symbols.play_arrow : Symbols.pause),
-                    label: Text(conversation.paused ? 'Retomar' : 'Pausar'),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final statusLabel = conversation.status.toUpperCase() == 'OPEN' ? '' : conversation.status;
+    final statusText = conversation.paused
+      ? (statusLabel.isNotEmpty ? '$statusLabel • PAUSADO' : 'PAUSADO')
+      : statusLabel;
+    final phoneLabel = _formatPhoneLabel(conversation.phone);
+
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      backgroundColor: colorScheme.surface,
+      body: Column(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                const SizedBox(height: 32),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          colorScheme.primaryContainer,
+                          colorScheme.surfaceContainerHighest,
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Column(
+                      children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: colorScheme.onPrimaryContainer.withOpacity(0.12),
+                          child: Icon(Symbols.chat, color: colorScheme.onPrimaryContainer),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                phoneLabel,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: colorScheme.onPrimaryContainer,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Atendimento via WhatsApp',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onPrimaryContainer.withOpacity(0.75),
+                                ),
+                              ),
+                              if (statusText.isNotEmpty)
+                                Text(
+                                  statusText,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onPrimaryContainer.withOpacity(0.9),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: Icon(Symbols.close, color: colorScheme.onPrimaryContainer),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        _StatusPill(
+                          label: conversation.paused ? 'Status: Pausado' : 'Status: Ativo',
+                          color: colorScheme.onPrimaryContainer,
+                          backgroundColor: colorScheme.primaryContainer.withOpacity(0.6),
+                          textColor: colorScheme.onPrimaryContainer,
+                        ),
+                        _StatusPill(
+                          label: 'Total de mensagens: ${_messages.length}',
+                          color: colorScheme.onPrimaryContainer,
+                          backgroundColor: colorScheme.primaryContainer.withOpacity(0.6),
+                          textColor: colorScheme.onPrimaryContainer,
+                        ),
+                        _StatusPill(
+                          label: conversation.lastMessageDirection == 'IN'
+                              ? 'Última mensagem: Cliente'
+                              : 'Última mensagem: Atendimento',
+                          color: colorScheme.onPrimaryContainer,
+                          backgroundColor: colorScheme.primaryContainer.withOpacity(0.6),
+                          textColor: colorScheme.onPrimaryContainer,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _isActionLoading ? null : _togglePauseResume,
+                        icon: Icon(conversation.paused ? Symbols.play_arrow : Symbols.pause),
+                        label: Text(conversation.paused ? 'Retomar' : 'Pausar'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colorScheme.onPrimaryContainer,
+                          foregroundColor: colorScheme.primaryContainer,
+                        ),
+                      ),
+                    ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: _isActionLoading ? null : _showSendMessageDialog,
-                    icon: const Icon(Symbols.send),
-                    label: const Text('Enviar Mensagem'),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const Divider(height: 1),
-            if (_isLoading)
-              const Expanded(child: Center(child: CircularProgressIndicator()))
-            else if (_error != null)
-              Expanded(
-                child: Center(
+          ),
+          if (_isLoading)
+            const Expanded(child: Center(child: CircularProgressIndicator()))
+          else if (_error != null)
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('Erro ao carregar mensagens: $_error', textAlign: TextAlign.center),
+                      Icon(Symbols.warning, size: 42, color: colorScheme.error),
+                      const SizedBox(height: 12),
+                      Text('Erro ao carregar mensagens', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      Text('$_error', textAlign: TextAlign.center),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
                         onPressed: _loadMessages,
@@ -563,53 +894,115 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
                     ],
                   ),
                 ),
-              )
-            else if (_messages.isEmpty)
-              const Expanded(child: Center(child: Text('Sem mensagens nesta conversa.')))
-            else
-              Expanded(
-                child: ListView.builder(
-                  controller: _messagesScrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _messages.length,
-                  itemBuilder: (context, index) {
-                    final message = _messages[index];
-                    final isIncoming = message.direction == 'IN';
-                    final align = isIncoming ? Alignment.centerLeft : Alignment.centerRight;
-                    final color = isIncoming
-                        ? Theme.of(context).colorScheme.surfaceContainerHighest
-                        : Theme.of(context).colorScheme.primaryContainer;
+              ),
+            )
+          else
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                ),
+                child: _messages.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Symbols.chat_bubble, size: 42, color: colorScheme.outline),
+                            const SizedBox(height: 12),
+                            Text('Sem mensagens nesta conversa.', style: theme.textTheme.titleMedium),
+                          ],
+                        ),
+                      )
+                    : Stack(
+                        children: [
+                          ListView.custom(
+                            controller: _messagesScrollController,
+                            reverse: true,
+                            padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+                            cacheExtent: 1200,
+                            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                            childrenDelegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                if (_hasMoreMessages && index == _messages.length) {
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    child: Center(
+                                      child: _isLoadingMore
+                                          ? const SizedBox(
+                                              height: 24,
+                                              width: 24,
+                                              child: CircularProgressIndicator(strokeWidth: 2),
+                                            )
+                                          : OutlinedButton.icon(
+                                              onPressed: _loadMoreMessages,
+                                              icon: const Icon(Symbols.expand_less),
+                                              label: const Text('Carregar mensagens antigas'),
+                                            ),
+                                    ),
+                                  );
+                                }
 
-                    return Align(
-                      alignment: align,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 420),
-                        child: Card(
-                          color: color,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  message.text.isNotEmpty ? message.text : '(mensagem sem texto)',
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  '${isIncoming ? 'Cliente' : 'Bot'} • ${_formatTime(message.createdAt)} • ${message.status}',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
+                                final message = _messages[_messages.length - 1 - index];
+                                final messagePosition = _messages.length - 1 - index;
+                                final previousMessage = messagePosition > 0 ? _messages[messagePosition - 1] : null;
+                                final shouldShowSeparator = previousMessage == null ||
+                                    previousMessage.createdAt.year != message.createdAt.year ||
+                                    previousMessage.createdAt.month != message.createdAt.month ||
+                                    previousMessage.createdAt.day != message.createdAt.day;
+
+                                return RepaintBoundary(
+                                  child: Column(
+                                    children: [
+                                      if (shouldShowSeparator) DateSeparator(date: message.createdAt),
+                                      ChatBubble(
+                                        text: message.text,
+                                        timestamp: message.createdAt,
+                                        isOutgoing: message.direction != 'IN',
+                                        status: message.status,
+                                        senderLabel: message.direction == 'IN' ? 'Cliente' : 'Atendimento',
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              childCount: _messages.length + (_hasMoreMessages ? 1 : 0),
+                              addAutomaticKeepAlives: false,
+                              addRepaintBoundaries: true,
+                              addSemanticIndexes: false,
                             ),
                           ),
-                        ),
+                          Positioned(
+                            right: 12,
+                            bottom: 12,
+                            child: AnimatedOpacity(
+                              opacity: _showJumpToBottom ? 1 : 0,
+                              duration: const Duration(milliseconds: 160),
+                              child: AnimatedScale(
+                                scale: _showJumpToBottom ? 1 : 0.9,
+                                duration: const Duration(milliseconds: 160),
+                                child: Material(
+                                  color: colorScheme.primaryContainer,
+                                  shape: const CircleBorder(),
+                                  child: IconButton(
+                                    onPressed: _showJumpToBottom ? _scrollToLatest : null,
+                                    icon: Icon(Symbols.south, color: colorScheme.onPrimaryContainer),
+                                    tooltip: 'Ir para o fim',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                ),
               ),
-          ],
-        ),
+            ),
+          ChatInputField(
+            controller: _messageInputController,
+            onSendPressed: _sendMessageFromInput,
+            isLoading: _isActionLoading,
+          ),
+        ],
       ),
     );
   }

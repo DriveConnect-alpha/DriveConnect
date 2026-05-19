@@ -6,6 +6,7 @@ import { Cliente } from '../entities/Cliente.js';
 import { Gerente } from '../entities/Gerente.js';
 
 import crypto from 'crypto';
+import { notifyNovoCliente } from './fcm.service.js';
 
 // ──────────────────────────────────────────────
 // AUTENTICAÇÃO
@@ -23,6 +24,8 @@ export interface UsuarioAutenticado {
   perfilId: string | null;
   /** Filial do gerente (null = global ou não-gerente). Usado no JWT para escopo de dados. */
   filialId: string | null;
+  imagemUrl: string | null;
+  preferencias: any;
 }
 
 /**
@@ -31,7 +34,7 @@ export interface UsuarioAutenticado {
  */
 export async function autenticarUsuario(payload: LoginPayload): Promise<UsuarioAutenticado> {
   const resultado = await query(
-    `SELECT id, email, senha, tipo FROM usuario WHERE email = $1 AND deletado_em IS NULL`,
+    `SELECT id, email, senha, tipo, imagem_url, preferencias FROM usuario WHERE email = $1 AND deletado_em IS NULL`,
     [payload.email],
   );
 
@@ -53,7 +56,15 @@ export async function autenticarUsuario(payload: LoginPayload): Promise<UsuarioA
     filialId = r.rows[0]?.filial_id ?? null;
   }
 
-  return { id: row.id, email: row.email, tipo: row.tipo, perfilId, filialId };
+  return {
+    id: row.id,
+    email: row.email,
+    tipo: row.tipo,
+    perfilId,
+    filialId,
+    imagemUrl: row.imagem_url,
+    preferencias: row.preferencias
+  };
 }
 
 // ──────────────────────────────────────────────
@@ -106,6 +117,11 @@ export async function criarCliente(params: CriarClienteParams): Promise<{ usuari
     const clienteId: string = clienteRes.rows[0].id;
 
     await client.query('COMMIT');
+    // Notifica gerentes/admin sobre novo cliente (não bloqueia fluxo)
+    void notifyNovoCliente({ clienteId, clienteNome: params.nomeCompleto }).catch((err) => {
+      console.error('[Usuario] Falha ao notificar novo cliente via FCM:', err);
+    });
+
     return { usuarioId, clienteId };
   } catch (err) {
     await client.query('ROLLBACK');
@@ -158,7 +174,7 @@ export async function criarGerente(params: CriarGerenteParams): Promise<{ usuari
 /** Busca um usuário ativo por ID, sem expor o hash de senha. */
 export async function buscarUsuarioPorId(id: string): Promise<Usuario | null> {
   const r = await query(
-    `SELECT id, email, tipo, criado_em, deletado_em FROM usuario WHERE id = $1`,
+    `SELECT id, email, tipo, imagem_url, preferencias, criado_em, deletado_em FROM usuario WHERE id = $1`,
     [id],
   );
 
@@ -169,9 +185,27 @@ export async function buscarUsuarioPorId(id: string): Promise<Usuario | null> {
     id: row.id,
     email: row.email,
     tipo: row.tipo,
+    imagemUrl: row.imagem_url,
+    preferencias: row.preferencias,
     criadoEm: row.criado_em,
     deletadoEm: row.deletado_em,
   });
+}
+
+/** Atualiza a foto de perfil do usuário. */
+export async function atualizarFotoPerfil(usuarioId: string, imagemUrl: string): Promise<void> {
+  await query(
+    `UPDATE usuario SET imagem_url = $1 WHERE id = $2 AND deletado_em IS NULL`,
+    [imagemUrl, usuarioId]
+  );
+}
+
+/** Atualiza as preferências do usuário (tema e notificações). */
+export async function atualizarPreferenciasUsuario(usuarioId: string, preferencias: any): Promise<void> {
+  await query(
+    `UPDATE usuario SET preferencias = $1 WHERE id = $2 AND deletado_em IS NULL`,
+    [JSON.stringify(preferencias), usuarioId]
+  );
 }
 
 /** Lista todos os clientes ativos com seus dados de perfil e email. */
@@ -189,6 +223,7 @@ export async function listarClientes(): Promise<any[]> {
           'id', u.id,
           'email', u.email,
           'tipo', u.tipo,
+          'imagemUrl', u.imagem_url,
           'criado_em', u.criado_em,
           'nome', c.nome_completo,
           'perfilId', c.id
@@ -210,6 +245,7 @@ export async function listarUsuariosSistema(): Promise<any[]> {
         u.id, 
         u.email, 
         u.tipo, 
+        u.imagem_url as "imagemUrl",
         u.criado_em,
         COALESCE(c.nome_completo, g.nome_completo, 'Administrador') as nome
      FROM usuario u
@@ -222,53 +258,39 @@ export async function listarUsuariosSistema(): Promise<any[]> {
 }
 
 /** Busca um cliente ativo por ID com seus dados de perfil. */
-export async function buscarClientePorId(clienteId: string): Promise<Cliente | null> {
+export async function buscarClientePorId(clienteId: string): Promise<any | null> {
   const r = await query(
-    `SELECT c.id, c.usuario_id, c.nome_completo, c.cpf, c.rg, c.cnh, c.criado_em, c.deletado_em
+    `SELECT 
+        c.id as perfil_id, 
+        c.usuario_id as id, 
+        c.nome_completo as nome, 
+        c.cpf, c.rg, c.cnh, c.criado_em,
+        u.email, u.tipo, u.imagem_url, u.preferencias
      FROM cliente c
      JOIN usuario u ON u.id = c.usuario_id
      WHERE c.id = $1 AND c.deletado_em IS NULL AND u.deletado_em IS NULL`,
     [clienteId],
   );
 
-  const row = r.rows[0];
-  if (!row) return null;
-
-  return new Cliente({
-    id: row.id,
-    usuarioId: row.usuario_id,
-    nomeCompleto: row.nome_completo,
-    cpf: row.cpf,
-    rg: row.rg,
-    cnh: row.cnh,
-    criadoEm: row.criado_em,
-    deletadoEm: row.deletado_em,
-  });
+  return r.rows[0] || null;
 }
 
 /** Busca o perfil do próprio cliente usando o usuarioId do caller. */
-export async function buscarMeuPerfilCliente(usuarioId: string): Promise<Cliente | null> {
+export async function buscarMeuPerfilCliente(usuarioId: string): Promise<any | null> {
   const r = await query(
-    `SELECT c.id, c.usuario_id, c.nome_completo, c.cpf, c.rg, c.cnh, c.criado_em, c.deletado_em
+    `SELECT 
+        c.id as perfil_id, 
+        c.usuario_id as id, 
+        c.nome_completo as nome, 
+        c.cpf, c.rg, c.cnh, c.criado_em,
+        u.email, u.tipo, u.imagem_url, u.preferencias
      FROM cliente c
      JOIN usuario u ON u.id = c.usuario_id
      WHERE c.usuario_id = $1 AND c.deletado_em IS NULL AND u.deletado_em IS NULL`,
     [usuarioId],
   );
 
-  const row = r.rows[0];
-  if (!row) return null;
-
-  return new Cliente({
-    id: row.id,
-    usuarioId: row.usuario_id,
-    nomeCompleto: row.nome_completo,
-    cpf: row.cpf,
-    rg: row.rg,
-    cnh: row.cnh,
-    criadoEm: row.criado_em,
-    deletadoEm: row.deletado_em,
-  });
+  return r.rows[0] || null;
 }
 
 interface AtualizarMeuPerfilParams {
@@ -281,7 +303,7 @@ interface AtualizarMeuPerfilParams {
 export async function atualizarMeuPerfilCliente(
   usuarioId: string,
   params: AtualizarMeuPerfilParams,
-): Promise<Cliente | null> {
+): Promise<any | null> {
   if (params.nomeCompleto) Cliente.validarNome(params.nomeCompleto);
 
   const campos: string[] = [];
@@ -289,8 +311,8 @@ export async function atualizarMeuPerfilCliente(
   let idx = 1;
 
   if (params.nomeCompleto !== undefined) { campos.push(`nome_completo = $${idx++}`); valores.push(params.nomeCompleto); }
-  if (params.rg           !== undefined) { campos.push(`rg = $${idx++}`);            valores.push(params.rg); }
-  if (params.cnh          !== undefined) { campos.push(`cnh = $${idx++}`);           valores.push(params.cnh); }
+  if (params.rg !== undefined) { campos.push(`rg = $${idx++}`); valores.push(params.rg); }
+  if (params.cnh !== undefined) { campos.push(`cnh = $${idx++}`); valores.push(params.cnh); }
 
   if (campos.length === 0) return null;
 
@@ -325,8 +347,8 @@ export async function atualizarCliente(
   let idx = 1;
 
   if (params.nomeCompleto !== undefined) { campos.push(`nome_completo = $${idx++}`); valores.push(params.nomeCompleto); }
-  if (params.rg !== undefined)           { campos.push(`rg = $${idx++}`);            valores.push(params.rg); }
-  if (params.cnh !== undefined)          { campos.push(`cnh = $${idx++}`);           valores.push(params.cnh); }
+  if (params.rg !== undefined) { campos.push(`rg = $${idx++}`); valores.push(params.rg); }
+  if (params.cnh !== undefined) { campos.push(`cnh = $${idx++}`); valores.push(params.cnh); }
 
   if (campos.length === 0) return null;
 

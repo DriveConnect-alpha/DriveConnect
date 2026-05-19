@@ -17,6 +17,8 @@ class MockAuthService implements IAuthService {
           tipo: isActuallyAdmin ? 'ADMIN' : 'GERENTE',
           perfilId: isActuallyAdmin ? null : 'g1',
           filialId: isActuallyAdmin ? null : 'f1',
+          imagemUrl: null,
+          preferencias: {},
           criadoEm: DateTime.now(),
         ),
       };
@@ -30,6 +32,8 @@ class MockAuthService implements IAuthService {
           tipo: 'CLIENTE',
           perfilId: 'c1',
           filialId: null,
+          imagemUrl: null,
+          preferencias: {},
           criadoEm: DateTime.now(),
         ),
       };
@@ -60,8 +64,40 @@ class MockAuthService implements IAuthService {
       tipo: 'CLIENTE',
       perfilId: id,
       filialId: null,
+      imagemUrl: null,
+      preferencias: {},
       criadoEm: DateTime.now(),
     );
+  }
+
+  @override
+  Future<void> changePassword({
+    required String id,
+    required String newPassword,
+  }) async {
+    await Future.delayed(const Duration(seconds: 1));
+  }
+
+  @override
+  Future<String> updateProfilePhoto({
+    required String id,
+    required dynamic imageFile,
+  }) async {
+    await Future.delayed(const Duration(seconds: 1));
+    return 'mock_photo_url.jpg';
+  }
+
+  @override
+  Future<void> updatePreferences({
+    required String id,
+    required Map<String, dynamic> preferences,
+  }) async {
+    await Future.delayed(const Duration(seconds: 1));
+  }
+
+  @override
+  Future<void> removeProfilePhoto({required String id}) async {
+    await Future.delayed(const Duration(seconds: 1));
   }
 
   @override

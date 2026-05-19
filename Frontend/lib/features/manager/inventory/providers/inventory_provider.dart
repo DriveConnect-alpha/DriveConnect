@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/models/veiculo.dart';
-import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_exceptions.dart';
 
 import '../services/iinventory_service.dart';
@@ -51,12 +50,12 @@ class InventoryProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> updateVehicle(String id, {int? modeloId, String? filialId, String? placa, int? ano, String? cor, String? status}) async {
+  Future<bool> updateVehicle(String id, {int? modeloId, String? filialId, String? placa, int? ano, String? cor, String? status, XFile? image, bool? removerImagem}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
     try {
-      await _service.updateVehicle(id, modeloId: modeloId, filialId: filialId, placa: placa, ano: ano, cor: cor, status: status);
+      await _service.updateVehicle(id, modeloId: modeloId, filialId: filialId, placa: placa, ano: ano, cor: cor, status: status, image: image, removerImagem: removerImagem);
       await fetchInventory();
       return true;
     } catch (e) {

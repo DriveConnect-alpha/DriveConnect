@@ -8,6 +8,9 @@ import '../../../../core/widgets/dc_button.dart';
 import '../../../../core/widgets/dc_card.dart';
 import '../../../../calls/filial.call.dart';
 import '../../../../core/models/filial.dart';
+import '../../../../core/feedback/app_feedback.dart';
+import '../../../../core/widgets/dc_feedback_message.dart';
+import '../../../../core/loading/app_loading.dart';
 
 class PeriodSelectionScreen extends StatefulWidget {
   const PeriodSelectionScreen({super.key});
@@ -44,6 +47,7 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
       onError: (msg) {
         if (mounted) {
           setState(() => _isLoadingFiliais = false);
+          AppFeedback.showError(msg, fallback: 'Erro ao carregar filiais.');
         }
       },
     );
@@ -53,6 +57,14 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bookingProvider = context.watch<BookingProvider>();
+
+    // Inicializa IDs locais a partir do provider se ainda não estiverem setados nesta tela
+    if (_pickupBranchId == null && bookingProvider.pickupBranchId != null) {
+      _pickupBranchId = bookingProvider.pickupBranchId;
+    }
+    if (_returnBranchId == null && bookingProvider.returnBranchId != null) {
+      _returnBranchId = bookingProvider.returnBranchId;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -91,18 +103,34 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
                 ],
               ),
             ),
+            
             const SizedBox(height: 24),
             Text(
               'Onde você vai retirar e devolver?',
               style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            _buildBranchSelector(
-              label: 'Retirada',
-              value: _pickupBranchId,
-              onChanged: (val) => setState(() => _pickupBranchId = val),
+            
+            // Retirada Travada
+            Opacity(
+              opacity: 0.7,
+              child: _buildBranchSelector(
+                label: 'Retirada (Obrigatório)',
+                value: _pickupBranchId,
+                onChanged: null, // Desabilitado: carro já está lá
+              ),
             ),
-            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.only(left: 12, top: 4),
+              child: Text(
+                'Nota: A retirada deve ser feita na filial atual do veículo.',
+                style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey[600]),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Devolução Livre
             _buildBranchSelector(
               label: 'Devolução',
               value: _returnBranchId,
@@ -112,9 +140,9 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
             if (bookingProvider.error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  bookingProvider.error!,
-                  style: TextStyle(color: theme.colorScheme.error),
+                child: DCFeedbackMessage(
+                  message: bookingProvider.error!,
+                  type: AppFeedbackType.error,
                 ),
               ),
             DCButton(
@@ -131,7 +159,7 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
   Widget _buildBranchSelector({
     required String label,
     required String? value,
-    required ValueChanged<String?> onChanged,
+    required ValueChanged<String?>? onChanged,
   }) {
     return DCCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -147,7 +175,7 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
               isExpanded: true,
               items: _filiais.map<DropdownMenuItem<String>>((f) {
                 return DropdownMenuItem<String>(
-                  value: f.id ?? '',
+                  value: f.id,
                   child: Text(f.nome ?? ''),
                 );
               }).toList(),
@@ -162,13 +190,10 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
     
     // Mostra um loading rápido se necessário
     if (bookingProvider.selectedVehicle?.id != null) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
+      await AppLoading.wrap(
+        () => bookingProvider.loadOccupiedDates(bookingProvider.selectedVehicle!.id),
+        message: 'Buscando datas ocupadas...',
       );
-      await bookingProvider.loadOccupiedDates(bookingProvider.selectedVehicle!.id!);
-      if (mounted) Navigator.pop(context); // Fecha o loading
     }
 
     final occupied = bookingProvider.occupiedDates;
@@ -214,12 +239,7 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
       final duration = range.end.difference(range.start).inDays;
       if (duration > 30) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('A reserva inicial não pode ultrapassar 30 dias. Você poderá renová-la depois.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          AppFeedback.showWarning('A reserva inicial não pode ultrapassar 30 dias. Você poderá renová-la depois.');
         }
         return;
       }
@@ -236,9 +256,7 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
 
       if (hasOverlap) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('O período selecionado contém datas já reservadas.')),
-          );
+          AppFeedback.showWarning('O período selecionado contém datas já reservadas.');
         }
         return;
       }
@@ -252,9 +270,7 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
 
   void _handleCheckAvailability() async {
     if (_startDate == null || _endDate == null || _pickupBranchId == null || _returnBranchId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, preencha todos os campos')),
-      );
+      AppFeedback.showWarning('Por favor, preencha todos os campos.');
       return;
     }
 

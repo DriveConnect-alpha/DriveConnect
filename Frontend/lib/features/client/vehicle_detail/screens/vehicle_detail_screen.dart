@@ -7,6 +7,7 @@ import '../../../../core/models/veiculo.dart';
 import '../../../../core/widgets/dc_button.dart';
 import '../../../../core/widgets/dc_card.dart';
 import '../../booking/providers/booking_provider.dart';
+import '../../../../core/feedback/app_feedback.dart';
 
 class VehicleDetailScreen extends StatefulWidget {
   final Veiculo veiculo;
@@ -24,23 +25,15 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
     setState(() {
       _isFavorite = !_isFavorite;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_isFavorite ? 'Veículo adicionado aos favoritos!' : 'Veículo removido dos favoritos.'),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    if (_isFavorite) {
+      AppFeedback.showSuccess('Veículo adicionado aos favoritos!');
+    } else {
+      AppFeedback.showInfo('Veículo removido dos favoritos.');
+    }
   }
 
   void _shareVehicle() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Compartilhando link do veículo...'),
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 2),
-      ),
-    );
+    AppFeedback.showInfo('Compartilhando link do veículo...');
   }
 
   @override
@@ -60,14 +53,18 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                       '$apiBaseUrl/storage/carros/${veiculo.imagemUrl}',
                       headers: vehicleImageHeaders,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Image.network(
-                        'https://placehold.co/800x600/png?text=${veiculo.modelo?.nome}',
-                        fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: Colors.grey[200],
+                        child: Center(
+                          child: Icon(Symbols.directions_car, size: 64, color: Colors.grey[400]),
+                        ),
                       ),
                     )
-                  : Image.network(
-                      'https://placehold.co/800x600/png?text=${veiculo.modelo?.nome}',
-                      fit: BoxFit.cover,
+                  : Container(
+                      color: Colors.grey[200],
+                      child: Center(
+                        child: Icon(Symbols.directions_car, size: 64, color: Colors.grey[400]),
+                      ),
                     ),
             ),
             actions: [

@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import '../providers/booking_provider.dart';
+import '../../../../calls/api_core.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/widgets/dc_button.dart';
 import '../../../../core/widgets/dc_card.dart';
 import '../../../../core/widgets/dc_loading.dart';
+import '../../../../core/feedback/app_feedback.dart';
+import '../../../../core/widgets/dc_feedback_message.dart';
 
 class CheckoutScreen extends StatelessWidget {
   const CheckoutScreen({super.key});
@@ -48,11 +54,19 @@ class CheckoutScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceVariant,
                       borderRadius: BorderRadius.circular(8),
-                      image: const DecorationImage(
-                        image: NetworkImage('https://placehold.co/200x150/png?text=Car'),
-                        fit: BoxFit.cover,
-                      ),
+                      image: veiculo.imagemUrl != null
+                          ? DecorationImage(
+                              image: NetworkImage(
+                                '$apiBaseUrl/storage/carros/${veiculo.imagemUrl}',
+                                headers: vehicleImageHeaders,
+                              ),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
                     ),
+                    child: veiculo.imagemUrl == null
+                        ? Icon(Symbols.directions_car, color: theme.colorScheme.onSurfaceVariant, size: 32)
+                        : null,
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -135,9 +149,9 @@ class CheckoutScreen extends StatelessWidget {
             if (bookingProvider.error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  bookingProvider.error!,
-                  style: TextStyle(color: theme.colorScheme.error),
+                child: DCFeedbackMessage(
+                  message: bookingProvider.error!,
+                  type: AppFeedbackType.error,
                 ),
               ),
           ],
@@ -219,33 +233,117 @@ class _PaymentProcessingSheetState extends State<_PaymentProcessingSheet> {
 
   void _startPolling() async {
     final provider = context.read<BookingProvider>();
-    // Simulação de polling
-    await Future.delayed(const Duration(seconds: 5));
-    if (mounted) {
-      // No mundo real, verificaríamos o status via provider
+    
+    // Abre o link automaticamente se disponível
+    if (provider.paymentLink != null) {
+      final uri = Uri.parse(provider.paymentLink!);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }
+
+    // Polling real de status através do provider
+    bool isPaid = false;
+    while (mounted && !isPaid) {
+      await provider.pollPaymentStatus();
+      if (provider.paymentStatus == 'RESERVADA') {
+        isPaid = true;
+        break;
+      }
+      await Future.delayed(const Duration(seconds: 4));
+    }
+
+    if (mounted && isPaid) {
       context.go('/my-reservations');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final provider = context.watch<BookingProvider>();
+    final veiculo = provider.selectedVehicle;
+    
+    // Calcula total novamente para o preview (ou poderia vir do provider se salvo)
+    final dias = provider.endDate!.difference(provider.startDate!).inDays;
+    final totalDiarias = (veiculo?.modelo?.tipoCarro?.precoBaseDiaria ?? 0) * dias;
+    const taxaServico = 45.00;
+    const planoProtecao = 80.00;
+    final totalGeral = totalDiarias + taxaServico + planoProtecao;
+
     return Container(
       padding: const EdgeInsets.all(24),
-      height: 400,
+      height: 600, // Aumentado para o preview
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const DCLoading(message: 'Aguardando confirmação do pagamento...'),
-          const SizedBox(height: 24),
-          const Text(
-            'Estamos processando seu pagamento via InfinitePay. Por favor, não feche esta tela.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey),
+          const Icon(Symbols.credit_score, size: 60, color: Color(0xFF00628b)),
+          const SizedBox(height: 16),
+          Text(
+            'Link de Pagamento Gerado!',
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 24),
+          
+          // Preview Card
+          DCCard(
+            color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(veiculo?.modelo?.nome ?? 'Veículo', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text('R\$ ${totalGeral.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const Divider(height: 24),
+                Row(
+                  children: [
+                    const Icon(Symbols.calendar_month, size: 16, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${DateFormat('dd/MM').format(provider.startDate!)} até ${DateFormat('dd/MM').format(provider.endDate!)}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
           const SizedBox(height: 32),
+          if (provider.paymentLink != null) ...[
+            DCButton(
+              label: 'Pagar Agora (Abrir Link)',
+              onPressed: () async {
+                final uri = Uri.parse(provider.paymentLink!);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: provider.paymentLink!));
+                AppFeedback.showSuccess('Link copiado para a área de transferência!');
+              },
+              icon: const Icon(Symbols.content_copy, size: 20),
+              label: const Text('Copiar Link de Pagamento'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+                side: BorderSide(color: theme.colorScheme.primary),
+              ),
+            ),
+          ],
+          const SizedBox(height: 24),
+          const DCLoading(message: 'Aguardando confirmação automática...'),
+          const SizedBox(height: 24),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar Pagamento'),
+            child: const Text('Voltar e revisar', style: TextStyle(color: Colors.grey)),
           ),
         ],
       ),

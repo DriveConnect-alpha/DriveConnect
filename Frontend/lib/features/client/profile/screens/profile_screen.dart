@@ -1,10 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/widgets/dc_card.dart';
+import '../../../../calls/api_core.dart';
 import '../widgets/edit_profile_dialog.dart';
+import '../../../../core/feedback/app_feedback.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -15,6 +20,71 @@ class ProfileScreen extends StatelessWidget {
       context: context,
       builder: (context) => EditProfileDialog(user: user),
     );
+  }
+
+  Future<void> _pickImage(BuildContext context, AuthProvider authProvider) async {
+    final picker = ImagePicker();
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Symbols.photo_camera),
+              title: const Text('Tirar Foto'),
+              onTap: () => Navigator.pop(ctx, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(Symbols.image),
+              title: const Text('Escolher da Galeria'),
+              onTap: () => Navigator.pop(ctx, 'gallery'),
+            ),
+            if (authProvider.user?.imagemUrl != null)
+              ListTile(
+                leading: const Icon(Symbols.delete, color: Colors.red),
+                title: const Text('Remover Foto Atual', style: TextStyle(color: Colors.red)),
+                onTap: () => Navigator.pop(ctx, 'remove'),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    if (action == null) return;
+
+    if (action == 'remove') {
+      try {
+        await authProvider.removeProfilePhoto();
+        if (context.mounted) {
+          AppFeedback.showSuccess('Foto removida com sucesso!');
+        }
+      } catch (e) {
+        if (context.mounted) {
+          AppFeedback.showError(e, fallback: 'Erro ao remover foto.');
+        }
+      }
+      return;
+    }
+
+    final source = action == 'camera' ? ImageSource.camera : ImageSource.gallery;
+    final image = await picker.pickImage(source: source, imageQuality: 70);
+
+    if (image != null) {
+      try {
+        // AuthProvider.updateProfilePhoto espera File em algumas implementações, 
+        // mas o image_picker retorna XFile. Convertemos para File.
+        await authProvider.updateProfilePhoto(File(image.path));
+        if (context.mounted) {
+          AppFeedback.showSuccess('Foto atualizada com sucesso!');
+        }
+      } catch (e) {
+        if (context.mounted) {
+          AppFeedback.showError(e, fallback: 'Erro ao atualizar foto.');
+        }
+      }
+    }
   }
 
   @override
@@ -31,9 +101,34 @@ class ProfileScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            const CircleAvatar(
-              radius: 50,
-              backgroundImage: NetworkImage('https://i.pravatar.cc/150?u=driveconnect'),
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: 60,
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  backgroundImage: user?.imagemUrl != null
+                      ? CachedNetworkImageProvider(
+                          '$apiBaseUrl/usuarios/me/foto?v=${user!.imagemUrl}',
+                          headers: authHeaders,
+                        )
+                      : null,
+                  child: user?.imagemUrl == null
+                      ? Icon(Symbols.person, size: 40, color: theme.colorScheme.onPrimaryContainer)
+                      : null,
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: theme.colorScheme.primary,
+                    child: IconButton(
+                      icon: const Icon(Symbols.photo_camera, size: 18, color: Colors.white),
+                      onPressed: () => _pickImage(context, authProvider),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             Text(
@@ -47,7 +142,7 @@ class ProfileScreen extends StatelessWidget {
             _buildProfileItem(Symbols.credit_card, 'Métodos de Pagamento', () {}),
             _buildProfileItem(Symbols.history, 'Histórico de Aluguéis', () => context.push('/my-reservations')),
             _buildProfileItem(Symbols.help, 'Ajuda e Suporte', () {}),
-            _buildProfileItem(Symbols.settings, 'Configurações', () {}),
+            _buildProfileItem(Symbols.settings, 'Configurações', () => context.push('/profile/settings')),
             
             const SizedBox(height: 24),
             _buildProfileItem(
@@ -57,7 +152,7 @@ class ProfileScreen extends StatelessWidget {
                 await authProvider.logout();
                 if (context.mounted) context.go('/login');
               },
-              color: Colors.orange, // Changed to orange to distinguish from Delete
+              color: Colors.orange,
             ),
             _buildProfileItem(
               Symbols.delete_forever, 
@@ -123,9 +218,7 @@ class ProfileScreen extends StatelessWidget {
                 }
               } catch (e) {
                 if (ctx.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erro ao excluir conta: $e')),
-                  );
+                  AppFeedback.showError(e, fallback: 'Erro ao excluir conta.');
                 }
               }
             },

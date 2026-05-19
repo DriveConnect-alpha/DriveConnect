@@ -4,6 +4,7 @@
 
 import 'dotenv/config';
 import { answerWhatsAppMessage } from '../ai/rag.js';
+import { atenderClienteComAgent } from '../ai/agent.js';
 import { query } from '../db/index.js';
 import {
   buscarVeiculoDisponivelPorFilial,
@@ -22,6 +23,7 @@ import {
   resumeConversation,
   sendManagerMessage,
 } from './whatsappStorage.service.js';
+import { notifyNovaConversa, notifyNovaMensagemAtendimento } from './fcm.service.js';
 import { criarCliente } from './usuario.service.js';
 import crypto from 'crypto';
 
@@ -206,6 +208,10 @@ export async function processIncomingMessage(payload: any): Promise<void> {
       rawPayload: message,
       status: 'received',
     });
+    // Notifica gerentes/admin sobre nova mensagem mesmo se conversa estiver pausada
+    void notifyNovaMensagemAtendimento({ phone: from, conversationId: conversation.id, message: text }).catch((err) => {
+      console.error('[WhatsApp] Falha ao notificar nova mensagem via FCM:', err);
+    });
     return;
   }
 
@@ -217,6 +223,17 @@ export async function processIncomingMessage(payload: any): Promise<void> {
     rawPayload: message,
     status: 'received',
   });
+
+  // Notifica gerentes/admins: se é criação de conversa, nova conversa; caso contrário, nova mensagem
+  if ((conversation as any).created) {
+    void notifyNovaConversa({ phone: from, conversationId: conversation.id, message: text }).catch((err) => {
+      console.error('[WhatsApp] Falha ao notificar nova conversa via FCM:', err);
+    });
+  } else {
+    void notifyNovaMensagemAtendimento({ phone: from, conversationId: conversation.id, message: text }).catch((err) => {
+      console.error('[WhatsApp] Falha ao notificar nova mensagem via FCM:', err);
+    });
+  }
 
   if (!text) {
     const fallback = 'Mensagem de mídia recebida, consigo processar apenas texto no momento.';
@@ -308,7 +325,36 @@ export async function processIncomingMessage(payload: any): Promise<void> {
   }
 
   try {
-    const reply = sanitizeAiPaymentReply(await answerWhatsAppMessage(text, { history }));
+    // Usar Agent para requisições estruturadas (reserva, cotação, etc)
+    // Fallback para RAG para perguntas genéricas
+    let reply: string;
+    
+    const useAgent = process.env.WHATSAPP_USE_AGENT === 'true' || true; // Default: true
+    if (useAgent) {
+      const agentResult = await atenderClienteComAgent(text, { history });
+      reply = sanitizeAiPaymentReply(agentResult.resposta);
+      console.log(`[WhatsApp Service] Agent executado: intenção=${agentResult.intencao}, tools=${agentResult.tools_usadas.join(',')}`);
+      
+      // Enviar foto se solicitada (apenas 1 foto)
+      if (agentResult.fotos && agentResult.fotos.length > 0 && agentResult.fotos[0]) {
+        const { sendImageByUrl } = await import('./whatsapp-media.service.js');
+        const messageId = await sendImageByUrl(from, agentResult.fotos[0]).catch((err) => {
+          console.error('[WhatsApp] Erro ao enviar foto:', err);
+          return null;
+        });
+
+        if (!messageId) {
+          const fallbackPhotoLink = agentResult.fotos[0];
+          const fallbackText = `Não consegui enviar a imagem diretamente agora, mas aqui está o link: ${fallbackPhotoLink}`;
+          await sendMessage(from, fallbackText).catch((err) => {
+            console.error('[WhatsApp] Erro enviando fallback da foto:', err);
+          });
+        }
+      }
+    } else {
+      reply = sanitizeAiPaymentReply(await answerWhatsAppMessage(text, { history }));
+    }
+    
     if (placeholderTimer) clearTimeout(placeholderTimer);
 
     const replyMessageId = await sendMessage(from, reply);

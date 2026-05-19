@@ -62,4 +62,55 @@ class AppTheme {
       ),
     ),
   );
+
+  static ThemeData get dark => ThemeData(
+    useMaterial3: true,
+    colorScheme: const ColorScheme.dark(
+      primary: Color(0xFF81CDFF),
+      onPrimary: Color(0xFF00344D),
+      primaryContainer: Color(0xFF004B6D),
+      onPrimaryContainer: Color(0xFFC9E6FF),
+      surface: Color(0xFF0A0F12),
+      onSurface: Color(0xFFDEE3E5),
+      surfaceContainerHighest: Color(0xFF22282C),
+      onSurfaceVariant: Color(0xFFBEC8CF),
+      error: Color(0xFFFFB4AB),
+      errorContainer: Color(0xFF93000A),
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Color(0xFF0A0F12),
+      foregroundColor: Color(0xFFDEE3E5),
+    ),
+    textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
+    cardTheme: CardThemeData(
+      elevation: 0,
+      color: const Color(0xFF1A1F23),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: const Color(0xFF1A1F23),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Color(0xFF33393E)),
+      ),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF81CDFF),
+        foregroundColor: const Color(0xFF00344D),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        minimumSize: const Size.fromHeight(48),
+      ),
+    ),
+  );
 }

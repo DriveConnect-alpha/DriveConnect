@@ -4,7 +4,8 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'carros');
+const CARROS_DIR = path.join(process.cwd(), 'uploads', 'carros');
+const PERFIL_DIR = path.join(process.cwd(), 'uploads', 'perfil');
 const EXTENSOES_IMAGEM_VALIDAS = new Set([
     '.jpg',
     '.jpeg',
@@ -16,12 +17,15 @@ const EXTENSOES_IMAGEM_VALIDAS = new Set([
     '.heif',
 ]);
 
-// Verifica se o diretório existe, caso contrário cria
-if (!fs.existsSync(UPLOAD_DIR)) {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
+// Garante que os diretórios existam
+[CARROS_DIR, PERFIL_DIR].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+});
 
-export async function processarUpload(req: IncomingMessage): Promise<{ campos: Record<string, any>, caminhosImagens: string[], caminhoImagem: string | null }> {
+export async function processarUpload(req: IncomingMessage, subdiretorio: 'carros' | 'perfil' = 'carros'): Promise<{ campos: Record<string, any>, caminhosImagens: string[], caminhoImagem: string | null }> {
+    const uploadDir = subdiretorio === 'perfil' ? PERFIL_DIR : CARROS_DIR;
     const ehImagemValida = (part: any): boolean => {
         const mimetype = String(part?.mimetype ?? '').toLowerCase();
         if (mimetype.includes('image/')) {
@@ -34,7 +38,7 @@ export async function processarUpload(req: IncomingMessage): Promise<{ campos: R
     };
 
     const form = formidable({
-        uploadDir: UPLOAD_DIR,
+        uploadDir,
         keepExtensions: true,
         maxFileSize: 5 * 1024 * 1024, // 5MB (compatível com testes e uso padrão)
         multiples: false, // Veículo aceita apenas uma imagem
@@ -71,12 +75,12 @@ export async function processarUpload(req: IncomingMessage): Promise<{ campos: R
             if (arquivosEncontrados.length > 1) {
                 for (const filename of arquivosEncontrados) {
                     try {
-                        fs.unlinkSync(path.join(UPLOAD_DIR, filename));
+                        fs.unlinkSync(path.join(uploadDir, filename));
                     } catch {
                         // noop
                     }
                 }
-                return reject(new Error('Apenas uma imagem é permitida por veículo.'));
+                return reject(new Error('Apenas uma imagem é permitida.'));
             }
 
             const caminhoImagem: string | null = arquivosEncontrados.length > 0
@@ -89,11 +93,12 @@ export async function processarUpload(req: IncomingMessage): Promise<{ campos: R
 }
 
 // Ler arquivo de forma segura
-export function lerArquivoSeguro(filename: string): fs.ReadStream {
-    const filepath = path.join(UPLOAD_DIR, filename);
+export function lerArquivoSeguro(filename: string, subdiretorio: 'carros' | 'perfil' = 'carros'): fs.ReadStream {
+    const baseDir = subdiretorio === 'perfil' ? PERFIL_DIR : CARROS_DIR;
+    const filepath = path.join(baseDir, filename);
 
     // Evita path traversal: verifica se o caminho resolvido continua dentro da pasta
-    if (!filepath.startsWith(UPLOAD_DIR)) {
+    if (!filepath.startsWith(baseDir)) {
         throw new Error('Acesso negado.');
     }
 

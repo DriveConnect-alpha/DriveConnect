@@ -11,6 +11,7 @@ import {
   confirmarDevolucao,
   estenderReservaHandler,
   manualConfirmarPagamento,
+  atualizarReservaHandler,
 } from './routes/reserva.routes.js';
 
 // Rotas de relatórios / dashboards
@@ -75,6 +76,10 @@ import {
   desativarMinhaContaCliente,
   trocarSenha,
   deletarUsuario,
+  atualizarFotoPerfilHandler,
+  atualizarPreferenciasHandler,
+  baixarMinhaFotoHandler,
+  removerFotoPerfilHandler,
 } from './routes/usuario.routes.js';
 
 // Rotas de filial / gerente
@@ -115,7 +120,8 @@ import {
   atualizar,
   deletar,
   listarOpcionais,
-  listarReservasVeiculoHandler
+  listarReservasVeiculoHandler,
+  listarDisponiveis as listarVeiculosDisponiveisRoute
 } from './routes/veiculo.routes.js';
 
 // Rotas de WhatsApp
@@ -265,6 +271,10 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   if (method === 'GET' && path === '/usuarios/clientes/me') return buscarMeuPerfil(req, res);
   if (method === 'PUT' && path === '/usuarios/clientes/me') return editarMeuPerfil(req, res);
   if (method === 'DELETE' && path === '/usuarios/clientes/me') return desativarMinhaContaCliente(req, res);
+  if (method === 'POST' && path === '/usuarios/me/foto') return atualizarFotoPerfilHandler(req, res);
+  if (method === 'GET' && path === '/usuarios/me/foto') return baixarMinhaFotoHandler(req, res);
+  if (method === 'DELETE' && path === '/usuarios/me/foto') return removerFotoPerfilHandler(req, res);
+  if (method === 'PATCH' && path === '/usuarios/me/preferencias') return atualizarPreferenciasHandler(req, res);
 
   const matchCliente = path.match(/^\/usuarios\/clientes\/([^/]+)$/);
   if (matchCliente) {
@@ -344,7 +354,7 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
     const reservaId = matchEstender[1];
     if (reservaId !== undefined) return estenderReservaHandler(req, res, reservaId);
   }
-  
+
   const matchConfirmarPagamento = path.match(/^\/reservas\/([^/]+)\/confirmar-pagamento$/);
   if (matchConfirmarPagamento && method === 'POST') {
     const reservaId = matchConfirmarPagamento[1];
@@ -370,9 +380,12 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
   }
 
   const matchReserva = path.match(/^\/reservas\/([^/]+)$/);
-  if (matchReserva && method === 'GET') {
+  if (matchReserva) {
     const reservaId = matchReserva[1];
-    if (reservaId !== undefined) return detalharReserva(req, res, reservaId);
+    if (reservaId !== undefined) {
+      if (method === 'GET') return detalharReserva(req, res, reservaId);
+      if (method === 'PATCH') return atualizarReservaHandler(req, res, reservaId);
+    }
   }
 
   // ── Seguros ───────────────────────────────────
@@ -420,12 +433,13 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
     return cobrancaExtraHandler(req, res, matchCobranca[1]);
   }
 
-  // ── Storage (Imagens de Veículos) ─────────────
-  if (method === 'GET' && path.startsWith('/storage/carros/')) {
-    const filename = path.replace('/storage/carros/', '');
+  // ── Storage (Imagens de Veículos e Perfil) ────────
+  if (method === 'GET' && (path.startsWith('/storage/carros/') || path.startsWith('/storage/perfil/'))) {
+    const isPerfil = path.startsWith('/storage/perfil/');
+    const filename = path.replace(isPerfil ? '/storage/perfil/' : '/storage/carros/', '');
     const { lerArquivoSeguro } = await import('./services/storage.service.js');
     try {
-      const stream = lerArquivoSeguro(filename);
+      const stream = lerArquivoSeguro(filename, isPerfil ? 'perfil' : 'carros');
       const ext = filename.split('.').pop()?.toLowerCase();
       const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
       res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=86400' });
@@ -440,6 +454,7 @@ async function roteador(req: IncomingMessage, res: ServerResponse): Promise<void
 
   // ── Veículos ──────────────────────────────────
   if (method === 'POST' && path === '/veiculos') return registrarVeiculo(req, res);
+  if (method === 'GET' && path === '/veiculos/disponiveis') return listarVeiculosDisponiveisRoute(req, res);
   if (method === 'GET' && path === '/veiculos') return listar(req, res);
   if (method === 'GET' && path === '/opcionais') return listarOpcionais(req, res);
 

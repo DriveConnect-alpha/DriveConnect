@@ -4,6 +4,8 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../../core/models/plano_seguro.dart';
 import '../providers/insurance_provider.dart';
 import '../../widgets/manager_scaffold.dart';
+import '../../../../core/feedback/app_feedback.dart';
+import '../../../../core/widgets/dc_feedback_message.dart';
 
 class InsuranceScreen extends StatefulWidget {
   const InsuranceScreen({super.key});
@@ -32,7 +34,12 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
           }
 
           if (provider.error != null) {
-            return Center(child: Text(provider.error!));
+            return Center(
+              child: DCFeedbackMessage(
+                message: provider.error!,
+                type: AppFeedbackType.error,
+              ),
+            );
           }
 
           return ListView.builder(
@@ -102,9 +109,11 @@ class _InsuranceScreenState extends State<InsuranceScreen> {
                   );
                   if (context.mounted) {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(success ? 'Plano atualizado' : 'Erro ao atualizar')),
-                    );
+                    if (success) {
+                      AppFeedback.showSuccess('Plano atualizado');
+                    } else {
+                      AppFeedback.showError('Erro ao atualizar plano.');
+                    }
                   }
                 }
               },

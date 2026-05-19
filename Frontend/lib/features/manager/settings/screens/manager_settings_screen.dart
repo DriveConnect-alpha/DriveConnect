@@ -10,6 +10,7 @@ import '../../../../core/providers/theme_provider.dart';
 import '../../../../calls/api_core.dart';
 import '../../widgets/manager_scaffold.dart';
 import '../../../../core/feedback/app_feedback.dart';
+import '../../../../core/loading/app_loading.dart';
 
 class ManagerSettingsScreen extends StatefulWidget {
   const ManagerSettingsScreen({super.key});
@@ -82,22 +83,16 @@ class _ManagerSettingsScreenState extends State<ManagerSettingsScreen> {
 
     if (image != null) {
       if (!mounted) return;
-      
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => const Center(child: CircularProgressIndicator()),
-      );
-
       try {
-        await authProvider.updateProfilePhoto(File(image.path));
+        await AppLoading.wrap(
+          () => authProvider.updateProfilePhoto(File(image.path)),
+          message: 'Atualizando foto de perfil...',
+        );
         if (mounted) {
-          Navigator.pop(context);
           AppFeedback.showSuccess('Foto de perfil atualizada com sucesso!');
         }
       } catch (e) {
         if (mounted) {
-          Navigator.pop(context);
           AppFeedback.showError(e, fallback: 'Erro ao atualizar foto.');
         }
       }

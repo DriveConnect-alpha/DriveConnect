@@ -5,6 +5,7 @@ import 'core/router/app_router.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/feedback/app_feedback.dart';
+import 'core/widgets/app_loading_overlay.dart';
 import 'package:go_router/go_router.dart';
 import 'calls/api_core.dart';
 import 'features/client/explore/providers/explore_provider.dart';
@@ -142,6 +143,7 @@ class DriveConnectApp extends StatelessWidget {
             darkTheme: AppTheme.dark,
             themeMode: themeProvider.themeMode,
             scaffoldMessengerKey: AppFeedback.messengerKey,
+            builder: (context, child) => AppLoadingOverlay(child: child ?? const SizedBox.shrink()),
             routerConfig: AppRouter.router,
           );
         },

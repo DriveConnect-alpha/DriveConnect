@@ -10,6 +10,7 @@ import '../../../../calls/filial.call.dart';
 import '../../../../core/models/filial.dart';
 import '../../../../core/feedback/app_feedback.dart';
 import '../../../../core/widgets/dc_feedback_message.dart';
+import '../../../../core/loading/app_loading.dart';
 
 class PeriodSelectionScreen extends StatefulWidget {
   const PeriodSelectionScreen({super.key});
@@ -174,7 +175,7 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
               isExpanded: true,
               items: _filiais.map<DropdownMenuItem<String>>((f) {
                 return DropdownMenuItem<String>(
-                  value: f.id ?? '',
+                  value: f.id,
                   child: Text(f.nome ?? ''),
                 );
               }).toList(),
@@ -189,13 +190,10 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
     
     // Mostra um loading rápido se necessário
     if (bookingProvider.selectedVehicle?.id != null) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
+      await AppLoading.wrap(
+        () => bookingProvider.loadOccupiedDates(bookingProvider.selectedVehicle!.id),
+        message: 'Buscando datas ocupadas...',
       );
-      await bookingProvider.loadOccupiedDates(bookingProvider.selectedVehicle!.id!);
-      if (mounted) Navigator.pop(context); // Fecha o loading
     }
 
     final occupied = bookingProvider.occupiedDates;

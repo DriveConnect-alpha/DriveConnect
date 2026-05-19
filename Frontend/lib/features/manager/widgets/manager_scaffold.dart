@@ -65,10 +65,16 @@ class ManagerScaffold extends StatelessWidget {
               child: Column(
                 children: [
                   UserAccountsDrawerHeader(
-                    accountName: Text(authProvider.user?.email.split('@')[0] ?? 'Gerente'),
-                    accountEmail: Text(authProvider.user?.email ?? ''),
+                    accountName: Text(
+                      authProvider.user?.email.split('@')[0] ?? 'Gerente',
+                      style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+                    ),
+                    accountEmail: Text(
+                      authProvider.user?.email ?? '',
+                      style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+                    ),
                     currentAccountPicture: CircleAvatar(
-                      backgroundColor: theme.colorScheme.onPrimary,
+                      backgroundColor: theme.colorScheme.onPrimaryContainer,
                       backgroundImage: authProvider.user?.imagemUrl != null
                           ? CachedNetworkImageProvider(
                               '$apiBaseUrl/usuarios/me/foto?v=${authProvider.user!.imagemUrl}',
@@ -79,7 +85,7 @@ class ManagerScaffold extends StatelessWidget {
                           ? Icon(Symbols.person, color: theme.colorScheme.primary)
                           : null,
                     ),
-                    decoration: BoxDecoration(color: theme.colorScheme.primary),
+                    decoration: BoxDecoration(color: theme.colorScheme.primaryContainer),
                   ),
                   ...menuItems.map((item) => ListTile(
                         leading: Icon(item['icon']),

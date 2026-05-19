@@ -77,6 +77,10 @@ class AppTheme {
       error: Color(0xFFFFB4AB),
       errorContainer: Color(0xFF93000A),
     ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Color(0xFF0A0F12),
+      foregroundColor: Color(0xFFDEE3E5),
+    ),
     textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
     cardTheme: CardThemeData(
       elevation: 0,

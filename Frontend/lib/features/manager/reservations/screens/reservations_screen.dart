@@ -229,14 +229,21 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Text(
-                                                'Reserva #$reservaIdShort',
-                                                style: theme.textTheme.titleMedium?.copyWith(
-                                                  fontWeight: FontWeight.w700,
-                                                  color: colorScheme.onSurface,
+                                              Expanded(
+                                                child: Text(
+                                                  'Reserva #$reservaIdShort',
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: theme.textTheme.titleMedium?.copyWith(
+                                                    fontWeight: FontWeight.w700,
+                                                    color: colorScheme.onSurface,
+                                                  ),
                                                 ),
                                               ),
-                                              DCStatusBadge(status: reserva.status, label: reserva.status),
+                                              const SizedBox(width: 8),
+                                              Flexible(
+                                                child: DCStatusBadge(status: reserva.status, label: reserva.status),
+                                              ),
                                             ],
                                           ),
                                           const SizedBox(height: 12),
@@ -264,44 +271,42 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                                             colorScheme: colorScheme,
                                           ),
                                           const SizedBox(height: 16),
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.end,
-                                            children: [
-                                              if (reserva.status == 'PENDENTE_PAGAMENTO' || reserva.status == 'RESERVADA')
-                                                Padding(
-                                                  padding: const EdgeInsets.only(right: 8),
-                                                  child: _ActionButton(
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Wrap(
+                                              spacing: 8,
+                                              runSpacing: 8,
+                                              children: [
+                                                if (reserva.status == 'PENDENTE_PAGAMENTO' || reserva.status == 'RESERVADA')
+                                                  _ActionButton(
                                                     label: 'Cancelar',
                                                     onPressed: () => _confirmCancel(context, reserva.id),
                                                     isDanger: true,
                                                   ),
-                                                ),
-                                              if (reserva.status == 'PENDENTE_PAGAMENTO') ...[
-                                                Padding(
-                                                  padding: const EdgeInsets.only(right: 8),
-                                                  child: _ActionButton(
+                                                if (reserva.status == 'PENDENTE_PAGAMENTO') ...[
+                                                  _ActionButton(
                                                     label: 'Editar',
                                                     onPressed: () => _showEditModal(context, reserva),
                                                   ),
-                                                ),
-                                                _ActionButton(
-                                                  label: 'Confirmar',
-                                                  onPressed: () => _updateStatus(context, reserva.id, 'RESERVADA'),
-                                                  isPrimary: true,
-                                                ),
-                                              ] else if (reserva.status == 'RESERVADA')
-                                                _ActionButton(
-                                                  label: 'Iniciar',
-                                                  onPressed: () => _updateStatus(context, reserva.id, 'ATIVA'),
-                                                  isPrimary: true,
-                                                )
-                                              else if (reserva.status == 'ATIVA')
-                                                _ActionButton(
-                                                  label: 'Finalizar',
-                                                  onPressed: () => _updateStatus(context, reserva.id, 'FINALIZADA'),
-                                                  isPrimary: true,
-                                                ),
-                                            ],
+                                                  _ActionButton(
+                                                    label: 'Confirmar',
+                                                    onPressed: () => _updateStatus(context, reserva.id, 'RESERVADA'),
+                                                    isPrimary: true,
+                                                  ),
+                                                ] else if (reserva.status == 'RESERVADA')
+                                                  _ActionButton(
+                                                    label: 'Iniciar',
+                                                    onPressed: () => _updateStatus(context, reserva.id, 'ATIVA'),
+                                                    isPrimary: true,
+                                                  )
+                                                else if (reserva.status == 'ATIVA')
+                                                  _ActionButton(
+                                                    label: 'Finalizar',
+                                                    onPressed: () => _updateStatus(context, reserva.id, 'FINALIZADA'),
+                                                    isPrimary: true,
+                                                  ),
+                                              ],
+                                            ),
                                           )
                                         ],
                                       ),
@@ -510,7 +515,7 @@ class _ActionButton extends StatelessWidget {
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: isPrimary ? colorScheme.primary : (isDanger ? Colors.red.shade50 : null),
-        foregroundColor: isPrimary ? Colors.white : (isDanger ? Colors.red : null),
+        foregroundColor: isPrimary ? colorScheme.onPrimary : (isDanger ? Colors.red : null),
         side: isDanger ? BorderSide(color: Colors.red.shade200) : null,
         minimumSize: const Size(100, 36),
         padding: const EdgeInsets.symmetric(horizontal: 16),

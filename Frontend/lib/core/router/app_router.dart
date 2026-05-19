@@ -29,6 +29,8 @@ import '../../features/admin/screens/admin_users_screen.dart';
 import '../../features/admin/screens/admin_create_manager_screen.dart';
 import '../../features/admin/screens/admin_whatsapp_conversations_screen.dart';
 import '../models/veiculo.dart';
+import '../screens/not_found_screen.dart';
+import '../screens/unauthorized_screen.dart';
 
 class AppRouter {
   static final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -39,11 +41,22 @@ class AppRouter {
     redirect: (context, state) {
       final authProvider = context.read<AuthProvider>();
       final bool loggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/register';
+      final bool isUnauthorizedRoute = state.matchedLocation == '/unauthorized';
+      final bool isManagerRoute = state.matchedLocation.startsWith('/manager');
+      final bool isAdminRoute = state.matchedLocation.startsWith('/manager/admin');
 
       if (authProvider.isLoading) return null;
 
       if (!authProvider.isAuthenticated && !loggingIn && state.matchedLocation != '/') {
         return '/login';
+      }
+
+      if (authProvider.isAuthenticated && (isAdminRoute && !authProvider.isAdmin) && !isUnauthorizedRoute) {
+        return '/unauthorized';
+      }
+
+      if (authProvider.isAuthenticated && (isManagerRoute && !authProvider.isManager) && !isUnauthorizedRoute) {
+        return '/unauthorized';
       }
 
       if (authProvider.isAuthenticated && loggingIn) {
@@ -52,6 +65,7 @@ class AppRouter {
 
       return null;
     },
+    errorBuilder: (context, state) => NotFoundScreen(location: state.uri.toString()),
     routes: [
       GoRoute(
         path: '/',
@@ -64,6 +78,10 @@ class AppRouter {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/unauthorized',
+        builder: (context, state) => const UnauthorizedScreen(),
       ),
       
       // Rotas do Cliente

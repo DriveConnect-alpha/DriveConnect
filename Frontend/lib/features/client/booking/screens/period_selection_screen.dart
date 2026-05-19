@@ -8,6 +8,8 @@ import '../../../../core/widgets/dc_button.dart';
 import '../../../../core/widgets/dc_card.dart';
 import '../../../../calls/filial.call.dart';
 import '../../../../core/models/filial.dart';
+import '../../../../core/feedback/app_feedback.dart';
+import '../../../../core/widgets/dc_feedback_message.dart';
 
 class PeriodSelectionScreen extends StatefulWidget {
   const PeriodSelectionScreen({super.key});
@@ -44,6 +46,7 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
       onError: (msg) {
         if (mounted) {
           setState(() => _isLoadingFiliais = false);
+          AppFeedback.showError(msg, fallback: 'Erro ao carregar filiais.');
         }
       },
     );
@@ -136,9 +139,9 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
             if (bookingProvider.error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  bookingProvider.error!,
-                  style: TextStyle(color: theme.colorScheme.error),
+                child: DCFeedbackMessage(
+                  message: bookingProvider.error!,
+                  type: AppFeedbackType.error,
                 ),
               ),
             DCButton(
@@ -238,12 +241,7 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
       final duration = range.end.difference(range.start).inDays;
       if (duration > 30) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('A reserva inicial não pode ultrapassar 30 dias. Você poderá renová-la depois.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          AppFeedback.showWarning('A reserva inicial não pode ultrapassar 30 dias. Você poderá renová-la depois.');
         }
         return;
       }
@@ -260,9 +258,7 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
 
       if (hasOverlap) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('O período selecionado contém datas já reservadas.')),
-          );
+          AppFeedback.showWarning('O período selecionado contém datas já reservadas.');
         }
         return;
       }
@@ -276,9 +272,7 @@ class _PeriodSelectionScreenState extends State<PeriodSelectionScreen> {
 
   void _handleCheckAvailability() async {
     if (_startDate == null || _endDate == null || _pickupBranchId == null || _returnBranchId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, preencha todos os campos')),
-      );
+      AppFeedback.showWarning('Por favor, preencha todos os campos.');
       return;
     }
 

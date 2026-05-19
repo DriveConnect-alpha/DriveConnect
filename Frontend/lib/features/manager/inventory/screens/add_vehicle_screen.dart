@@ -13,6 +13,7 @@ import '../providers/inventory_provider.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../../calls/filial.call.dart';
 import '../../../../calls/frota.call.dart';
+import '../../../../core/feedback/app_feedback.dart';
 
 class AddVehicleScreen extends StatefulWidget {
   const AddVehicleScreen({super.key});
@@ -111,9 +112,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
   void _handleSave() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedModeloId == null || _selectedFilialId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Selecione o modelo e a filial')),
-        );
+        AppFeedback.showWarning('Selecione o modelo e a filial.');
         return;
       }
 
@@ -136,9 +135,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
         itensIds: _selectedOpcionaisIds,
       );
       if (mounted && success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Veículo adicionado com sucesso!')),
-        );
+        AppFeedback.showSuccess('Veículo adicionado com sucesso!');
         context.pop();
       }
     }
@@ -197,7 +194,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                         _loadInitialData();
                       },
                       onError: (msg) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                        AppFeedback.showError(msg, fallback: 'Erro ao registrar modelo.');
                       },
                     );
                   }
@@ -243,7 +240,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                       _loadInitialData();
                     },
                     onError: (msg) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                      AppFeedback.showError(msg, fallback: 'Erro ao registrar filial.');
                     },
                   );
                 }

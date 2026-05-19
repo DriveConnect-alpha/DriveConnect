@@ -8,6 +8,7 @@ import '../../manager/widgets/manager_scaffold.dart';
 import '../models/whatsapp_conversation.dart';
 import '../models/whatsapp_message.dart';
 import '../widgets/chat_bubble.dart';
+import '../../../core/feedback/app_feedback.dart';
 
 class AdminWhatsAppConversationsScreen extends StatefulWidget {
   const AdminWhatsAppConversationsScreen({super.key});
@@ -575,9 +576,7 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
       setState(() {
         _isLoadingMore = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao carregar mensagens antigas: $e')),
-      );
+      AppFeedback.showError(e, fallback: 'Erro ao carregar mensagens antigas.');
     }
   }
 
@@ -644,18 +643,14 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
         onSuccess: (data) {
           if (mounted) {
             setState(() => _isActionLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Atendimento retomado.')),
-            );
+            AppFeedback.showSuccess('Atendimento retomado.');
             Navigator.of(context).pop();
           }
         },
         onError: (msg) {
           if (mounted) {
             setState(() => _isActionLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Erro ao retomar: $msg')),
-            );
+            AppFeedback.showError(msg, fallback: 'Erro ao retomar atendimento.');
           }
         },
       );
@@ -665,18 +660,14 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
         onSuccess: (data) {
           if (mounted) {
             setState(() => _isActionLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Atendimento pausado. O bot não responderá.')),
-            );
+            AppFeedback.showWarning('Atendimento pausado. O bot não responderá.');
             Navigator.of(context).pop();
           }
         },
         onError: (msg) {
           if (mounted) {
             setState(() => _isActionLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Erro ao pausar: $msg')),
-            );
+            AppFeedback.showError(msg, fallback: 'Erro ao pausar atendimento.');
           }
         },
       );
@@ -706,17 +697,13 @@ class _ConversationMessagesSheetState extends State<_ConversationMessagesSheet> 
               _scrollToLatest();
             }
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Mensagem enviada com sucesso.')),
-          );
+          AppFeedback.showSuccess('Mensagem enviada com sucesso.');
         }
       },
       onError: (msg) {
         if (mounted) {
           setState(() => _isActionLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao enviar: $msg')),
-          );
+          AppFeedback.showError(msg, fallback: 'Erro ao enviar mensagem.');
         }
       },
     );

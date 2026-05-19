@@ -9,6 +9,7 @@ import '../../../../core/widgets/dc_card.dart';
 import '../../../../core/widgets/dc_status_badge.dart';
 import '../../../../core/widgets/dc_button.dart';
 import '../providers/my_reservations_provider.dart';
+import '../../../../core/feedback/app_feedback.dart';
 
 class ReservationDetailScreen extends StatelessWidget {
   final Reserva reserva;
@@ -257,13 +258,12 @@ class ReservationDetailScreen extends StatelessWidget {
       final success = await context.read<MyReservationsProvider>().estenderReserva(reserva.id, picked);
       if (context.mounted) {
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Reserva renovada com sucesso!')),
-          );
+          AppFeedback.showSuccess('Reserva renovada com sucesso!');
           context.pop();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.read<MyReservationsProvider>().error ?? 'Erro ao renovar reserva.')),
+          AppFeedback.showError(
+            context.read<MyReservationsProvider>().error,
+            fallback: 'Erro ao renovar reserva.',
           );
         }
       }
@@ -291,13 +291,12 @@ class ReservationDetailScreen extends StatelessWidget {
       final success = await context.read<MyReservationsProvider>().cancelarReserva(reserva.id);
       if (context.mounted) {
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Reserva cancelada com sucesso.')),
-          );
+          AppFeedback.showSuccess('Reserva cancelada com sucesso.');
           context.pop();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.read<MyReservationsProvider>().error ?? 'Erro ao cancelar reserva.')),
+          AppFeedback.showError(
+            context.read<MyReservationsProvider>().error,
+            fallback: 'Erro ao cancelar reserva.',
           );
         }
       }

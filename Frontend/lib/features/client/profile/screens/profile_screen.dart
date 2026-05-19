@@ -9,6 +9,7 @@ import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/widgets/dc_card.dart';
 import '../../../../calls/api_core.dart';
 import '../widgets/edit_profile_dialog.dart';
+import '../../../../core/feedback/app_feedback.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -57,15 +58,11 @@ class ProfileScreen extends StatelessWidget {
       try {
         await authProvider.removeProfilePhoto();
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Foto removida com sucesso!')),
-          );
+          AppFeedback.showSuccess('Foto removida com sucesso!');
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao remover: $e'), backgroundColor: Colors.red),
-          );
+          AppFeedback.showError(e, fallback: 'Erro ao remover foto.');
         }
       }
       return;
@@ -80,15 +77,11 @@ class ProfileScreen extends StatelessWidget {
         // mas o image_picker retorna XFile. Convertemos para File.
         await authProvider.updateProfilePhoto(File(image.path));
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Foto atualizada com sucesso!')),
-          );
+          AppFeedback.showSuccess('Foto atualizada com sucesso!');
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao atualizar foto: $e')),
-          );
+          AppFeedback.showError(e, fallback: 'Erro ao atualizar foto.');
         }
       }
     }
@@ -225,9 +218,7 @@ class ProfileScreen extends StatelessWidget {
                 }
               } catch (e) {
                 if (ctx.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erro ao excluir conta: $e')),
-                  );
+                  AppFeedback.showError(e, fallback: 'Erro ao excluir conta.');
                 }
               }
             },

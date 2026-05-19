@@ -7,6 +7,7 @@ import '../providers/admin_provider.dart';
 import '../models/admin_user.dart';
 import '../../manager/widgets/manager_scaffold.dart';
 import '../../../calls/api_core.dart';
+import '../../../core/feedback/app_feedback.dart';
 
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
@@ -95,15 +96,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   Navigator.pop(ctx);
                   _searchController.clear();
                   setState(() => _searchQuery = '');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Usuário atualizado com sucesso')),
-                  );
+                  AppFeedback.showSuccess('Usuário atualizado com sucesso');
                 }
               } catch (e) {
                 if (ctx.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
-                  );
+                  AppFeedback.showError(e, fallback: 'Erro ao atualizar usuário.');
                 }
               }
             },
@@ -132,15 +129,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 await context.read<AdminProvider>().deleteUser(user.id);
                 if (ctx.mounted) {
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Usuário desativado com sucesso')),
-                  );
+                  AppFeedback.showSuccess('Usuário desativado com sucesso');
                 }
               } catch (e) {
                 if (ctx.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
-                  );
+                  AppFeedback.showError(e, fallback: 'Erro ao desativar usuário.');
                 }
               }
             },

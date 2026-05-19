@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/widgets/dc_button.dart';
 import '../../../core/widgets/dc_text_field.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/feedback/app_feedback.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -35,12 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
       
       if (mounted) {
         if (authProvider.error != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(authProvider.error!),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
+          AppFeedback.showError(authProvider.error, fallback: 'Falha ao fazer login.');
         } else if (authProvider.isAuthenticated) {
           if (authProvider.isManager) {
             context.go('/manager');

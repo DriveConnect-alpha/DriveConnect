@@ -6,6 +6,7 @@ import '../providers/admin_provider.dart';
 import '../../filial/services/ifilial_service.dart';
 import '../../filial/models/filial.dart';
 import '../../manager/widgets/manager_scaffold.dart';
+import '../../../core/feedback/app_feedback.dart';
 
 class AdminCreateManagerScreen extends StatefulWidget {
   const AdminCreateManagerScreen({super.key});
@@ -41,9 +42,7 @@ class _AdminCreateManagerScreenState extends State<AdminCreateManagerScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao carregar filiais: $e'), backgroundColor: Colors.red),
-        );
+        AppFeedback.showError(e, fallback: 'Erro ao carregar filiais.');
         setState(() => _isLoadingFiliais = false);
       }
     }
@@ -60,9 +59,7 @@ class _AdminCreateManagerScreenState extends State<AdminCreateManagerScreen> {
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedFilialId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione uma filial')),
-      );
+      AppFeedback.showWarning('Selecione uma filial.');
       return;
     }
 
@@ -75,16 +72,12 @@ class _AdminCreateManagerScreenState extends State<AdminCreateManagerScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gerente cadastrado com sucesso!')),
-        );
+        AppFeedback.showSuccess('Gerente cadastrado com sucesso!');
         context.pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao cadastrar gerente: $e'), backgroundColor: Colors.red),
-        );
+        AppFeedback.showError(e, fallback: 'Erro ao cadastrar gerente.');
       }
     }
   }

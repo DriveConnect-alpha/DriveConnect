@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/models/usuario.dart';
+import '../../../../core/feedback/app_feedback.dart';
 
 class EditProfileDialog extends StatefulWidget {
   final Usuario user;
@@ -44,9 +45,7 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao atualizar perfil: $e')),
-        );
+        AppFeedback.showError(e, fallback: 'Erro ao atualizar perfil.');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

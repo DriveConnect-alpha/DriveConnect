@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/theme_provider.dart';
 import '../../../../core/widgets/dc_card.dart';
+import '../../../../core/feedback/app_feedback.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -203,11 +204,11 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
       await context.read<AuthProvider>().changePassword(_passwordController.text);
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Senha alterada com sucesso!')));
+        AppFeedback.showSuccess('Senha alterada com sucesso!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e')));
+        AppFeedback.showError(e, fallback: 'Erro ao alterar senha.');
       }
     } finally {
       if (mounted) setState(() => _loading = false);

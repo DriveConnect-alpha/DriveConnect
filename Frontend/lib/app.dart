@@ -4,6 +4,7 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/theme_provider.dart';
+import 'core/feedback/app_feedback.dart';
 import 'package:go_router/go_router.dart';
 import 'calls/api_core.dart';
 import 'features/client/explore/providers/explore_provider.dart';
@@ -140,6 +141,7 @@ class DriveConnectApp extends StatelessWidget {
             theme: AppTheme.light,
             darkTheme: AppTheme.dark,
             themeMode: themeProvider.themeMode,
+            scaffoldMessengerKey: AppFeedback.messengerKey,
             routerConfig: AppRouter.router,
           );
         },

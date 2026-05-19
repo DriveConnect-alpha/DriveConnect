@@ -7,6 +7,7 @@ import '../providers/reservations_provider.dart';
 import '../../../../calls/frota.call.dart';
 import '../../../../core/models/reserva.dart';
 import '../../../../core/models/veiculo.dart';
+import '../../../../core/feedback/app_feedback.dart';
 
 class EditReservationModal extends StatefulWidget {
   final Reserva reserva;
@@ -120,7 +121,7 @@ class _EditReservationModalState extends State<EditReservationModal> {
           TextButton(
             onPressed: () {
               Clipboard.setData(ClipboardData(text: link));
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copiado!')));
+              AppFeedback.showSuccess('Link copiado!');
             },
             child: const Text('Copiar'),
           ),

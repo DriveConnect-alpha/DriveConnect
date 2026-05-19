@@ -9,6 +9,7 @@ import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/theme_provider.dart';
 import '../../../../calls/api_core.dart';
 import '../../widgets/manager_scaffold.dart';
+import '../../../../core/feedback/app_feedback.dart';
 
 class ManagerSettingsScreen extends StatefulWidget {
   const ManagerSettingsScreen({super.key});
@@ -66,15 +67,11 @@ class _ManagerSettingsScreenState extends State<ManagerSettingsScreen> {
       try {
         await authProvider.removeProfilePhoto();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Foto de perfil removida!')),
-          );
+          AppFeedback.showSuccess('Foto de perfil removida!');
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao remover: $e'), backgroundColor: Colors.red),
-          );
+          AppFeedback.showError(e, fallback: 'Erro ao remover foto.');
         }
       }
       return;
@@ -96,16 +93,12 @@ class _ManagerSettingsScreenState extends State<ManagerSettingsScreen> {
         await authProvider.updateProfilePhoto(File(image.path));
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Foto de perfil atualizada com sucesso!')),
-          );
+          AppFeedback.showSuccess('Foto de perfil atualizada com sucesso!');
         }
       } catch (e) {
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao atualizar foto: $e'), backgroundColor: Colors.red),
-          );
+          AppFeedback.showError(e, fallback: 'Erro ao atualizar foto.');
         }
       }
     }
@@ -291,15 +284,11 @@ class _ManagerSettingsScreenState extends State<ManagerSettingsScreen> {
                               setState(() => _isEditingPassword = false);
                               _oldPasswordController.clear();
                               _newPasswordController.clear();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Senha alterada com sucesso!')),
-                              );
+                              AppFeedback.showSuccess('Senha alterada com sucesso!');
                             }
                           } catch (e) {
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
-                              );
+                              AppFeedback.showError(e, fallback: 'Erro ao alterar senha.');
                             }
                           }
                         },

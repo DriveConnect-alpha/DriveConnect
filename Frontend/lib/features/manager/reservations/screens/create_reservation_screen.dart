@@ -12,6 +12,7 @@ import '../../../../calls/filial.call.dart';
 import '../../../../calls/seguro.call.dart';
 import '../providers/reservations_provider.dart';
 import '../../widgets/manager_scaffold.dart';
+import '../../../../core/feedback/app_feedback.dart';
 
 class CreateReservationScreen extends StatefulWidget {
   const CreateReservationScreen({super.key});
@@ -63,9 +64,7 @@ class _CreateReservationScreenState extends State<CreateReservationScreen> {
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedClient == null || _selectedVehicle == null || _selectedDateRange == null || _selectedFilialRetirada == null || _selectedFilialDevolucao == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, preencha todos os campos obrigatórios')),
-      );
+      AppFeedback.showWarning('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
 
@@ -87,16 +86,12 @@ class _CreateReservationScreenState extends State<CreateReservationScreen> {
       if (linkPagamento != null) {
         _showSuccessWithLink(linkPagamento);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reserva criada com sucesso!')),
-        );
+        AppFeedback.showSuccess('Reserva criada com sucesso!');
         context.pop();
       }
     } else if (mounted) {
       final error = context.read<ReservationsProvider>().error;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error ?? 'Erro ao criar reserva')),
-      );
+      AppFeedback.showError(error, fallback: 'Erro ao criar reserva.');
     }
   }
 
@@ -122,9 +117,7 @@ class _CreateReservationScreenState extends State<CreateReservationScreen> {
             onPressed: () {
               Clipboard.setData(ClipboardData(text: link)).then((_) {
                 if (mounted) {
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    const SnackBar(content: Text('Link copiado para a área de transferência!')),
-                  );
+                  AppFeedback.showSuccess('Link copiado para a área de transferência!');
                 }
               });
             },

@@ -13,6 +13,7 @@ import 'dart:io';
 import '../../../../calls/api_core.dart';
 import '../../../../calls/filial.call.dart';
 import '../../../../calls/frota.call.dart';
+import '../../../../core/feedback/app_feedback.dart';
 
 class EditVehicleScreen extends StatefulWidget {
   final Veiculo veiculo;
@@ -100,9 +101,7 @@ class _EditVehicleScreenState extends State<EditVehicleScreen> {
         removerImagem: _removeImage,
       );
       if (mounted && success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Veículo atualizado com sucesso!')),
-        );
+        AppFeedback.showSuccess('Veículo atualizado com sucesso!');
         context.pop();
       }
     }

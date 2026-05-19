@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/widgets/dc_button.dart';
 import '../../../core/widgets/dc_text_field.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/feedback/app_feedback.dart';
 
 import '../../../features/auth/services/auth_service.dart';
 import '../../../core/network/api_client.dart';
@@ -44,16 +45,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           cpf: _cpfController.text,
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Conta criada com sucesso! Faça login.')),
-          );
+          AppFeedback.showSuccess('Conta criada com sucesso! Faça login.');
           context.pop();
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(authProvider.error ?? e.toString())),
-          );
+          AppFeedback.showError(authProvider.error ?? e, fallback: 'Erro ao criar conta.');
         }
       }
     }

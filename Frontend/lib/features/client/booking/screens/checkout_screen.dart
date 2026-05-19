@@ -5,13 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:material_symbols_icons/symbols.dart';
 import '../providers/booking_provider.dart';
 import '../../../../calls/api_core.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/widgets/dc_button.dart';
 import '../../../../core/widgets/dc_card.dart';
 import '../../../../core/widgets/dc_loading.dart';
+import '../../../../core/feedback/app_feedback.dart';
+import '../../../../core/widgets/dc_feedback_message.dart';
 
 class CheckoutScreen extends StatelessWidget {
   const CheckoutScreen({super.key});
@@ -148,9 +149,9 @@ class CheckoutScreen extends StatelessWidget {
             if (bookingProvider.error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  bookingProvider.error!,
-                  style: TextStyle(color: theme.colorScheme.error),
+                child: DCFeedbackMessage(
+                  message: bookingProvider.error!,
+                  type: AppFeedbackType.error,
                 ),
               ),
           ],
@@ -327,9 +328,7 @@ class _PaymentProcessingSheetState extends State<_PaymentProcessingSheet> {
             OutlinedButton.icon(
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: provider.paymentLink!));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Link copiado para a área de transferência!'), behavior: SnackBarBehavior.floating),
-                );
+                AppFeedback.showSuccess('Link copiado para a área de transferência!');
               },
               icon: const Icon(Symbols.content_copy, size: 20),
               label: const Text('Copiar Link de Pagamento'),

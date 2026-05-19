@@ -57,6 +57,28 @@ import 'features/admin/services/iadmin_service.dart';
 import 'features/admin/services/admin_service.dart';
 import 'features/admin/services/mock_admin_service.dart';
 
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
+  }
+
+  @override
+  Widget buildScrollbar(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
+  }
+}
+
 class DriveConnectApp extends StatelessWidget {
   const DriveConnectApp({super.key});
 
@@ -142,6 +164,7 @@ class DriveConnectApp extends StatelessWidget {
             theme: AppTheme.light,
             darkTheme: AppTheme.dark,
             themeMode: themeProvider.themeMode,
+            scrollBehavior: const AppScrollBehavior(),
             scaffoldMessengerKey: AppFeedback.messengerKey,
             builder: (context, child) => AppLoadingOverlay(child: child ?? const SizedBox.shrink()),
             routerConfig: AppRouter.router,

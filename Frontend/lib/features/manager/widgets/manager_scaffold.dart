@@ -146,7 +146,7 @@ class ManagerScaffold extends StatelessWidget {
                       ))
                   .toList(),
             ),
-          const VerticalDivider(thickness: 1, width: 1),
+          if (useSideRail) const VerticalDivider(thickness: 1, width: 1),
           Expanded(child: child),
         ],
       ),

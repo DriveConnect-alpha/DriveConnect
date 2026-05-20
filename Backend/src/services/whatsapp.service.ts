@@ -271,25 +271,6 @@ export async function processIncomingMessage(payload: any): Promise<void> {
     return;
   }
 
-  // Verificar se há intenção de reserva e cliente não cadastrado
-  const reservationCheck = await tryHandleReservationIntent({
-    messageText: text,
-    phone: from,
-    conversationId: conversation.id,
-  });
-
-  if (reservationCheck?.handled) {
-    const replyMessageId = await sendMessage(from, reservationCheck.replyText);
-    await storeMessage({
-      conversationId: conversation.id,
-      direction: 'OUT',
-      waMessageId: replyMessageId,
-      text: reservationCheck.replyText,
-      status: 'sent',
-    });
-    return;
-  }
-
   const paymentResult = await tryHandlePaymentIntent({
     messageText: text,
     phone: from,
@@ -639,9 +620,35 @@ function historyHasReservationContext(history: HistoryMessage[] | undefined): bo
 
 function buildPaymentContextText(messageText: string, history: HistoryMessage[] | undefined): string {
   if (!history || history.length === 0) return messageText;
-  const recentUser = history.filter((m) => m.role === 'user').slice(-3).map((m) => m.content);
-  const combined = [...recentUser, messageText].filter(Boolean).join(' ');
+
+  const recentContext = history
+    .slice(-8)
+    .map((m) => `${m.role === 'assistant' ? 'assistente' : 'cliente'}: ${m.content}`)
+    .filter(Boolean);
+
+  const combined = [...recentContext, messageText].filter(Boolean).join(' ');
   return combined.trim() || messageText;
+}
+
+function buildNextReservationPrompt(params: {
+  customerMissing: boolean;
+  modelMissing: boolean;
+  filialMissing: boolean;
+  datesMissing: boolean;
+}): string {
+  if (params.customerMissing) {
+    return 'Para seguir, me envie seu CPF e e-mail. Se preferir, pode mandar em mensagens separadas.';
+  }
+  if (params.modelMissing) {
+    return 'Qual modelo você quer reservar?';
+  }
+  if (params.filialMissing) {
+    return 'Qual unidade você quer usar?';
+  }
+  if (params.datesMissing) {
+    return 'Me envie as datas de retirada e devolução, por favor.';
+  }
+  return 'Me envie mais um detalhe para eu continuar.';
 }
 
 async function detectModelo(messageText: string): Promise<{ id: number; descricao: string } | null> {
@@ -920,71 +927,6 @@ async function tryHandleAutoRegistration(params: {
   }
 }
 
-async function tryHandleReservationIntent(params: {
-  messageText: string;
-  phone: string;
-  conversationId: string;
-}): Promise<{ handled: boolean; replyText: string }> {
-  const { messageText, phone } = params;
-
-  // Verificar se há intenção de reserva/aluguel
-  if (!isReservationIntent(messageText)) {
-    return { handled: false, replyText: '' };
-  }
-
-  // Verificar se o cliente já está cadastrado
-  const cliente = await findClienteByPhone(phone);
-  if (cliente) {
-    // Cliente já cadastrado, deixar o fluxo normal continuar
-    return { handled: false, replyText: '' };
-  }
-
-  // Cliente não cadastrado - verificar se forneceu CPF e email na mensagem
-  const { cpf, email } = extractCpfAndEmail(messageText);
-
-  if (cpf && email && isValidCpfFormat(cpf) && isValidEmail(email)) {
-    // Tentar cadastrar o cliente automaticamente
-    try {
-      const nomeCliente = `Cliente WhatsApp ${phone.slice(-4)}`; // Nome temporário baseado no telefone
-      const senhaGerada = generateSecurePassword();
-
-      const resultadoCadastro = await criarCliente({
-        email,
-        senha: senhaGerada,
-        nomeCompleto: nomeCliente,
-        cpf,
-        telefone: phone,
-      });
-
-      console.log(`[WhatsApp] Cliente cadastrado automaticamente via reserva: ${resultadoCadastro.usuarioId}`);
-
-      // Enviar mensagem com as credenciais
-      const mensagemCredenciais = `✅ Cadastro realizado com sucesso!\n\n` +
-        `📧 Email: ${email}\n` +
-        `🔑 Senha temporária: ${senhaGerada}\n\n` +
-        `⚠️ Guarde essas informações! Você pode alterar a senha no app ou site.\n\n` +
-        `Agora posso te ajudar com sua reserva. Me informe o modelo do carro, unidade e datas (retirada e devolução).`;
-
-      return {
-        handled: true,
-        replyText: mensagemCredenciais,
-      };
-    } catch (error) {
-      console.error('[WhatsApp] Erro no cadastro automático via reserva:', error);
-      return {
-        handled: true,
-        replyText: `Olá! Vejo que você quer alugar um carro, mas preciso do seu cadastro primeiro. Me informe seu CPF e e‑mail para fazer o cadastro automático.`,
-      };
-    }
-  } else {
-    // Cliente não cadastrado e não forneceu dados suficientes
-    return {
-      handled: true,
-      replyText: `Olá! Vejo que você quer alugar um carro, mas preciso do seu cadastro primeiro. Me informe seu CPF e e‑mail para fazer o cadastro automático.`,
-    };
-  }
-}
-
 async function tryHandlePaymentIntent(params: {
   messageText: string;
   phone: string;
@@ -1006,6 +948,49 @@ async function tryHandlePaymentIntent(params: {
   const modelo = await detectModelo(intentText);
   const filialId = await detectFilialId(intentText);
 
+  if (!cliente) {
+    const customerContext = extractCpfAndEmail(intentText);
+    if (customerContext.cpf && customerContext.email && isValidCpfFormat(customerContext.cpf) && isValidEmail(customerContext.email)) {
+      try {
+        const nomeCliente = `Cliente WhatsApp ${phone.slice(-4)}`;
+        const senhaGerada = generateSecurePassword();
+
+        const resultadoCadastro = await criarCliente({
+          email: customerContext.email,
+          senha: senhaGerada,
+          nomeCompleto: nomeCliente,
+          cpf: customerContext.cpf,
+          telefone: phone,
+        });
+
+        console.log(`[WhatsApp] Cliente cadastrado automaticamente: ${resultadoCadastro.usuarioId}`);
+        cliente = await findClienteByPhone(phone);
+
+        if (cliente) {
+          const mensagemCredenciais =
+            `✅ Cadastro realizado com sucesso!\n\n` +
+            `📧 Email: ${customerContext.email}\n` +
+            `🔑 Senha temporária: ${senhaGerada}\n\n` +
+            `⚠️ Guarde essas informações! Você pode alterar a senha no app ou site.\n\n` +
+            `Agora continuo com sua reserva.`;
+
+          await sendMessage(phone, mensagemCredenciais);
+        }
+      } catch (error) {
+        console.error('[WhatsApp] Erro no cadastro automático:', error);
+        return {
+          handled: true,
+          replyText: buildNextReservationPrompt({
+            customerMissing: true,
+            modelMissing: !modelo,
+            filialMissing: !filialId,
+            datesMissing: !(startDate && endDate),
+          }),
+        };
+      }
+    }
+  }
+
   if (startDate && endDate) {
     const inicio = new Date(startDate);
     const fim = new Date(endDate);
@@ -1018,68 +1003,21 @@ async function tryHandlePaymentIntent(params: {
     if (fim.getTime() <= inicio.getTime()) {
       return {
         handled: true,
-        replyText: 'A data de devolução precisa ser depois da retirada. Pode corrigir, por favor?',
+        replyText: 'A data de devolução precisa ser depois da retirada. Me envie as datas corretas, por favor.',
       };
     }
   }
 
-  if (!startDate || !endDate || !modelo || !filialId) {
+  if (!cliente || !startDate || !endDate || !modelo || !filialId) {
     return {
       handled: true,
-      replyText: 'Consigo gerar seu link de pagamento. Me envie: modelo do carro, unidade de retirada e datas (retirada e devolução).',
+      replyText: buildNextReservationPrompt({
+        customerMissing: !cliente,
+        modelMissing: !modelo,
+        filialMissing: !filialId,
+        datesMissing: !(startDate && endDate),
+      }),
     };
-  }
-  if (!cliente) {
-    // Verificar se a mensagem contém CPF e email para cadastro automático
-    const { cpf, email } = extractCpfAndEmail(messageText);
-
-    if (cpf && email && isValidCpfFormat(cpf) && isValidEmail(email)) {
-      // Tentar cadastrar o cliente automaticamente
-      try {
-        const nomeCliente = `Cliente WhatsApp ${phone.slice(-4)}`; // Nome temporário baseado no telefone
-        const senhaGerada = generateSecurePassword();
-
-        const resultadoCadastro = await criarCliente({
-          email,
-          senha: senhaGerada,
-          nomeCompleto: nomeCliente,
-          cpf,
-          telefone: phone,
-        });
-
-        console.log(`[WhatsApp] Cliente cadastrado automaticamente: ${resultadoCadastro.usuarioId}`);
-
-        // Buscar o cliente recém-criado
-        cliente = await findClienteByPhone(phone);
-
-        if (cliente) {
-          // Enviar mensagem com as credenciais
-          const mensagemCredenciais = `✅ Cadastro realizado com sucesso!\n\n` +
-            `📧 Email: ${email}\n` +
-            `🔑 Senha temporária: ${senhaGerada}\n\n` +
-            `⚠️ Guarde essas informações! Você pode alterar a senha no app ou site.\n\n` +
-            `Agora posso gerar seu link de pagamento.`;
-
-          // Enviar mensagem separada com credenciais primeiro
-          await sendMessage(phone, mensagemCredenciais);
-
-          // Continuar com o fluxo normal
-        } else {
-          throw new Error('Falha ao buscar cliente recém-cadastrado');
-        }
-      } catch (error) {
-        console.error('[WhatsApp] Erro no cadastro automático:', error);
-        return {
-          handled: true,
-          replyText: `Não consegui fazer seu cadastro automático. Verifique se o CPF e email estão corretos.`,
-        };
-      }
-    } else {
-      return {
-        handled: true,
-        replyText: `Para gerar o link, preciso do seu cadastro. Se preferir, me informe seu CPF e e‑mail para localizar sua conta.`,
-      };
-    }
   }
 
   const inicio = new Date(startDate);

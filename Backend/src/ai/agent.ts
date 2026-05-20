@@ -5,6 +5,8 @@ import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { RunnableSequence } from '@langchain/core/runnables';
 import { query } from '../db/index.js';
+import { buscarVeiculoDisponivelPorFilial, calcularValorTotal, criarReservaPendente } from '../services/reserva.service.js';
+import { criarCliente } from '../services/usuario.service.js';
 
 export type HistoryMessage = {
   role: 'user' | 'assistant';
@@ -1207,18 +1209,161 @@ function isReservationConfirmation(messageText: string): boolean {
  */
 async function generatePaymentLink(data: ReservationData, clienteId?: string): Promise<string> {
   try {
-    // Aqui você integraria com seu sistema de pagamento (Stripe, MercadoPago, etc)
-    // Por exemplo, salvando a reserva e gerando um link de checkout
-    
-    // Placeholder: simular link de pagamento
-    const reservaId = clienteId || 'RES_' + Date.now();
-    const paymentLink = `${process.env.APP_URL || 'https://driveconnect.com'}/checkout/${reservaId}`;
-    
-    return paymentLink;
+    if (!data.startDate || !data.endDate || !data.modeloNome) return '';
+
+    const reservaInicio = new Date(data.startDate);
+    const reservaFim = new Date(data.endDate);
+    if (Number.isNaN(reservaInicio.getTime()) || Number.isNaN(reservaFim.getTime()) || reservaFim <= reservaInicio) {
+      return '';
+    }
+
+    const cliente = await resolveClienteForReservation(data, clienteId);
+    if (!cliente) return '';
+
+    const modelo = await resolveModeloByName(data.modeloNome);
+    const filialId = await resolveFilialIdForReservation(data);
+    if (!modelo || !filialId) return '';
+
+    const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, reservaInicio, reservaFim);
+    if (!veiculoId) return '';
+
+    const valorAluguel = await calcularValorTotal(modelo.id, filialId, reservaInicio, reservaFim);
+    const reserva = await criarReservaPendente({
+      clienteId: cliente.id,
+      veiculoId,
+      filialRetiradaId: filialId,
+      filialDevolucaoId: filialId,
+      dataInicio: reservaInicio,
+      dataFim: reservaFim,
+      valorAluguel,
+      nomeCliente: cliente.nome,
+      emailCliente: cliente.email,
+      telefoneCliente: cliente.telefone ?? undefined,
+      descricaoModelo: modelo.descricao,
+      origem: 'WHATSAPP_AI',
+    });
+
+    return reserva.linkPagamento || '';
   } catch (err) {
     console.error('[Agent] Erro ao gerar link de pagamento:', err);
     return '';
   }
+}
+
+async function resolveModeloByName(modeloNome: string): Promise<{ id: number; descricao: string } | null> {
+  const normalized = (modeloNome || '').trim();
+  if (!normalized) return null;
+
+  const result = await query(
+    `SELECT m.id, m.nome, m.marca
+     FROM modelo m
+     WHERE m.nome ILIKE $1
+        OR CONCAT_WS(' ', m.marca, m.nome) ILIKE $1
+        OR CONCAT_WS(' ', m.nome, m.marca) ILIKE $1
+     ORDER BY m.nome
+     LIMIT 1`,
+    [`%${normalized}%`],
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    id: Number(row.id),
+    descricao: `${row.marca || ''} ${row.nome || ''}`.trim(),
+  };
+}
+
+async function resolveFilialIdForReservation(data: ReservationData): Promise<string | null> {
+  if (data.filialId) return data.filialId;
+  const filialNome = (data.filialNome || '').trim();
+  if (!filialNome) return null;
+
+  const result = await query(
+    `SELECT id
+     FROM filial
+     WHERE deletado_em IS NULL AND ativo = TRUE
+       AND (nome ILIKE $1 OR cidade ILIKE $1)
+     ORDER BY nome
+     LIMIT 1`,
+    [`%${filialNome}%`],
+  );
+
+  return result.rows[0]?.id ? String(result.rows[0].id) : null;
+}
+
+async function resolveClienteForReservation(
+  data: ReservationData,
+  clienteId?: string,
+): Promise<{ id: string; nome: string; email: string; telefone?: string | null } | null> {
+  if (clienteId) {
+    const result = await query(
+      `SELECT c.id, c.nome_completo, u.email, c.telefone
+       FROM cliente c
+       JOIN usuario u ON u.id = c.usuario_id
+       WHERE c.id = $1 AND c.deletado_em IS NULL AND u.deletado_em IS NULL
+       LIMIT 1`,
+      [clienteId],
+    );
+
+    const row = result.rows[0];
+    if (row) {
+      return {
+        id: String(row.id),
+        nome: String(row.nome_completo || 'Cliente'),
+        email: String(row.email || ''),
+        telefone: row.telefone ? String(row.telefone) : null,
+      };
+    }
+  }
+
+  const cpfDigits = (data.clienteCpf || '').replace(/\D/g, '');
+  const email = (data.clienteEmail || '').trim();
+  const phone = (data.clientePhone || '').replace(/\D/g, '');
+
+  const lookup = await query(
+    `SELECT c.id, c.nome_completo, u.email, c.telefone
+     FROM cliente c
+     JOIN usuario u ON u.id = c.usuario_id
+     WHERE (
+       ($1::text IS NOT NULL AND regexp_replace(c.cpf, '\\D', '', 'g') = $1)
+       OR ($2::text IS NOT NULL AND lower(u.email) = lower($2))
+       OR ($3::text IS NOT NULL AND regexp_replace(c.telefone, '\\D', '', 'g') = $3)
+     )
+     AND c.deletado_em IS NULL
+     AND u.deletado_em IS NULL
+     ORDER BY c.criado_em DESC
+     LIMIT 1`,
+    [cpfDigits || null, email || null, phone || null],
+  );
+
+  const existing = lookup.rows[0];
+  if (existing) {
+    return {
+      id: String(existing.id),
+      nome: String(existing.nome_completo || 'Cliente'),
+      email: String(existing.email || ''),
+      telefone: existing.telefone ? String(existing.telefone) : null,
+    };
+  }
+
+  if (!cpfDigits || !email) return null;
+
+  const nome = (data.clienteNome || `Cliente WhatsApp ${phone.slice(-4) || 'novo'}`).trim();
+  const senhaTemporaria = `${Math.random().toString(36).slice(-10)}A1!`;
+  const created = await criarCliente({
+    email,
+    senha: senhaTemporaria,
+    nomeCompleto: nome,
+    cpf: cpfDigits,
+    telefone: phone || undefined,
+  });
+
+  return {
+    id: created.clienteId,
+    nome,
+    email,
+    telefone: phone || null,
+  };
 }
 
 export async function answerWhatsAppMessage(messageText: string, options: RagOptions = {}): Promise<string> {
@@ -1326,6 +1471,15 @@ export async function atenderClienteComAgent(
           paymentLink = await generatePaymentLink(reservationData, options.clienteId);
           intencao = 'CONFIRMAR_RESERVA';
           tools_usadas.push('gerar_link_pagamento');
+
+          if (!paymentLink) {
+            return {
+              resposta: 'Encontrei sua confirmação, mas ainda preciso de CPF e e-mail para gerar o pagamento corretamente. Se preferir, me envie esses dados agora.',
+              intencao,
+              tools_usadas,
+              clienteId: options.clienteId,
+            };
+          }
           
           const resposta = `Ótimo! 🎉 Sua reserva foi confirmada!\n\n*Link de pagamento:*\n${paymentLink}\n\nClique no link para finalizar o pagamento. Qualquer dúvida, pode contar comigo!`;
           return {

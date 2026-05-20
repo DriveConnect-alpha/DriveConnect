@@ -56,9 +56,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'Buscar marca ou modelo...',
-                    prefixIcon: const Icon(Symbols.search),
+                    prefixIcon: Icon(Symbols.search, color: theme.colorScheme.onSurfaceVariant),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: theme.cardTheme.color ?? theme.colorScheme.surface,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -131,7 +131,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                   ),
                                   child: veiculo.imagemUrl == null
                                       ? Center(
-                                          child: Icon(Symbols.directions_car, size: 48, color: Colors.grey[400]),
+                                                  child: Icon(Symbols.directions_car, size: 48, color: theme.colorScheme.onSurface.withOpacity(0.3)),
                                         )
                                       : null,
                                 ),
@@ -140,10 +140,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                   right: 12,
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                    ),
+                                            decoration: BoxDecoration(
+                                              color: theme.cardTheme.color ?? theme.colorScheme.surface,
+                                              shape: BoxShape.circle,
+                                            ),
                                     child: Icon(
                                       Symbols.favorite,
                                       size: 20,
@@ -177,11 +177,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                               padding: const EdgeInsets.only(top: 4),
                                               child: Row(
                                                 children: [
-                                                  const Icon(Symbols.location_on, size: 12, color: Colors.grey),
+                                                  Icon(Symbols.location_on, size: 12, color: theme.colorScheme.onSurfaceVariant),
                                                   const SizedBox(width: 4),
                                                   Text(
                                                     veiculo.filial?.nome ?? '',
-                                                    style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey),
+                                                    style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                                                   ),
                                                 ],
                                               ),
@@ -241,7 +241,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: theme.colorScheme.primary,
-        unselectedItemColor: Colors.grey,
+        unselectedItemColor: theme.colorScheme.onSurfaceVariant,
         showUnselectedLabels: true,
         items: const [
           BottomNavigationBarItem(icon: Icon(Symbols.home), label: 'Home'),
@@ -256,9 +256,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Widget _buildSpec(IconData icon, String label) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: Colors.grey),
+        Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
       ],
     );
   }

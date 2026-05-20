@@ -4,7 +4,6 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
 import '../../../../calls/filial.call.dart';
 import '../../../../core/models/filial.dart';
-import '../../../../core/models/gerente.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../widgets/manager_scaffold.dart';
 
@@ -17,7 +16,6 @@ class FiliaisScreen extends StatefulWidget {
 
 class _FiliaisScreenState extends State<FiliaisScreen> {
   final List<Filial> _filiais = [];
-  final List<Gerente> _gerentes = [];
   bool _isLoading = true;
   String? _error;
 
@@ -44,24 +42,7 @@ class _FiliaisScreenState extends State<FiliaisScreen> {
       onError: (msg) => setState(() => _error = msg),
     );
 
-    final authProvider = context.read<AuthProvider>();
-    if (authProvider.isAdmin) {
-      await FilialCall.listarGerentes(
-        onSuccess: (data) {
-          final gerentes = data.map((g) => Gerente.fromJson(g)).toList();
-          setState(() => _gerentes
-            ..clear()
-            ..addAll(gerentes));
-        },
-        onError: (_) {},
-      );
-    }
-
     if (mounted) setState(() => _isLoading = false);
-  }
-
-  List<Gerente> _gerentesDaFilial(String filialId) {
-    return _gerentes.where((g) => g.filialId == filialId).toList();
   }
 
   Future<void> _showFilialForm({Filial? filial}) async {
@@ -269,10 +250,9 @@ class _FiliaisScreenState extends State<FiliaisScreen> {
                     )
                   else
                     ..._filiais.map((filial) {
-                      final gerentes = _gerentesDaFilial(filial.id);
-                      final gerenteLabel = gerentes.isEmpty
+                      final gerenteLabel = filial.gerenteResponsavel == null
                           ? 'Sem gerente'
-                          : gerentes.map((g) => g.nomeCompleto).join(', ');
+                          : filial.gerenteResponsavel!.nomeCompleto;
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 16),

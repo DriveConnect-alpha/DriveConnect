@@ -231,12 +231,17 @@ function parseDateToIso(text: string | null): string | null {
   const iso = t.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
 
-  const br = t.match(/\b(\d{1,2})\/(\d{1,2})\/(20\d{2})\b/);
+  // Aceita DD/MM/AAAA ou DD/MM/AA (assume 20XX para anos com 2 dígitos)
+  const br = t.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
   if (br) {
-    const [, ddRaw, mmRaw, yyyy] = br;
-    if (!ddRaw || !mmRaw || !yyyy) return null;
+    const [, ddRaw, mmRaw, yyyyRaw] = br;
+    if (!ddRaw || !mmRaw || !yyyyRaw) return null;
     const dd = ddRaw.padStart(2, '0');
     const mm = mmRaw.padStart(2, '0');
+    let yyyy = yyyyRaw;
+    if (yyyy.length === 2) {
+      yyyy = `20${yyyy.padStart(2, '0')}`;
+    }
     return `${yyyy}-${mm}-${dd}`;
   }
 
@@ -358,10 +363,11 @@ function extractDateRange(messageText: string): { startDate: string | null; endD
   const raw = messageText || '';
   
   // Tentar formato numérico primeiro (DD/MM/YYYY ou YYYY-MM-DD)
-  const matches = raw.match(/\b(\d{1,2}\/\d{1,2}\/20\d{2}|20\d{2}-\d{2}-\d{2})\b/g);
+  // Aceita formatos numéricos DD/MM/AA, DD/MM/AAAA ou ISO YYYY-MM-DD
+  const matches = raw.match(/\b(\d{1,2}\/\d{1,2}\/\d{2,4}|20\d{2}-\d{2}-\d{2})\b/g);
   if (matches && matches.length >= 2) {
     const startDate = parseDateToIso(matches[0]);
-    const endDate = parseDateToIso(matches[1] || null);
+    const endDate = parseDateToIso(matches[1] || matches[0]);
     if (startDate && endDate) {
       return { startDate, endDate };
     }

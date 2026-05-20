@@ -53,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = authProvider.user;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () => exploreProvider.fetchVeiculos(),
@@ -78,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Text(
                             'Pronto para sua próxima viagem?',
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey[600],
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -117,10 +117,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Encontre o carro perfeito',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: theme.colorScheme.onPrimary,
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -129,14 +129,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               Text(
                                 'Explore mais de 100 veículos disponíveis hoje.',
                                 style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.8),
+                                  color: theme.colorScheme.onPrimary.withOpacity(0.8),
                                   fontSize: 14,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const Icon(Symbols.search, color: Colors.white, size: 40),
+                        Icon(Symbols.search, color: theme.colorScheme.onPrimary, size: 40),
                       ],
                     ),
                   ),
@@ -225,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: _onTabTapped,
         type: BottomNavigationBarType.fixed,
         selectedItemColor: theme.colorScheme.primary,
-        unselectedItemColor: Colors.grey,
+        unselectedItemColor: theme.colorScheme.onSurfaceVariant,
         showUnselectedLabels: true,
         items: const [
           BottomNavigationBarItem(icon: Icon(Symbols.home), label: 'Home'),
@@ -251,15 +251,15 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.cardTheme.color ?? theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  color: theme.colorScheme.primary.withOpacity(0.08),
                   width: 1,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: theme.brightness == Brightness.dark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -268,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Icon(icon, color: theme.colorScheme.primary),
             ),
             const SizedBox(height: 8),
-            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+            Text(label, style: theme.textTheme.bodySmall?.copyWith(fontSize: 12, fontWeight: FontWeight.w500)),
           ],
         ),
       ),
@@ -286,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Container(
             height: 150,
             decoration: BoxDecoration(
-              color: Colors.grey[200],
+              color: theme.colorScheme.surfaceVariant,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               image: veiculo.imagemUrl != null
                   ? DecorationImage(
@@ -300,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: veiculo.imagemUrl == null
                 ? Center(
-                    child: Icon(Symbols.directions_car, size: 48, color: Colors.grey[400]),
+                    child: Icon(Symbols.directions_car, size: 48, color: theme.colorScheme.onSurface.withOpacity(0.3)),
                   )
                 : null,
           ),
@@ -318,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     Text(
                       veiculo.modelo?.marca ?? 'Marca',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
                     ),
                   ],
                 ),

@@ -6,6 +6,7 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 import { RunnableSequence } from '@langchain/core/runnables';
 import { query } from '../db/index.js';
 import { buscarVeiculoDisponivelPorFilial, buscarVeiculoFisicoDisponivelSemData, calcularValorTotal, criarReservaPendente } from '../services/reserva.service.js';
+import { setFilialContextForPhone } from '../services/filialContext.service.js';
 import { criarCliente } from '../services/usuario.service.js';
 
 export type HistoryMessage = {
@@ -1226,7 +1227,7 @@ function isReservationConfirmation(messageText: string): boolean {
 /**
  * Gera link de pagamento para reserva
  */
-async function generatePaymentLink(data: ReservationData, clienteId?: string): Promise<string> {
+async function generatePaymentLink(data: ReservationData, clienteId?: string, phone?: string): Promise<string> {
   try {
     if (!data.startDate || !data.endDate || !data.modeloNome) return '';
 
@@ -1243,15 +1244,27 @@ async function generatePaymentLink(data: ReservationData, clienteId?: string): P
     const filialId = await resolveFilialIdForReservation(data);
     if (!modelo || !filialId) return '';
 
-    // Agent: apenas verificar existência física (sem checagem por datas)
-    // Para criar a reserva, precisamos de um veículo que esteja livre no período.
-    // Primeiro tenta encontrar um veículo livre para as datas (checagem por datas).
+    // Agent: apenas verificar existência física (sem checagem por datas) para diagnóstico,
+    // mas para criação da reserva precisamos de veículo livre para o período.
     let veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, reservaInicio, reservaFim);
     if (!veiculoId) {
       console.warn('[Agent] Nenhum veículo livre nas datas solicitadas. Tentando localizar veículo físico disponível (sem checagem por datas) para diagnóstico.');
       const fisico = await buscarVeiculoFisicoDisponivelSemData(modelo.id, filialId);
       console.warn('[Agent] Veículo físico encontrado (sem checagem por datas):', fisico);
       return '';
+    }
+
+    // Atualiza contexto de filial para o telefone, se informado, com a filial do veículo selecionado
+    if (phone && veiculoId) {
+      try {
+        const vRes = await query('SELECT filial_id FROM veiculo WHERE id = $1', [veiculoId]);
+        const veicFilial = vRes.rows[0]?.filial_id;
+        if (veicFilial) {
+          setFilialContextForPhone(phone, String(veicFilial));
+        }
+      } catch (err) {
+        console.error('[Agent] Erro ao atualizar filial do telefone após escolher veiculo:', err);
+      }
     }
 
     const valorAluguel = await calcularValorTotal(modelo.id, filialId, reservaInicio, reservaFim);
@@ -1500,7 +1513,7 @@ export async function atenderClienteComAgent(
         
         // Gerar link de pagamento
         if (reservationData.startDate && reservationData.endDate && reservationData.modeloNome) {
-          paymentLink = await generatePaymentLink(reservationData, options.clienteId);
+          paymentLink = await generatePaymentLink(reservationData, options.clienteId, options.telefone);
           intencao = 'CONFIRMAR_RESERVA';
           tools_usadas.push('gerar_link_pagamento');
 

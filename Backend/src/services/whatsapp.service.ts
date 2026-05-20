@@ -82,9 +82,7 @@ type RegistrationDraft = { cpf: string | null; email: string | null; expiresAt: 
 const REGISTRATION_TTL_MS = Number.parseInt(process.env.WHATSAPP_REGISTRATION_TTL_MS || '900000', 10); // 15 min
 const registrationDrafts = new Map<string, RegistrationDraft>();
 
-type FilialContextDraft = { filialId: string; expiresAt: number };
-const FILIAL_CONTEXT_TTL_MS = Number.parseInt(process.env.WHATSAPP_FILIAL_CONTEXT_TTL_MS || '21600000', 10); // 6h
-const filialContextByPhone = new Map<string, FilialContextDraft>();
+import { setFilialContextForPhone, getFilialContextForPhone } from './filialContext.service.js';
 
 function cleanupRegistrationDrafts(): void {
   const now = Date.now();
@@ -94,33 +92,6 @@ function cleanupRegistrationDrafts(): void {
 }
 
 setInterval(cleanupRegistrationDrafts, Math.max(30_000, Math.floor(REGISTRATION_TTL_MS / 2))).unref();
-
-function cleanupFilialContextDrafts(): void {
-  const now = Date.now();
-  for (const [key, value] of filialContextByPhone.entries()) {
-    if (now > value.expiresAt) filialContextByPhone.delete(key);
-  }
-}
-
-setInterval(cleanupFilialContextDrafts, Math.max(30_000, Math.floor(FILIAL_CONTEXT_TTL_MS / 2))).unref();
-
-function setFilialContextForPhone(phone: string, filialId: string): void {
-  if (!phone || !filialId) return;
-  filialContextByPhone.set(phone, {
-    filialId,
-    expiresAt: Date.now() + FILIAL_CONTEXT_TTL_MS,
-  });
-}
-
-function getFilialContextForPhone(phone: string): string | null {
-  const item = filialContextByPhone.get(phone);
-  if (!item) return null;
-  if (Date.now() > item.expiresAt) {
-    filialContextByPhone.delete(phone);
-    return null;
-  }
-  return item.filialId;
-}
 
 function setCache<T>(key: string, value: T, ttlMs: number): void {
   cache.set(key, { value, expiresAt: Date.now() + ttlMs });
@@ -1254,6 +1225,22 @@ async function tryHandlePaymentIntent(params: {
   );
   console.log(`[WhatsApp][DEBUG] tryHandlePaymentIntent checando disponibilidade modeloId=${modelo.id} descricao=${modelo.descricao} filialId=${filialId} inicio=${inicio.toISOString()} fim=${fim.toISOString()}`);
   const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, inicio, fim);
+
+  // Se encontramos um veículo, atualiza o contexto de filial para a filial deste veículo
+  if (veiculoId) {
+    try {
+      const vRes = await query('SELECT filial_id FROM veiculo WHERE id = $1', [veiculoId]);
+      const veicFilial = vRes.rows[0]?.filial_id;
+      if (veicFilial) {
+        setFilialContextForPhone(phone, String(veicFilial));
+        // sincroniza variável local também
+        filialId = String(veicFilial);
+        console.log(`[WhatsApp][DEBUG] Atualizada filial do telefone ${phone} para filialId=${filialId} baseada no veiculo ${veiculoId}`);
+      }
+    } catch (err) {
+      console.error('[WhatsApp] Erro ao atualizar filial pelo veiculo selecionado:', err);
+    }
+  }
 
   if (!veiculoId) {
     return {

@@ -426,8 +426,8 @@ export async function processIncomingMessage(payload: any): Promise<void> {
 function extractDateRange(messageText: string): { startDate: string | null; endDate: string | null } {
   const raw = messageText || '';
 
-  // 1) Datas numéricas (DD/MM/AAAA ou ISO)
-  const numericMatches = raw.match(/\b(\d{1,2}\/\d{1,2}\/20\d{2}|20\d{2}-\d{2}-\d{2})\b/g);
+  // 1) Datas numéricas (DD/MM/AAAA ou DD/MM/AA ou ISO)
+  const numericMatches = raw.match(/\b(\d{1,2}\/\d{1,2}\/\d{2,4}|20\d{2}-\d{2}-\d{2})\b/g);
   if (numericMatches && numericMatches.length > 0) {
     const startDate = parseDateToIso(numericMatches[0]);
     const endDate = parseDateToIso(numericMatches[1] || numericMatches[0]);
@@ -450,12 +450,22 @@ function parseDateToIso(text: string | null): string | null {
   const iso = t.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
 
-  const br = t.match(/\b(\d{1,2})\/(\d{1,2})\/(20\d{2})\b/);
+  // Aceita DD/MM/YYYY ou DD/MM/YY
+  const br = t.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
   if (br) {
-    const [, ddRaw, mmRaw, yyyy] = br;
-    if (!ddRaw || !mmRaw || !yyyy) return null;
+    const [, ddRaw, mmRaw, yyyyRaw] = br;
+    if (!ddRaw || !mmRaw || !yyyyRaw) return null;
     const dd = ddRaw.padStart(2, '0');
     const mm = mmRaw.padStart(2, '0');
+    
+    // Se ano tem 2 dígitos, assumir 20XX
+    let yyyy = yyyyRaw;
+    if (yyyy.length === 2) {
+      const twoDigitYear = parseInt(yyyy, 10);
+      // Assumir 20XX se ano está entre 00 e 99
+      yyyy = `20${yyyy.padStart(2, '0')}`;
+    }
+    
     return `${yyyy}-${mm}-${dd}`;
   }
 

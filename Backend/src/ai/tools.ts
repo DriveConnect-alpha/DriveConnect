@@ -131,7 +131,7 @@ export async function toolListarCarrosDisponiveis(params: {
       WHERE v.deletado_em IS NULL
         AND f.deletado_em IS NULL
         AND f.ativo = TRUE
-        AND v.status IN ('DISPONIVEL', 'ALUGADO')
+        AND v.status = 'DISPONIVEL'
     `;
 
     const values: any[] = [];
@@ -244,7 +244,7 @@ export async function toolValidarDisponibilidade(params: {
     }
 
     const veiculo = veiculoRes.rows[0];
-    if (veiculo.status !== 'DISPONIVEL' && veiculo.status !== 'ALUGADO') {
+    if (veiculo.status !== 'DISPONIVEL') {
       return {
         success: true,
         data: {

@@ -375,6 +375,23 @@ export async function processIncomingMessage(payload: any): Promise<void> {
     if (useAgent) {
       const agentResult = await atenderClienteComAgent(text, { history });
       reply = sanitizeAiPaymentReply(agentResult.resposta);
+
+      // Evita enviar placeholder sem URL real; tenta o fluxo transacional primeiro.
+      if (hasPaymentPlaceholderWithoutRealUrl(reply)) {
+        const paymentFallback = await tryHandlePaymentIntent({
+          messageText: text,
+          phone: from,
+          conversationId: conversation.id,
+          history,
+        });
+
+        if (paymentFallback?.handled && paymentFallback.replyText) {
+          reply = paymentFallback.replyText;
+        } else {
+          reply = 'Estou gerando seu link de pagamento seguro. Assim que concluir, envio aqui.';
+        }
+      }
+
       console.log(`[WhatsApp Service] Agent executado: intenção=${agentResult.intencao}, tools=${agentResult.tools_usadas.join(',')}`);
       
       // Enviar foto se solicitada (apenas 1 foto)
@@ -667,6 +684,20 @@ function sanitizeAiPaymentReply(text: string): string {
   return text;
 }
 
+function hasPaymentPlaceholderWithoutRealUrl(text: string): boolean {
+  const content = String(text || '');
+  const lower = content.toLowerCase();
+  if (!lower) return false;
+
+  const mentionsPaymentLink =
+    lower.includes('[link para pagamento]') ||
+    lower.includes('<link para pagamento>') ||
+    lower.includes('link para pagamento');
+
+  const hasRealUrl = /https?:\/\//i.test(content);
+  return mentionsPaymentLink && !hasRealUrl;
+}
+
 function isPaymentIntent(text: string): boolean {
   const t = (text || '').toLowerCase();
   const intentWords = ['pagar', 'pagamento', 'link', 'checkout', 'finalizar', 'fechar'];
@@ -681,12 +712,11 @@ function isReservationIntent(text: string): boolean {
   if (isListFiliaisIntent(t)) return false;
 
   const reservationVerbs = ['alugar', 'aluguel', 'locar', 'locacao', 'reserva', 'reservar', 'fechar locacao', 'contratar'];
-  const carWords = ['carro', 'carros', 'veiculo', 'veiculos', 'automovel', 'automoveis', 'modelo'];
-
   const hasReservationVerb = reservationVerbs.some((w) => t.includes(w));
-  const hasCarWord = carWords.some((c) => t.includes(c));
 
-  return hasReservationVerb && hasCarWord;
+  // Não exige termos como "carro"/"modelo" para não perder casos como:
+  // "quero alugar um BMW 320i ..."
+  return hasReservationVerb;
 }
 
 function isListFiliaisIntent(text: string): boolean {

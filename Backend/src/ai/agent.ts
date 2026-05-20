@@ -1243,7 +1243,12 @@ async function generatePaymentLink(data: ReservationData, clienteId?: string): P
       origem: 'WHATSAPP_AI',
     });
 
-    return reserva.linkPagamento || '';
+    if (!reserva.linkPagamento) {
+      console.warn('[Agent] Reserva criada mas sem link de pagamento:', reserva.reservaId);
+      return '';
+    }
+
+    return reserva.linkPagamento;
   } catch (err) {
     console.error('[Agent] Erro ao gerar link de pagamento:', err);
     return '';

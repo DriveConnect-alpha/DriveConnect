@@ -371,7 +371,7 @@ export async function processIncomingMessage(payload: any): Promise<void> {
     // Fallback para RAG para perguntas genéricas
     let reply: string;
     
-    const useAgent = process.env.WHATSAPP_USE_AGENT === 'true' || true; // Default: true
+    const useAgent = (process.env.WHATSAPP_USE_AGENT ?? 'true').toLowerCase() !== 'false';
     if (useAgent) {
       const agentResult = await atenderClienteComAgent(text, { history });
       reply = sanitizeAiPaymentReply(agentResult.resposta);
@@ -546,26 +546,33 @@ function normalizePhone(phone: string): string {
 }
 
 /**
- * Gera uma senha aleatória segura
+ * Gera uma senha temporária com entropia criptográfica.
  */
 function generateSecurePassword(): string {
   const length = 12;
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-  let password = '';
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const digits = '0123456789';
+  const special = '!@#$%^&*';
+  const all = `${upper}${lower}${digits}${special}`;
 
-  // Garantir pelo menos um de cada tipo
-  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // maiúscula
-  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // minúscula
-  password += '0123456789'[Math.floor(Math.random() * 10)]; // número
-  password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // especial
+  const picks: string[] = [
+    upper[crypto.randomInt(upper.length)]!,
+    lower[crypto.randomInt(lower.length)]!,
+    digits[crypto.randomInt(digits.length)]!,
+    special[crypto.randomInt(special.length)]!,
+  ];
 
-  // Preencher o resto aleatoriamente
-  for (let i = password.length; i < length; i++) {
-    password += chars[Math.floor(Math.random() * chars.length)];
+  while (picks.length < length) {
+    picks.push(all[crypto.randomInt(all.length)]!);
   }
 
-  // Embaralhar a senha
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+  for (let i = picks.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [picks[i], picks[j]] = [picks[j]!, picks[i]!];
+  }
+
+  return picks.join('');
 }
 
 /**
@@ -610,33 +617,44 @@ function extractCpfAndEmail(text: string): { cpf: string | null; email: string |
   return { cpf: extractCpf(text), email: extractEmail(text) };
 }
 
-function looksLikeCardDataRequest(text: string): boolean {
+function looksLikeDangerousCardDataRequest(text: string): boolean {
   const t = (text || '').toLowerCase();
   if (!t) return false;
-  const patterns = [
-    'cartão',
-    'cartao',
-    'número do cartão',
-    'numero do cartao',
-    'número do cartao',
-    'validade',
-    'cvv',
-    'código de segurança',
-    'codigo de seguranca',
-    'titular do cartão',
-    'titular do cartao',
+  // Detecta pedidos explícitos de dados sensíveis (nunca devemos fazer isso)
+  const dangerousPatterns = [
+    'me envie o número do cartão',
+    'digite o numero do cartao',
+    'qual é o cvv',
+    'qual o cvv',
+    'código de segurança do seu cartão',
+    'codigo de seguranca do cartao',
+    'titular do seu cartão',
+    'titular do seu cartao',
     'dados do seu cartão',
     'dados do seu cartao',
+    'me mande o cartão',
+    'mande seu cartão',
+    'número da validade',
+    'numero da validade',
   ];
-  return patterns.some((p) => t.includes(p));
+  return dangerousPatterns.some((p) => t.includes(p));
 }
 
 function sanitizeAiPaymentReply(text: string): string {
-  if (!looksLikeCardDataRequest(text)) return text;
+  // Se houver um link de pagamento (seguro), deixa passar normalmente
+  // O link é externo (InfinitePay) e oferece todas as opções de pagamento
   const lower = text.toLowerCase();
-  const hasLink = lower.includes('link de pagamento') || lower.includes('checkout');
-  if (hasLink) return text;
-  return 'Para finalizar, eu envio um link de pagamento seguro. Me informe o modelo do carro, a unidade de retirada e as datas (retirada e devolução).';
+  if (lower.includes('link de pagamento') || lower.includes('checkout') || lower.includes('https://')) {
+    return text;
+  }
+  
+  // Se parecer um pedido perigoso de dados de cartão, bloqueia
+  if (looksLikeDangerousCardDataRequest(text)) {
+    return 'Para finalizar, eu envio um link de pagamento seguro. Me informe o modelo do carro e as datas (retirada e devolução).';
+  }
+  
+  // Caso contrário, deixa a resposta da IA passar normalmente
+  return text;
 }
 
 function isPaymentIntent(text: string): boolean {
@@ -646,10 +664,19 @@ function isPaymentIntent(text: string): boolean {
 }
 
 function isReservationIntent(text: string): boolean {
-  const t = (text || '').toLowerCase();
-  const intentWords = ['alugar', 'aluguel', 'locar', 'locação', 'reserva', 'reservar', 'quero', 'gostaria', 'interessado'];
-  const carWords = ['carro', 'veículo', 'veiculo', 'automóvel', 'automovel'];
-  return intentWords.some((w) => t.includes(w)) && carWords.some((c) => t.includes(c));
+  const t = normalizeText(text || '');
+  if (!t) return false;
+
+  // Evita falso positivo em frases de consulta como "gostaria de listar filiais"
+  if (isListFiliaisIntent(t)) return false;
+
+  const reservationVerbs = ['alugar', 'aluguel', 'locar', 'locacao', 'reserva', 'reservar', 'fechar locacao', 'contratar'];
+  const carWords = ['carro', 'carros', 'veiculo', 'veiculos', 'automovel', 'automoveis', 'modelo'];
+
+  const hasReservationVerb = reservationVerbs.some((w) => t.includes(w));
+  const hasCarWord = carWords.some((c) => t.includes(c));
+
+  return hasReservationVerb && hasCarWord;
 }
 
 function isListFiliaisIntent(text: string): boolean {
@@ -675,13 +702,19 @@ function isListVeiculosByFilialIntent(text: string): boolean {
 
   const veiculoTerms = ['carro', 'carros', 'veiculo', 'veiculos', 'frota', 'modelos'];
   const filialTerms = ['filial', 'filiais', 'unidade', 'unidades'];
-  const disponibilidadeTerms = ['disponivel', 'disponiveis', 'tem', 'mostrar', 'listar', 'quais'];
+  const listTerms = ['mostrar', 'listar', 'lista', 'quais', 'catalogo', 'catálogo', 'opcoes', 'opções'];
+  const reservationTerms = ['alugar', 'locar', 'reservar', 'reserva', 'checkout', 'pagamento'];
 
   const hasVeiculo = veiculoTerms.some((k) => t.includes(k));
   const hasFilial = filialTerms.some((k) => t.includes(k));
-  const hasAction = disponibilidadeTerms.some((k) => t.includes(k));
+  const hasListAction = listTerms.some((k) => t.includes(k));
+  const hasReservationSignal = reservationTerms.some((k) => t.includes(k));
 
-  return hasVeiculo && (hasFilial || hasAction);
+  // Quando há sinal claro de reserva, não trata como listagem para evitar desvio de fluxo.
+  if (hasReservationSignal && !hasListAction) return false;
+
+  // Listagem explícita ou pergunta de frota por filial
+  return hasVeiculo && (hasFilial || hasListAction);
 }
 
 function isConfirmation(text: string): boolean {
@@ -864,7 +897,7 @@ async function updateClienteTelefoneIfNeeded(clienteId: string, phone: string): 
       `UPDATE cliente
        SET telefone = $1
        WHERE id = $2
-         AND (telefone IS NULL OR regexp_replace(telefone, '\\D', '', 'g') <> $1)`,
+         AND (telefone IS NULL OR regexp_replace(telefone, '\\D', '', 'g') = '')`,
       [normalized, clienteId],
     );
   } catch (err) {
@@ -1036,9 +1069,18 @@ async function tryHandlePaymentIntent(params: {
 }): Promise<{ handled: boolean; replyText: string }> {
   const { messageText, phone, conversationId, history } = params;
 
+  const isCatalogIntent =
+    isListFiliaisIntent(messageText) ||
+    isListVeiculosByFilialIntent(messageText);
+
+  // Evita cair no fluxo de pagamento/reserva quando a intenção é só consulta de catálogo/filiais.
+  if (isCatalogIntent && !isPaymentIntent(messageText) && !isConfirmation(messageText)) {
+    return { handled: false, replyText: '' };
+  }
+
   let cliente = await findClienteByPhone(phone);
   const shouldHandle = isPaymentIntent(messageText) ||
-    (isReservationIntent(messageText) && !!cliente) ||
+    isReservationIntent(messageText) ||
     (isConfirmation(messageText) && historyHasReservationContext(history));
   if (!shouldHandle) {
     return { handled: false, replyText: '' };
@@ -1168,20 +1210,39 @@ async function tryHandlePaymentIntent(params: {
   }
 
   const valorAluguel = await calcularValorTotal(modelo.id, filialId, inicio, fim);
-  const reserva = await criarReservaPendente({
-    clienteId: cliente.id,
-    veiculoId,
-    filialRetiradaId: filialId,
-    filialDevolucaoId: filialId,
-    dataInicio: inicio,
-    dataFim: fim,
-    valorAluguel,
-    nomeCliente: cliente.nome,
-    emailCliente: cliente.email,
-    telefoneCliente: cliente.telefone ?? phone,
-    descricaoModelo: modelo.descricao,
-    origem: 'WHATSAPP',
-  });
+  
+  let reserva;
+  try {
+    reserva = await criarReservaPendente({
+      clienteId: cliente.id,
+      veiculoId,
+      filialRetiradaId: filialId,
+      filialDevolucaoId: filialId,
+      dataInicio: inicio,
+      dataFim: fim,
+      valorAluguel,
+      nomeCliente: cliente.nome,
+      emailCliente: cliente.email,
+      telefoneCliente: cliente.telefone ?? phone,
+      descricaoModelo: modelo.descricao,
+      origem: 'WHATSAPP',
+    });
+  } catch (error) {
+    console.error('[WhatsApp] Erro ao criar reserva:', error);
+    return {
+      handled: true,
+      replyText: 'Desculpe, não consegui processar sua reserva agora. Pode tentar novamente em instantes?',
+    };
+  }
+
+  // Validação: se o link não foi gerado, retornar erro
+  if (!reserva.linkPagamento) {
+    console.error('[WhatsApp] Reserva criada mas sem link de pagamento:', reserva.reservaId);
+    return {
+      handled: true,
+      replyText: 'Sua reserva foi registrada, mas ocorreu um problema ao gerar o link de pagamento. Em breve, você receberá o link por aqui ou por email.',
+    };
+  }
 
   await linkReservaToConversation({
     reservaId: reserva.reservaId,

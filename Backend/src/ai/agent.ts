@@ -1244,8 +1244,15 @@ async function generatePaymentLink(data: ReservationData, clienteId?: string): P
     if (!modelo || !filialId) return '';
 
     // Agent: apenas verificar existência física (sem checagem por datas)
-    const veiculoId = await buscarVeiculoFisicoDisponivelSemData(modelo.id, filialId);
-    if (!veiculoId) return '';
+    // Para criar a reserva, precisamos de um veículo que esteja livre no período.
+    // Primeiro tenta encontrar um veículo livre para as datas (checagem por datas).
+    let veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, reservaInicio, reservaFim);
+    if (!veiculoId) {
+      console.warn('[Agent] Nenhum veículo livre nas datas solicitadas. Tentando localizar veículo físico disponível (sem checagem por datas) para diagnóstico.');
+      const fisico = await buscarVeiculoFisicoDisponivelSemData(modelo.id, filialId);
+      console.warn('[Agent] Veículo físico encontrado (sem checagem por datas):', fisico);
+      return '';
+    }
 
     const valorAluguel = await calcularValorTotal(modelo.id, filialId, reservaInicio, reservaFim);
     const reserva = await criarReservaPendente({

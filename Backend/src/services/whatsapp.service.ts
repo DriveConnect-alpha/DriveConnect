@@ -1131,7 +1131,14 @@ async function tryHandlePaymentIntent(params: {
   const intentText = buildPaymentContextText(messageText, history);
   const userContextText = buildRecentUserContext(messageText, history);
   const { startDate, endDate } = extractDateRange(intentText);
-  const modelo = await detectModelo(intentText);
+  // Prioriza a mensagem atual para evitar "contaminação" do histórico
+  // (ex.: conversa anterior com BMW e nova tentativa com Audi A4).
+  let modelo = await detectModelo(messageText);
+  let modeloSource: 'message' | 'context' = 'message';
+  if (!modelo) {
+    modelo = await detectModelo(intentText);
+    modeloSource = 'context';
+  }
   let filialId = await detectFilialId(messageText);
   if (!filialId) filialId = await detectFilialId(userContextText);
   if (filialId) {
@@ -1242,6 +1249,9 @@ async function tryHandlePaymentIntent(params: {
 
   const inicio = new Date(startDate);
   const fim = new Date(endDate);
+  console.log(
+    `[WhatsApp][DEBUG] tryHandlePaymentIntent modeloSource=${modeloSource} modeloId=${modelo.id} descricao=${modelo.descricao} filialId=${filialId} inicio=${inicio.toISOString()} fim=${fim.toISOString()}`,
+  );
   console.log(`[WhatsApp][DEBUG] tryHandlePaymentIntent checando disponibilidade modeloId=${modelo.id} descricao=${modelo.descricao} filialId=${filialId} inicio=${inicio.toISOString()} fim=${fim.toISOString()}`);
   const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, inicio, fim);
 

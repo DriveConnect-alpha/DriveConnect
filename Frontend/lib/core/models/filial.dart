@@ -1,3 +1,20 @@
+class GerenteDaFilial {
+  final String id;
+  final String nomeCompleto;
+
+  GerenteDaFilial({
+    required this.id,
+    required this.nomeCompleto,
+  });
+
+  factory GerenteDaFilial.fromJson(Map<String, dynamic> json) {
+    return GerenteDaFilial(
+      id: json['id'] ?? '',
+      nomeCompleto: json['nomeCompleto'] ?? '',
+    );
+  }
+}
+
 class Filial {
   final String id;
   final String? nome;
@@ -11,6 +28,7 @@ class Filial {
   final bool ativo;
   final DateTime? criadoEm;
   final DateTime? deletadoEm;
+  final GerenteDaFilial? gerenteResponsavel;
 
   Filial({
     required this.id,
@@ -25,6 +43,7 @@ class Filial {
     required this.ativo,
     this.criadoEm,
     this.deletadoEm,
+    this.gerenteResponsavel,
   });
 
   factory Filial.fromJson(Map<String, dynamic> json) {
@@ -42,6 +61,9 @@ class Filial {
         ativo: json['ativo'] ?? true,
         criadoEm: json['criado_em'] != null ? DateTime.tryParse(json['criado_em'].toString()) : null,
         deletadoEm: json['deletado_em'] != null ? DateTime.tryParse(json['deletado_em'].toString()) : null,
+        gerenteResponsavel: json['gerenteResponsavel'] != null 
+          ? GerenteDaFilial.fromJson(json['gerenteResponsavel'])
+          : null,
       );
     } catch (e) {
       print('Error parsing Filial: $e');
@@ -64,6 +86,10 @@ class Filial {
       'ativo': ativo,
       if (criadoEm != null) 'criado_em': criadoEm!.toIso8601String(),
       if (deletadoEm != null) 'deletado_em': deletadoEm!.toIso8601String(),
+      if (gerenteResponsavel != null) 'gerenteResponsavel': {
+        'id': gerenteResponsavel!.id,
+        'nomeCompleto': gerenteResponsavel!.nomeCompleto,
+      },
     };
   }
 }

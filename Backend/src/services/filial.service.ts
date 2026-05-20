@@ -5,6 +5,11 @@ import type { Caller } from '../middlewares/auth.js';
 // Interfaces de retorno seguro (sem dados sensíveis)
 // ──────────────────────────────────────────────
 
+export interface GerenteDaFilial {
+  id: string;
+  nomeCompleto: string;
+}
+
 export interface FilialPublica {
   id: string;
   nome: string | null;
@@ -12,6 +17,7 @@ export interface FilialPublica {
   uf: string | null;
   bairro: string | null;
   ativo: boolean;
+  gerenteResponsavel?: GerenteDaFilial | null;
 }
 
 export interface FilialDetalhada extends FilialPublica {
@@ -37,10 +43,12 @@ export interface GerenteResumo {
 /** Lista todas as filiais ativas. Dados públicos (sem endereço completo). */
 async function _listarFiliais(): Promise<FilialPublica[]> {
   const r = await query(
-    `SELECT id, nome, cidade, uf, bairro, ativo
-     FROM filial
-     WHERE deletado_em IS NULL
-     ORDER BY nome`,
+    `SELECT f.id, f.nome, f.cidade, f.uf, f.bairro, f.ativo,
+            g.id as gerente_id, g.nome_completo as gerente_nome
+     FROM filial f
+     LEFT JOIN gerente g ON g.filial_id = f.id AND g.deletado_em IS NULL
+     WHERE f.deletado_em IS NULL
+     ORDER BY f.nome`,
   );
 
   return r.rows.map((row) => ({
@@ -50,6 +58,10 @@ async function _listarFiliais(): Promise<FilialPublica[]> {
     uf: row.uf,
     bairro: row.bairro,
     ativo: row.ativo,
+    gerenteResponsavel: row.gerente_id ? {
+      id: row.gerente_id,
+      nomeCompleto: row.gerente_nome,
+    } : null,
   }));
 }
 
@@ -60,9 +72,11 @@ export async function listarFiliais(): Promise<FilialPublica[]> {
 /** Busca uma filial por ID com endereço completo. Qualquer gerente pode ler. */
 async function _buscarFilialPorId(filialId: string): Promise<FilialDetalhada | null> {
   const r = await query(
-    `SELECT id, nome, cep, uf, cidade, bairro, rua, numero, complemento, ativo, criado_em
-     FROM filial
-     WHERE id = $1 AND deletado_em IS NULL`,
+    `SELECT f.id, f.nome, f.cep, f.uf, f.cidade, f.bairro, f.rua, f.numero, f.complemento, f.ativo, f.criado_em,
+            g.id as gerente_id, g.nome_completo as gerente_nome
+     FROM filial f
+     LEFT JOIN gerente g ON g.filial_id = f.id AND g.deletado_em IS NULL
+     WHERE f.id = $1 AND f.deletado_em IS NULL`,
     [filialId],
   );
 
@@ -81,6 +95,10 @@ async function _buscarFilialPorId(filialId: string): Promise<FilialDetalhada | n
     complemento: row.complemento,
     ativo: row.ativo,
     criadoEm: row.criado_em,
+    gerenteResponsavel: row.gerente_id ? {
+      id: row.gerente_id,
+      nomeCompleto: row.gerente_nome,
+    } : null,
   };
 }
 

@@ -159,6 +159,34 @@ async function listTokensForAllManagers(): Promise<string[]> {
   return result.rows.map((row) => String(row.token)).filter(Boolean);
 }
 
+async function listTokensForAllManagersWhatsAppEnabled(): Promise<string[]> {
+  const result = await query(
+    `SELECT DISTINCT ft.token
+     FROM fcm_token ft
+     JOIN usuario u ON u.id = ft.usuario_id
+     LEFT JOIN gerente g ON g.usuario_id = u.id
+     WHERE u.deletado_em IS NULL
+       AND (
+         (u.tipo = 'GERENTE' AND g.deletado_em IS NULL)
+         OR u.tipo = 'ADMIN'
+       )
+       -- Chave antiga/gerente: preferencias.notificacoes (global)
+       -- Chave nova/cliente: preferencias.notifications.push
+       AND COALESCE(
+         NULLIF(u.preferencias->>'notificacoes', '')::boolean,
+         NULLIF(u.preferencias->'notifications'->>'push', '')::boolean,
+         true
+       ) = true
+       -- Chave específica WhatsApp (gerente) e fallback legado notifications.whatsapp
+       AND COALESCE(
+         NULLIF(u.preferencias->>'notificacao_whatsapp', '')::boolean,
+         NULLIF(u.preferencias->'notifications'->>'whatsapp', '')::boolean,
+         true
+       ) = true`,
+  );
+  return result.rows.map((row) => String(row.token)).filter(Boolean);
+}
+
 export async function notifyNovoCliente(params: {
   clienteId: string;
   clienteNome?: string;
@@ -190,7 +218,7 @@ export async function notifyNovaConversa(params: {
   origem?: string;
 }): Promise<void> {
   const { phone, conversationId, message, origem } = params;
-  const tokens = await listTokensForAllManagers();
+  const tokens = await listTokensForAllManagersWhatsAppEnabled();
   console.log(`[FCM] Tokens para nova conversa: ${tokens.length}`);
 
   const preview = (message || '').slice(0, 120);
@@ -218,7 +246,7 @@ export async function notifyNovaMensagemAtendimento(params: {
   origem?: string;
 }): Promise<void> {
   const { phone, conversationId, message, origem } = params;
-  const tokens = await listTokensForAllManagers();
+  const tokens = await listTokensForAllManagersWhatsAppEnabled();
   console.log(`[FCM] Tokens para nova mensagem atendimento: ${tokens.length}`);
 
   const preview = (message || '').slice(0, 120);

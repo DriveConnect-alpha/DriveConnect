@@ -82,6 +82,10 @@ type RegistrationDraft = { cpf: string | null; email: string | null; expiresAt: 
 const REGISTRATION_TTL_MS = Number.parseInt(process.env.WHATSAPP_REGISTRATION_TTL_MS || '900000', 10); // 15 min
 const registrationDrafts = new Map<string, RegistrationDraft>();
 
+type FilialContextDraft = { filialId: string; expiresAt: number };
+const FILIAL_CONTEXT_TTL_MS = Number.parseInt(process.env.WHATSAPP_FILIAL_CONTEXT_TTL_MS || '21600000', 10); // 6h
+const filialContextByPhone = new Map<string, FilialContextDraft>();
+
 function cleanupRegistrationDrafts(): void {
   const now = Date.now();
   for (const [key, value] of registrationDrafts.entries()) {
@@ -90,6 +94,33 @@ function cleanupRegistrationDrafts(): void {
 }
 
 setInterval(cleanupRegistrationDrafts, Math.max(30_000, Math.floor(REGISTRATION_TTL_MS / 2))).unref();
+
+function cleanupFilialContextDrafts(): void {
+  const now = Date.now();
+  for (const [key, value] of filialContextByPhone.entries()) {
+    if (now > value.expiresAt) filialContextByPhone.delete(key);
+  }
+}
+
+setInterval(cleanupFilialContextDrafts, Math.max(30_000, Math.floor(FILIAL_CONTEXT_TTL_MS / 2))).unref();
+
+function setFilialContextForPhone(phone: string, filialId: string): void {
+  if (!phone || !filialId) return;
+  filialContextByPhone.set(phone, {
+    filialId,
+    expiresAt: Date.now() + FILIAL_CONTEXT_TTL_MS,
+  });
+}
+
+function getFilialContextForPhone(phone: string): string | null {
+  const item = filialContextByPhone.get(phone);
+  if (!item) return null;
+  if (Date.now() > item.expiresAt) {
+    filialContextByPhone.delete(phone);
+    return null;
+  }
+  return item.filialId;
+}
 
 function setCache<T>(key: string, value: T, ttlMs: number): void {
   cache.set(key, { value, expiresAt: Date.now() + ttlMs });
@@ -266,6 +297,36 @@ export async function processIncomingMessage(payload: any): Promise<void> {
       direction: 'OUT',
       waMessageId: replyMessageId,
       text: registrationResult.replyText,
+      status: 'sent',
+    });
+    return;
+  }
+
+  const filiaisResult = await tryHandleListFiliaisIntent({ messageText: text });
+  if (filiaisResult?.handled) {
+    const replyMessageId = await sendMessage(from, filiaisResult.replyText);
+    await storeMessage({
+      conversationId: conversation.id,
+      direction: 'OUT',
+      waMessageId: replyMessageId,
+      text: filiaisResult.replyText,
+      status: 'sent',
+    });
+    return;
+  }
+
+  const veiculosFilialResult = await tryHandleListVeiculosByFilialIntent({
+    messageText: text,
+    history,
+    phone: from,
+  });
+  if (veiculosFilialResult?.handled) {
+    const replyMessageId = await sendMessage(from, veiculosFilialResult.replyText);
+    await storeMessage({
+      conversationId: conversation.id,
+      direction: 'OUT',
+      waMessageId: replyMessageId,
+      text: veiculosFilialResult.replyText,
       status: 'sent',
     });
     return;
@@ -591,6 +652,38 @@ function isReservationIntent(text: string): boolean {
   return intentWords.some((w) => t.includes(w)) && carWords.some((c) => t.includes(c));
 }
 
+function isListFiliaisIntent(text: string): boolean {
+  const t = normalizeText(text || '');
+  if (!t) return false;
+  const patterns = [
+    'filial',
+    'filiais',
+    'unidade',
+    'unidades',
+    'enderecos',
+    'onde voces estao',
+    'onde fica',
+    'localizacao',
+    'lista de filiais',
+  ];
+  return patterns.some((p) => t.includes(p));
+}
+
+function isListVeiculosByFilialIntent(text: string): boolean {
+  const t = normalizeText(text || '');
+  if (!t) return false;
+
+  const veiculoTerms = ['carro', 'carros', 'veiculo', 'veiculos', 'frota', 'modelos'];
+  const filialTerms = ['filial', 'filiais', 'unidade', 'unidades'];
+  const disponibilidadeTerms = ['disponivel', 'disponiveis', 'tem', 'mostrar', 'listar', 'quais'];
+
+  const hasVeiculo = veiculoTerms.some((k) => t.includes(k));
+  const hasFilial = filialTerms.some((k) => t.includes(k));
+  const hasAction = disponibilidadeTerms.some((k) => t.includes(k));
+
+  return hasVeiculo && (hasFilial || hasAction);
+}
+
 function isConfirmation(text: string): boolean {
   const t = (text || '').trim().toLowerCase();
   if (!t) return false;
@@ -641,9 +734,6 @@ function buildNextReservationPrompt(params: {
   }
   if (params.modelMissing) {
     return 'Qual modelo você quer reservar?';
-  }
-  if (params.filialMissing) {
-    return 'Qual unidade você quer usar?';
   }
   if (params.datesMissing) {
     return 'Me envie as datas de retirada e devolução, por favor.';
@@ -701,6 +791,17 @@ async function detectFilialId(messageText: string): Promise<string | null> {
     if (uf && containsWord(t, uf)) return String(row.id);
   }
   return null;
+}
+
+async function getDefaultActiveFilialId(): Promise<string | null> {
+  const rows = (await query(
+    `SELECT id
+     FROM filial
+     WHERE deletado_em IS NULL AND ativo = TRUE
+     ORDER BY nome
+     LIMIT 1`,
+  )).rows;
+  return rows[0]?.id ? String(rows[0].id) : null;
 }
 
 async function findClienteByPhone(phone: string): Promise<{ id: string; nome: string; email: string; telefone?: string | null } | null> {
@@ -944,14 +1045,40 @@ async function tryHandlePaymentIntent(params: {
   }
 
   const intentText = buildPaymentContextText(messageText, history);
+  const userContextText = buildRecentUserContext(messageText, history);
   const { startDate, endDate } = extractDateRange(intentText);
   const modelo = await detectModelo(intentText);
-  const filialId = await detectFilialId(intentText);
+  let filialId = await detectFilialId(messageText);
+  if (!filialId) filialId = await detectFilialId(userContextText);
+  if (filialId) {
+    setFilialContextForPhone(phone, filialId);
+  } else {
+    filialId = getFilialContextForPhone(phone) || await getDefaultActiveFilialId();
+    if (filialId) setFilialContextForPhone(phone, filialId);
+  }
 
   if (!cliente) {
     const customerContext = extractCpfAndEmail(intentText);
     if (customerContext.cpf && customerContext.email && isValidCpfFormat(customerContext.cpf) && isValidEmail(customerContext.email)) {
       try {
+        const existing = await findClienteByCpfOrEmail({
+          cpfDigits: customerContext.cpf,
+          email: customerContext.email,
+        });
+
+        if (existing) {
+          await updateClienteTelefoneIfNeeded(existing.id, phone);
+          cliente = {
+            id: existing.id,
+            nome: existing.nome,
+            email: existing.email,
+            telefone: existing.telefone ?? phone,
+          };
+
+          const mensagemCadastroExistente =
+            `✅ Encontrei seu cadastro pelo CPF/e-mail e já vou continuar sua reserva.`;
+          await sendMessage(phone, mensagemCadastroExistente);
+        } else {
         const nomeCliente = `Cliente WhatsApp ${phone.slice(-4)}`;
         const senhaGerada = generateSecurePassword();
 
@@ -965,6 +1092,14 @@ async function tryHandlePaymentIntent(params: {
 
         console.log(`[WhatsApp] Cliente cadastrado automaticamente: ${resultadoCadastro.usuarioId}`);
         cliente = await findClienteByPhone(phone);
+        if (!cliente) {
+          cliente = {
+            id: resultadoCadastro.clienteId,
+            nome: nomeCliente,
+            email: customerContext.email,
+            telefone: phone,
+          };
+        }
 
         if (cliente) {
           const mensagemCredenciais =
@@ -975,6 +1110,7 @@ async function tryHandlePaymentIntent(params: {
             `Agora continuo com sua reserva.`;
 
           await sendMessage(phone, mensagemCredenciais);
+        }
         }
       } catch (error) {
         console.error('[WhatsApp] Erro no cadastro automático:', error);
@@ -1057,6 +1193,172 @@ async function tryHandlePaymentIntent(params: {
     handled: true,
     replyText: `Perfeito! Aqui está seu link de pagamento: ${reserva.linkPagamento}\nAssim que o pagamento for confirmado, eu te aviso por aqui.`,
   };
+}
+
+async function tryHandleListFiliaisIntent(params: {
+  messageText: string;
+}): Promise<{ handled: boolean; replyText: string }> {
+  const { messageText } = params;
+  if (!isListFiliaisIntent(messageText)) {
+    return { handled: false, replyText: '' };
+  }
+
+  try {
+    const rows = (await query(
+      `SELECT nome, cidade, uf, rua, numero, bairro
+       FROM filial
+       WHERE deletado_em IS NULL AND ativo = TRUE
+       ORDER BY nome`,
+    )).rows;
+
+    if (!rows.length) {
+      return {
+        handled: true,
+        replyText: 'No momento não encontrei filiais ativas. Se quiser, posso te ajudar com a reserva online.',
+      };
+    }
+
+    const linhas = rows.map((r) => {
+      const nome = String(r.nome || 'Unidade');
+      const cidade = String(r.cidade || '').trim();
+      const uf = String(r.uf || '').trim();
+      const rua = String(r.rua || '').trim();
+      const numero = String(r.numero || '').trim();
+      const bairro = String(r.bairro || '').trim();
+
+      const local = [cidade, uf].filter(Boolean).join('/');
+      const endereco = [rua, numero, bairro].filter(Boolean).join(', ');
+
+      if (local && endereco) return `• ${nome} — ${local} (${endereco})`;
+      if (local) return `• ${nome} — ${local}`;
+      if (endereco) return `• ${nome} (${endereco})`;
+      return `• ${nome}`;
+    });
+
+    return {
+      handled: true,
+      replyText: `Temos estas unidades:\n${linhas.join('\n')}\n\nSe quiser, já te ajudo a escolher uma para a sua reserva.`,
+    };
+  } catch (error) {
+    console.error('[WhatsApp] Erro ao listar filiais:', error);
+    return {
+      handled: true,
+      replyText: 'Não consegui listar as filiais agora. Tente novamente em instantes, por favor.',
+    };
+  }
+}
+
+async function tryHandleListVeiculosByFilialIntent(params: {
+  messageText: string;
+  history?: HistoryMessage[];
+  phone?: string;
+}): Promise<{ handled: boolean; replyText: string }> {
+  const { messageText, history, phone } = params;
+  if (!isListVeiculosByFilialIntent(messageText)) {
+    return { handled: false, replyText: '' };
+  }
+
+  const userContextText = buildRecentUserContext(messageText, history);
+  let filialId = await detectFilialId(messageText);
+  if (!filialId) filialId = await detectFilialId(userContextText);
+  if (!filialId && phone) filialId = getFilialContextForPhone(phone);
+  if (filialId && phone) setFilialContextForPhone(phone, filialId);
+
+  if (!filialId) {
+    try {
+      const result = await query(
+        `SELECT f.nome AS filial_nome,
+                m.nome AS modelo,
+                m.marca,
+                COUNT(*)::int AS quantidade
+         FROM veiculo v
+         JOIN modelo m ON m.id = v.modelo_id
+         JOIN filial f ON f.id = v.filial_id
+         WHERE v.deletado_em IS NULL
+           AND f.deletado_em IS NULL
+           AND f.ativo = TRUE
+           AND v.status = 'DISPONIVEL'
+         GROUP BY f.nome, m.nome, m.marca
+         ORDER BY f.nome, m.nome
+         LIMIT 24`,
+      );
+
+      if (!result.rows.length) {
+        return {
+          handled: true,
+          replyText: 'No momento não encontrei veículos disponíveis nas filiais.',
+        };
+      }
+
+      const linhas = result.rows.map((r) => {
+        const modelo = `${String(r.marca || '').trim()} ${String(r.modelo || '').trim()}`.trim();
+        const filial = String(r.filial_nome || 'Filial').trim();
+        const qtd = Number(r.quantidade || 0);
+        return `• ${modelo} (Filial ${filial})${qtd > 1 ? ` - ${qtd} disponíveis` : ''}`;
+      });
+
+      return {
+        handled: true,
+        replyText: `Veículos disponíveis no geral:\n${linhas.join('\n')}\n\nSe preferir, eu filtro por uma filial específica também.`,
+      };
+    } catch (error) {
+      console.error('[WhatsApp] Erro ao listar veículos no geral:', error);
+      return {
+        handled: true,
+        replyText: 'Não consegui listar os veículos agora. Tente novamente em instantes.',
+      };
+    }
+  }
+
+  try {
+    const result = await query(
+      `SELECT f.nome AS filial_nome, f.cidade, f.uf,
+              m.nome AS modelo, m.marca, tc.nome AS categoria,
+              v.placa
+       FROM veiculo v
+       JOIN modelo m ON m.id = v.modelo_id
+       JOIN tipo_carro tc ON tc.id = m.tipo_carro_id
+       JOIN filial f ON f.id = v.filial_id
+       WHERE v.deletado_em IS NULL
+         AND f.deletado_em IS NULL
+         AND f.ativo = TRUE
+         AND v.status = 'DISPONIVEL'
+         AND v.filial_id = $1
+       ORDER BY tc.nome, m.nome
+       LIMIT 12`,
+      [filialId],
+    );
+
+    if (!result.rows.length) {
+      return {
+        handled: true,
+        replyText: 'No momento não encontrei veículos disponíveis nessa filial. Quer que eu consulte outra unidade?',
+      };
+    }
+
+    const headerRow = result.rows[0];
+    const local = [headerRow?.filial_nome, headerRow?.cidade, headerRow?.uf]
+      .filter(Boolean)
+      .join(' / ');
+
+    const linhas = result.rows.map((r) => {
+      const modelo = `${String(r.marca || '').trim()} ${String(r.modelo || '').trim()}`.trim();
+      const categoria = String(r.categoria || '').trim();
+      const placa = String(r.placa || '').trim();
+      return `• ${modelo}${categoria ? ` (${categoria})` : ''}${placa ? ` - ${placa}` : ''}`;
+    });
+
+    return {
+      handled: true,
+      replyText: `Veículos disponíveis em ${local || 'sua filial'}:\n${linhas.join('\n')}\n\nSe quiser, eu já monto a reserva para um deles.`,
+    };
+  } catch (error) {
+    console.error('[WhatsApp] Erro ao listar veículos por filial:', error);
+    return {
+      handled: true,
+      replyText: 'Não consegui listar os veículos dessa filial agora. Tente novamente em instantes.',
+    };
+  }
 }
 
 export async function notifyPaymentConfirmed(reservaId: string): Promise<void> {

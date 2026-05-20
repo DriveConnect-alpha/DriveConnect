@@ -33,7 +33,11 @@ class AppFeedback {
     showError(error, fallback: 'Ocorreu um erro inesperado.');
   }
 
-  static void _show(String message, AppFeedbackType type, {Duration? duration}) {
+  static void _show(
+    String message,
+    AppFeedbackType type, {
+    Duration? duration,
+  }) {
     final messenger = messengerKey.currentState;
     final context = messengerKey.currentContext;
     if (messenger == null || context == null) return;
@@ -41,26 +45,33 @@ class AppFeedback {
     final theme = Theme.of(context);
     final colors = _FeedbackColors.fromTheme(theme, type);
 
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        duration: duration ?? const Duration(seconds: 4),
-        backgroundColor: colors.background,
-        content: Row(
-          children: [
-            Icon(colors.icon, color: colors.foreground),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: theme.textTheme.bodyMedium?.copyWith(color: colors.foreground),
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final currentMessenger = messengerKey.currentState;
+      if (currentMessenger == null) return;
+
+      currentMessenger.hideCurrentSnackBar();
+      currentMessenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          duration: duration ?? const Duration(seconds: 4),
+          backgroundColor: colors.background,
+          content: Row(
+            children: [
+              Icon(colors.icon, color: colors.foreground),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.foreground,
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 }
 
@@ -85,7 +96,11 @@ class _FeedbackColors {
   final Color foreground;
   final IconData icon;
 
-  _FeedbackColors({required this.background, required this.foreground, required this.icon});
+  _FeedbackColors({
+    required this.background,
+    required this.foreground,
+    required this.icon,
+  });
 
   factory _FeedbackColors.fromTheme(ThemeData theme, AppFeedbackType type) {
     switch (type) {

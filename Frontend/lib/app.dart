@@ -82,9 +82,11 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 class DriveConnectApp extends StatelessWidget {
   const DriveConnectApp({super.key});
 
+  static bool _useMockServices() => false;
+
   @override
   Widget build(BuildContext context) {
-    const bool useMock = false; // Toggle centralizado
+    final bool useMock = _useMockServices(); // Toggle centralizado
 
     // Configure session expiry handler (JWT 401 → logout)
     onSessionExpired = () {
@@ -95,7 +97,7 @@ class DriveConnectApp extends StatelessWidget {
         });
       }
     };
-    
+
     // Services: no longer require ApiClient, they use the calls layer internally
     final IAuthService authService = useMock
         ? MockAuthService()
@@ -105,8 +107,8 @@ class DriveConnectApp extends StatelessWidget {
         ? MockExploreService()
         : ExploreService();
 
-    final IBookingService bookingService = useMock 
-        ? MockBookingService() 
+    final IBookingService bookingService = useMock
+        ? MockBookingService()
         : BookingService();
 
     final IReservationManagerService reservationManagerService = useMock
@@ -128,7 +130,7 @@ class DriveConnectApp extends StatelessWidget {
     final IInsuranceService insuranceService = useMock
         ? MockInsuranceService()
         : InsuranceService();
-        
+
     final IAdminService adminService = useMock
         ? MockAdminService()
         : AdminService();
@@ -141,18 +143,26 @@ class DriveConnectApp extends StatelessWidget {
       providers: [
         Provider<IFilialService>.value(value: filialService),
         ChangeNotifierProvider(create: (_) => AuthProvider(authService)),
+        ChangeNotifierProvider(create: (_) => ExploreProvider(exploreService)),
+        ChangeNotifierProvider(create: (_) => BookingProvider(bookingService)),
         ChangeNotifierProvider(
-          create: (_) => ExploreProvider(exploreService),
+          create: (_) => InventoryProvider(inventoryService),
         ),
         ChangeNotifierProvider(
-          create: (_) => BookingProvider(bookingService),
+          create: (_) => ReservationsProvider(reservationManagerService),
         ),
-        ChangeNotifierProvider(create: (_) => InventoryProvider(inventoryService)),
-        ChangeNotifierProvider(create: (_) => ReservationsProvider(reservationManagerService)),
-        ChangeNotifierProvider(create: (_) => ClientsProvider(clientManagerService)),
-        ChangeNotifierProvider(create: (_) => InsuranceProvider(insuranceService)),
-        ChangeNotifierProvider(create: (_) => MyReservationsProvider(bookingService)),
-        ChangeNotifierProvider(create: (_) => DashboardProvider(dashboardService)),
+        ChangeNotifierProvider(
+          create: (_) => ClientsProvider(clientManagerService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => InsuranceProvider(insuranceService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MyReservationsProvider(bookingService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => DashboardProvider(dashboardService),
+        ),
         ChangeNotifierProvider(create: (_) => AdminProvider(adminService)),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
@@ -166,8 +176,9 @@ class DriveConnectApp extends StatelessWidget {
             themeMode: themeProvider.themeMode,
             scrollBehavior: const AppScrollBehavior(),
             scaffoldMessengerKey: AppFeedback.messengerKey,
-            builder: (context, child) => AppLoadingOverlay(child: child ?? const SizedBox.shrink()),
-            routerConfig: AppRouter.router,
+            builder: (context, child) =>
+                AppLoadingOverlay(child: child ?? const SizedBox.shrink()),
+            routerConfig: AppRouter.createRouter(),
           );
         },
       ),

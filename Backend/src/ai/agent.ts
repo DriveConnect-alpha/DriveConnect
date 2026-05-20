@@ -5,7 +5,7 @@ import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { RunnableSequence } from '@langchain/core/runnables';
 import { query } from '../db/index.js';
-import { buscarVeiculoDisponivelPorFilial, calcularValorTotal, criarReservaPendente } from '../services/reserva.service.js';
+import { buscarVeiculoDisponivelPorFilial, buscarVeiculoFisicoDisponivelSemData, calcularValorTotal, criarReservaPendente } from '../services/reserva.service.js';
 import { criarCliente } from '../services/usuario.service.js';
 
 export type HistoryMessage = {
@@ -1230,7 +1230,8 @@ async function generatePaymentLink(data: ReservationData, clienteId?: string): P
     const filialId = await resolveFilialIdForReservation(data);
     if (!modelo || !filialId) return '';
 
-    const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, reservaInicio, reservaFim);
+    // Agent: apenas verificar existência física (sem checagem por datas)
+    const veiculoId = await buscarVeiculoFisicoDisponivelSemData(modelo.id, filialId);
     if (!veiculoId) return '';
 
     const valorAluguel = await calcularValorTotal(modelo.id, filialId, reservaInicio, reservaFim);

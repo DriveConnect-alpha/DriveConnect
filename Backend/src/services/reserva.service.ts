@@ -83,6 +83,29 @@ export async function buscarVeiculoDisponivelPorFilial(
 }
 
 /**
+ * Busca uma unidade física disponível de um modelo em uma filial específica
+ * sem considerar as datas (apenas verifica status do veículo).
+ * Uso: quando o agente deve apenas checar se existe veículo disponível fisicamente.
+ */
+export async function buscarVeiculoFisicoDisponivelSemData(
+  modeloId: number,
+  filialId: string,
+): Promise<string | null> {
+  const sql = `
+    SELECT v.id
+    FROM veiculo v
+    WHERE v.modelo_id = $1
+      AND v.filial_id = $2
+      AND v.status = 'DISPONIVEL'
+      AND v.deletado_em IS NULL
+    LIMIT 1;
+  `;
+
+  const resultado = await query(sql, [modeloId, filialId]);
+  return resultado.rows[0]?.id ?? null;
+}
+
+/**
  * Calcula o valor total da reserva com base na tabela de preço dinâmico.
  * Fallback para preco_base_diaria do tipo_carro quando não há registro específico.
  */

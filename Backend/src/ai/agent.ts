@@ -1111,6 +1111,19 @@ async function extractReservationDataFromHistory(
         else if (t.includes('onix')) data.modeloNome = 'Onix';
         else if (t.includes('kicks')) data.modeloNome = 'Kicks';
         else if (t.includes('tracker')) data.modeloNome = 'Tracker';
+        else {
+          // Tentar resolver modelo pelo nome livre (ex: "Audi A4")
+          try {
+            const resolved = await resolveModeloByName(msg.content);
+            if (resolved) {
+              data.modeloNome = resolved.descricao;
+              data.modeloId = String(resolved.id);
+              console.log(`[Agent][DEBUG] resolveModeloByName encontrou: modeloNome=${data.modeloNome} modeloId=${data.modeloId}`);
+            }
+          } catch (err) {
+            console.error('[Agent] Erro ao resolver modelo por nome:', err);
+          }
+        }
       }
 
       // Detectar datas

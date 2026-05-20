@@ -984,6 +984,7 @@ async function tryHandleAutoRegistration(params: {
     if (startDate && endDate && modelo && filialId) {
       const inicio = new Date(startDate);
       const fim = new Date(endDate);
+      console.log(`[WhatsApp][DEBUG] tryHandleAutoRegistration checando disponibilidade modeloId=${modelo.id} descricao=${modelo.descricao} filialId=${filialId} inicio=${inicio.toISOString()} fim=${fim.toISOString()}`);
       const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, inicio, fim);
       if (!veiculoId) {
         return {
@@ -1037,6 +1038,7 @@ async function tryHandleAutoRegistration(params: {
     if (startDate && endDate && modelo && filialId) {
       const inicio = new Date(startDate);
       const fim = new Date(endDate);
+      console.log(`[WhatsApp][DEBUG] tryHandleAutoRegistration (new user) checando disponibilidade modeloId=${modelo.id} descricao=${modelo.descricao} filialId=${filialId} inicio=${inicio.toISOString()} fim=${fim.toISOString()}`);
       const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, inicio, fim);
       if (!veiculoId) {
         return {
@@ -1210,6 +1212,7 @@ async function tryHandlePaymentIntent(params: {
 
   const inicio = new Date(startDate);
   const fim = new Date(endDate);
+  console.log(`[WhatsApp][DEBUG] tryHandlePaymentIntent checando disponibilidade modeloId=${modelo.id} descricao=${modelo.descricao} filialId=${filialId} inicio=${inicio.toISOString()} fim=${fim.toISOString()}`);
   const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo.id, filialId, inicio, fim);
 
   if (!veiculoId) {

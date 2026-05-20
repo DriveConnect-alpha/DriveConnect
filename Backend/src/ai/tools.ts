@@ -627,7 +627,7 @@ export const TOOLS_MAP = {
   listar_carros_disponiveis: {
     name: 'listar_carros_disponiveis',
     description:
-      'Lista carros disponíveis em um período, filial ou categoria. Retorna APENAS carros realmente disponíveis (sem conflitos de reserva).',
+      'Lista a frota de carros de uma filial ou categoria. Se as datas NÃO forem fornecidas, lista o catálogo geral da filial. Se as datas FOREM fornecidas, filtra por disponibilidade real (sem conflitos). Use para responder "quais carros vocês têm?", "ver veículos da filial X", etc.',
     func: toolListarCarrosDisponiveis,
     params: {
       filial_id: 'UUID da filial (opcional)',

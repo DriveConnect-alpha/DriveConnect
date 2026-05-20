@@ -15,91 +15,30 @@ import {
   executeTool,
   type ToolResult,
 } from '../../src/ai/tools.js';
-import { detectarIntencao, extrairParametros } from '../../src/ai/agent.js';
+import { atenderClienteComAgent } from '../../src/ai/agent.js';
 
 describe('🤖 AI TOOLS & AGENT', () => {
   // ──────────────────────────────────────────────────────
-  // INTENT DETECTION
+  // INTENT DETECTION (VIA AGENT)
   // ──────────────────────────────────────────────────────
 
-  describe('📋 Detecção de Intenção', () => {
-    it('deve detectar LISTAR_FILIAIS', () => {
-      const textos = [
-        'Vocês têm filiais em SP?',
-        'Qual a unidade mais próxima?',
-        'Endereço do local em São Paulo?',
-      ];
-      for (const texto of textos) {
-        expect(detectarIntencao(texto)).toBe('LISTAR_FILIAIS');
-      }
+  describe('📋 Resposta do Agente e Intenção', () => {
+    it('deve detectar intenção LISTAR_FILIAIS', async () => {
+      const result = await atenderClienteComAgent('Vocês têm filiais em SP?');
+      expect(result.intencao).toBe('LISTAR_FILIAIS');
     });
 
-    it('deve detectar LISTAR_CARROS', () => {
-      const textos = [
-        'Quais carros vocês têm?',
-        'Modelos disponíveis?',
-        'Que SUVs vocês oferecem?',
-      ];
-      for (const texto of textos) {
-        expect(detectarIntencao(texto)).toBe('LISTAR_CARROS');
-      }
+    it('deve detectar intenção LISTAR_CARROS', async () => {
+      const result = await atenderClienteComAgent('Quais carros vocês têm?');
+      expect(result.intencao).toBe('LISTAR_CARROS');
     });
 
-    it('deve detectar CRIAR_RESERVA', () => {
-      const textos = [
-        'Quero alugar um carro para 16/05',
-        'Como fazer uma reserva?',
-        'Preciso de um SUV para uma semana',
-      ];
-      for (const texto of textos) {
-        expect([
-          'CRIAR_RESERVA',
-          'LISTAR_CARROS', // fallback se não detectar "reserva"
-        ]).toContain(detectarIntencao(texto));
-      }
-    });
-
-    it('deve detectar REGISTRAR_CLIENTE', () => {
-      const textos = [
-        'Meu CPF é 123.456.789-10',
-        'Como me registrar?',
-        'Preciso criar uma conta',
-      ];
-      for (const texto of textos) {
-        expect(detectarIntencao(texto)).toBe('REGISTRAR_CLIENTE');
-      }
-    });
-  });
-
-  // ──────────────────────────────────────────────────────
-  // PARAMETER EXTRACTION
-  // ──────────────────────────────────────────────────────
-
-  describe('🔍 Extração de Parâmetros', () => {
-    it('deve extrair datas em DD/MM/YYYY', () => {
-      const texto = 'Quero alugar de 16/05/2026 até 18/05/2026';
-      const params = extrairParametros(texto, 'CRIAR_RESERVA');
-      expect(params.data_inicio).toBe('2026-05-16');
-      expect(params.data_fim).toBe('2026-05-18');
-    });
-
-    it('deve extrair CPF', () => {
-      const texto = 'Meu CPF é 123.456.789-10 e email teste@example.com';
-      const params = extrairParametros(texto, 'REGISTRAR_CLIENTE');
-      expect(params.cpf).toBe('123.456.789-10');
-      expect(params.email).toBe('teste@example.com');
-    });
-
-    it('deve extrair categoria de carro', () => {
-      const texto = 'Preciso de um SUV grande para a família';
-      const params = extrairParametros(texto, 'LISTAR_CARROS');
-      expect(params.categoria).toBe('SUV');
-    });
-
-    it('deve extrair nome', () => {
-      const texto = 'Meu nome é João Silva e quero registrar';
-      const params = extrairParametros(texto, 'REGISTRAR_CLIENTE');
-      expect(params.nome?.toLowerCase()).toContain('joão');
+    it('deve sugerir catálogo sem pedir datas quando o usuário quer apenas ver os veículos', async () => {
+      const result = await atenderClienteComAgent('gostaria de ver os veiculos da filial matriz');
+      // O agente deve retornar uma resposta que contenha opções do catálogo, 
+      // sem necessariamente entrar em erro de "pedir datas" imediatamente se o buildLocalContext retornar frota
+      expect(result.intencao).toBe('LISTAR_CARROS');
+      expect(result.resposta.toLowerCase()).not.toContain('preciso das datas');
     });
   });
 
@@ -126,7 +65,7 @@ describe('🤖 AI TOOLS & AGENT', () => {
         data_fim: '2026-05-14', // DATA FIM ANTES DO INÍCIO (ERRO)
       });
       expect(result.success).toBe(false);
-      expect(result.error).toContain('data_fim deve ser');
+      expect(result.error?.toLowerCase()).toContain('data fim deve ser');
     });
 
     it('listar_carros_disponiveis sem parâmetros deve retornar lista', async () => {

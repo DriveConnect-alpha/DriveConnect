@@ -1,157 +1,222 @@
-# DRIVE CONNECT — BASE DE CONHECIMENTO (LOCADORA E MOBILIDADE)
+# DRIVE CONNECT — BASE DE CONHECIMENTO (RAG)
 
-## 1) Visão geral (quem somos)
-A Drive Connect é uma locadora e operação de mobilidade com atendimento rápido via WhatsApp, focada em experiência simples: cotação, reserva, assinatura e suporte 24h (emergências). Trabalhamos com frota econômica, SUVs, premium e utilitários leves, com retirada em loja e opções de entrega/retirada no endereço do cliente (sujeito a disponibilidade e taxa).
+## 1) Sobre a Drive Connect
 
-## 2) Objetivo do atendimento (padrão WhatsApp)
-O atendimento deve:
-- Entender necessidade: cidade, datas/horários, categoria, número de passageiros, bagagem, uso (urbano/estrada/trabalho), preferência (automático, ar, multimídia).
-- Checar disponibilidade por período e sugerir 2–3 opções equivalentes.
-- Informar preço estimado, caução, franquia/planos de proteção, limites de km, requisitos e formas de pagamento.
-- Confirmar dados do motorista e conduzir para pagamento/reserva (Pix ou cartão) e assinatura do contrato.
+A Drive Connect é uma empresa de locação de veículos focada em praticidade, conforto, mobilidade e atendimento rápido via WhatsApp.
 
-Checklist rápido (antes de cotar):
-- Cidade/unidade de retirada e devolução (se for diferente)
-- Datas e horários de retirada/devolução
-- Categoria preferida e alternativas aceitas
-- Km estimado (se alto, sugerir pacote km)
-- Forma de pagamento (Pix/cartão)
-- Idade do motorista + CNH definitiva válida
-- Necessidade de entrega/retirada no endereço e adicionais (cadeirinha, motorista extra, etc.)
+A empresa atua com o objetivo de tornar o processo de aluguel de veículos mais simples, moderno e acessível, oferecendo suporte humanizado e atendimento eficiente durante toda a jornada do cliente.
 
-## 3) Unidades (exemplo de operação)
-Unidades e cobertura (modelo de cadastro):
-- Fortaleza/CE — Unidade Aldeota (retirada/entrega): Seg–Sex 08:00–18:00, Sáb 08:00–12:00
-- Fortaleza/CE — Aeroporto (retirada agendada): todos os dias 07:00–22:00 (mediante agendamento)
-- Caucaia/CE — Unidade Centro (retirada/entrega): Seg–Sex 08:00–17:00
+A Drive Connect busca entregar:
+- Atendimento rápido e cordial
+- Processo de reserva simples
+- Boa experiência ao cliente
+- Frota diversificada
+- Facilidade no pagamento e contratação
+- Suporte durante a locação
 
-Observação: domingos/feriados sem atendimento presencial; suporte 24h apenas para emergência, guincho e sinistro.
+A empresa valoriza:
+- Transparência
+- Segurança
+- Organização
+- Agilidade
+- Qualidade no atendimento
+- Confiança na relação com o cliente
 
-## 4) Catálogo de categorias e itens de série
-Observação importante:
-- As opções de modelos específicos variam por unidade, período e disponibilidade e devem ser consultadas no sistema (banco).
+---
 
-### 4.1 Econômico (1.0–1.6) — “melhor custo”
-Características comuns:
-- Ar-condicionado, direção elétrica, 4 portas, multimídia (varia), porta-malas médio
-Perfil ideal:
-- Viagens curtas, cidade, casal, pequenos grupos (até 5 ocupantes)
+## 2) Diferenciais da Drive Connect
 
-### 4.2 Compacto Automático — “conforto urbano”
-Características comuns:
-- Câmbio automático, central multimídia, consumo otimizado
+A Drive Connect se destaca por:
+- Atendimento ágil pelo WhatsApp
+- Processo simplificado de cotação e reserva
+- Atendimento humanizado
+- Opções variadas de categorias de veículos
+- Flexibilidade conforme disponibilidade operacional
+- Suporte ao cliente durante a locação
 
-### 4.3 Sedan — “porta-malas e rodovia”
-Características:
-- Mais porta-malas, mais conforto em estrada (especialmente médio/alto)
+O objetivo da empresa é oferecer uma experiência prática e tranquila para quem precisa de mobilidade para viagens, trabalho, turismo ou uso diário.
 
-### 4.4 SUV — “família e bagagem”
-Características:
-- Posição alta, porta-malas maior, conforto em viagens
+---
 
-### 4.5 Premium — “performance e status”
-Características:
-- Acabamento superior, potência, mais tecnologia
+## 3) O que a empresa oferece
 
-### 4.6 Utilitário leve (carga) — “trabalho”
-Características:
-- Volume de carga, ideal para pequenas mudanças e entregas
-Regras especiais:
-- Proibido transporte de materiais ilegais/perigosos; sujeito a vistoria reforçada.
+A Drive Connect trabalha com:
+- Locação diária
+- Locação por períodos maiores
+- Atendimento para viagens
+- Mobilidade urbana
+- Veículos para uso profissional
+- Categorias econômicas até premium
+- Utilitários leves
+- Serviços adicionais sujeitos à disponibilidade
 
-## 5) Preços base (referência) e o que pode alterar o valor
-Os valores podem variar por:
-- Datas (alta/baixa temporada), duração, disponibilidade, cidade/unidade, forma de retirada/entrega, adicionais e plano de proteção.
+---
 
-Tabela de referência (diária):
-- Econômico: a partir de R$ 120,00/dia
-- SUV: a partir de R$ 250,00/dia
-- Premium: a partir de R$ 600,00/dia
-- Compacto Automático e Sedan: sob cotação (depende do modelo e período)
-- Utilitário leve: sob cotação (depende do volume e período)
+## 4) Categorias disponíveis
 
-## 6) Disponibilidade (como funciona e exemplos)
-### 6.1 Regras de disponibilidade
-- A disponibilidade é por período (data + hora de retirada e devolução).
-- Reservas só são confirmadas após pagamento/garantia e validação dos documentos.
-- “Pré-reserva” pode expirar (ex.: 30–60 min) se não houver pagamento.
-Observação importante:
-- Quando houver consulta a “frota/disponibilidade”, a fonte de verdade é o sistema (banco local) e não apenas texto. Se o sistema indicar indisponível, ofereça alternativa equivalente.
-Categorias padronizadas (para consulta): Econômico, Sedan, SUV, Premium, Utilitário.
+Categorias normalmente disponíveis:
+- Econômico
+- Compacto Automático
+- Sedan
+- SUV
+- Premium
+- Utilitário
 
-### 6.2 Exemplo de status de disponibilidade
-Use termos padronizados no atendimento:
-- Disponível (confirmação imediata)
-- Últimas unidades (confirmar rápido)
-- Em preparação (libera após vistoria/limpeza; confirmar hora)
-- Indisponível (oferecer equivalente)
-- Sob consulta (aguardar retorno do pátio/unidade)
+Os modelos específicos variam conforme unidade, período e disponibilidade no sistema.
 
-# DRIVE CONNECT — BASE DE CONHECIMENTO (LOCADORA)
+---
 
-## 1) Papel do atendimento
-- Atender rápido via WhatsApp, entender necessidade e orientar a reserva.
-- Sempre confirmar unidade, datas e categoria antes de prometer disponibilidade.
-- Opções de carros, disponibilidade e preços reais devem vir do sistema (banco).
+## 5) Como funciona a locação
 
-Checklist rápido:
-- Unidade/cidade retirada e devolução
-- Datas e horários
-- Categoria preferida e alternativas aceitas
-- Forma de pagamento (Pix/cartão)
-- CNH válida e idade do motorista
-- Adicionais (cadeirinha, motorista extra, entrega/retirada no local)
+Fluxo padrão:
+1. Cliente informa unidade e datas
+2. O sistema consulta disponibilidade
+3. São apresentadas opções disponíveis
+4. O cliente escolhe a categoria/modelo
+5. O pagamento/garantia é realizado
+6. A reserva é confirmada
+7. O veículo é liberado para retirada
 
-## 2) Categorias (sem modelos específicos)
-Observação: modelos variam por unidade e período.
+---
 
-- Econômico — melhor custo/uso urbano
-- Compacto Automático — conforto urbano
-- Sedan — porta‑malas e estrada
-- SUV — família e bagagem
-- Premium — mais tecnologia e conforto
-- Utilitário — carga leve
+## 6) Disponibilidade
 
-## 3) Preços e disponibilidade
-- Valores variam por período, unidade, duração e disponibilidade.
-- Disponibilidade é por período (data/hora de retirada e devolução).
-- Reserva só é confirmada após pagamento/garantia.
+A disponibilidade depende de:
+- Unidade
+- Datas
+- Horários
+- Categoria
+- Situação operacional da frota
 
-## 4) Quilometragem
-- Padrão: 150 km/dia (pode variar por contrato/categoria).
-- Excedente: valores sob cotação.
-- Pacotes km (incluindo km livre) sob cotação.
+Os dados reais de disponibilidade devem sempre ser consultados no sistema.
 
-## 5) Pagamento e caução
-- Pagamento: Pix ou cartão (até 3x quando disponível).
-- Caução via cartão de crédito físico do locatário.
-- Não aceitamos dinheiro/cheque.
+Nunca garantir veículo sem validação do sistema.
 
-## 6) Requisitos do motorista
-- CNH definitiva e válida.
-- Documento com foto.
-- Idade mínima: 21 anos (premium pode exigir idade maior).
+---
 
-## 7) Retirada, devolução e limpeza
-- Política combustível: cheio/cheio.
-- Atraso pode gerar diária extra.
-- Sujeira excessiva pode gerar taxa.
+## 7) Pagamento
 
-## 8) Proteção/seguro
-- Franquia varia por categoria.
-- Planos adicionais podem reduzir franquia (sob cotação).
-- Uso indevido ou infrações graves podem invalidar cobertura.
+Formas de pagamento podem incluir:
+- Pix
+- Cartão
 
-## 9) Adicionais e serviços
-- Cadeirinha, motorista extra, entrega/retirada no endereço (sob disponibilidade).
+A reserva pode depender de:
+- Pagamento antecipado
+- Caução
+- Validação cadastral
+- Aprovação dos documentos
 
-## 10) Cancelamento e no‑show
-- Alterações podem mudar preço e disponibilidade.
-- No‑show pode gerar multa conforme política do período.
+O assistente nunca deve solicitar:
+- Número completo do cartão
+- CVV
+- Senha
+- Dados sensíveis
 
-## 11) Perguntas prontas
-1) “Qual unidade/cidade de retirada? A devolução é no mesmo local?”
-2) “Quais datas e horários de retirada e devolução?”
-3) “Qual categoria você prefere? Aceita alternativa?”
-4) “Vai pagar no Pix ou cartão?”
-Importante:
+O pagamento deve ocorrer apenas pelos canais oficiais.
+
+---
+
+## 8) Requisitos para locação
+
+O motorista normalmente precisa:
+- CNH definitiva válida
+- Documento com foto
+- Idade mínima conforme política da categoria
+
+Algumas categorias podem exigir critérios adicionais.
+
+---
+
+## 9) Quilometragem
+
+A quilometragem pode variar conforme:
+- Categoria
+- Plano contratado
+- Tipo da locação
+
+Pacotes especiais devem ser consultados no sistema.
+
+---
+
+## 10) Proteção e cobertura
+
+A Drive Connect pode oferecer opções de proteção conforme categoria e contrato.
+
+As regras de cobertura podem variar conforme:
+- Categoria do veículo
+- Tipo de proteção contratada
+- Conduta durante a locação
+
+Uso indevido do veículo pode invalidar cobertura.
+
+---
+
+## 11) Retirada e devolução
+
+As regras de retirada e devolução dependem da unidade e do contrato.
+
+Podem existir:
+- Taxas adicionais por atraso
+- Regras de combustível
+- Taxas por limpeza excessiva
+- Serviços de entrega e retirada
+
+Tudo depende da disponibilidade operacional.
+
+---
+
+## 12) Adicionais
+
+Serviços adicionais sujeitos à disponibilidade:
+- Cadeirinha
+- Motorista adicional
+- Entrega no endereço
+- Retirada no endereço
+
+---
+
+## 13) Perguntas frequentes (FAQ)
+
+### A Drive Connect é confiável?
+Sim. A Drive Connect busca oferecer um atendimento transparente, organizado e seguro, priorizando a experiência do cliente durante toda a locação.
+
+### O atendimento é rápido?
+Sim. O atendimento é focado em agilidade, principalmente via WhatsApp, para facilitar cotações, reservas e suporte.
+
+### A empresa possui veículos variados?
+Sim. A frota trabalha com diferentes categorias, desde veículos econômicos até SUVs, premium e utilitários.
+
+### Posso reservar online?
+O processo de reserva pode ser iniciado diretamente pelo atendimento digital da empresa.
+
+### Os preços são fixos?
+Não. Os valores podem variar conforme período, disponibilidade, categoria e unidade.
+
+### Posso escolher modelo específico?
+A escolha depende da disponibilidade operacional da unidade e do período solicitado.
+
+### A empresa oferece suporte?
+Sim. A Drive Connect busca prestar suporte ao cliente durante o processo de locação.
+
+### Posso alterar minha reserva?
+Alterações dependem da disponibilidade e podem impactar valores e condições.
+
+### A reserva é garantida automaticamente?
+Não. A reserva depende da confirmação do sistema e das etapas de pagamento/validação.
+
+---
+
+## 14) Política de atendimento do assistente
+
+O assistente deve:
+- Responder de forma natural
+- Ser cordial e objetivo
+- Demonstrar confiança
+- Representar bem a empresa
+- Evitar respostas robóticas
+- Fazer poucas perguntas por vez
+- Priorizar destravar o atendimento
+- Ajudar o cliente a concluir a reserva
+- Transmitir a imagem de uma empresa organizada, moderna e eficiente
+
+Nunca inventar informações que não estejam no sistema ou na base de conhecimento.

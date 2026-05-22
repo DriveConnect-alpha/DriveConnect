@@ -5,6 +5,7 @@ import {
   atualizarPlano,
   desativarPlano,
 } from '../services/seguro.service.js';
+import { requireCaller, requireTipo } from '../middlewares/auth.js';
 
 function lerCorpo(req: IncomingMessage): Promise<Record<string, any>> {
   return new Promise((resolve, reject) => {
@@ -18,16 +19,34 @@ function lerCorpo(req: IncomingMessage): Promise<Record<string, any>> {
   });
 }
 
+function responder(res: ServerResponse, status: number, corpo: unknown): void {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(corpo));
+}
+
+function mapearErro(err: unknown): { status: number; mensagem: string } {
+  const mensagem = err instanceof Error ? err.message : 'Erro interno.';
+  const status = mensagem.includes('inválid') || mensagem.includes('obrigatório') ? 400
+    : mensagem.includes('não encontrad') ? 404
+      : mensagem.includes('Não autorizado') ? 401
+        : mensagem.includes('Sem permissão') ? 403
+          : 500;
+  return { status, mensagem };
+}
+
 // ──────────────────────────────────────────────
 // GET /seguros
 // Lista todos os planos de seguro ativos da empresa.
 // O plano Básico (obrigatório) sempre aparece primeiro.
 // ──────────────────────────────────────────────
 export async function listarSeguros(_req: IncomingMessage, res: ServerResponse) {
-  const planos = await listarPlanos();
-
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(planos));
+  try {
+    const planos = await listarPlanos();
+    responder(res, 200, planos);
+  } catch (err) {
+    const { status, mensagem } = mapearErro(err);
+    responder(res, status, { erro: mensagem });
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -36,25 +55,29 @@ export async function listarSeguros(_req: IncomingMessage, res: ServerResponse) 
 // Body: { nome, descricao?, percentual, obrigatorio? }
 // ──────────────────────────────────────────────
 export async function criarSeguro(req: IncomingMessage, res: ServerResponse) {
-  const corpo = await lerCorpo(req);
-  const { nome, descricao, percentual, obrigatorio } = corpo;
+  try {
+    const caller = requireCaller(req);
+    requireTipo(caller, 'ADMIN');
 
-  if (!nome || percentual === undefined) {
-    res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ erro: 'Campos obrigatórios: nome, percentual.' }));
-    return;
+    const corpo = await lerCorpo(req);
+    const { nome, descricao, percentual, obrigatorio } = corpo;
+
+    if (!nome || percentual === undefined) {
+      responder(res, 400, { erro: 'Campos obrigatórios: nome, percentual.' });
+      return;
+    }
+
+    if (typeof percentual !== 'number' || percentual < 0 || percentual > 100) {
+      responder(res, 400, { erro: 'percentual deve ser um número entre 0 e 100.' });
+      return;
+    }
+
+    const plano = await criarPlano({ nome, descricao, percentual, obrigatorio });
+    responder(res, 201, plano);
+  } catch (err) {
+    const { status, mensagem } = mapearErro(err);
+    responder(res, status, { erro: mensagem });
   }
-
-  if (typeof percentual !== 'number' || percentual < 0 || percentual > 100) {
-    res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ erro: 'percentual deve ser um número entre 0 e 100.' }));
-    return;
-  }
-
-  const plano = await criarPlano({ nome, descricao, percentual, obrigatorio });
-
-  res.writeHead(201, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(plano));
 }
 
 // ──────────────────────────────────────────────
@@ -63,19 +86,25 @@ export async function criarSeguro(req: IncomingMessage, res: ServerResponse) {
 // Body: { nome?, descricao?, percentual? }
 // ──────────────────────────────────────────────
 export async function atualizarSeguro(req: IncomingMessage, res: ServerResponse, planoId: string) {
-  const corpo = await lerCorpo(req);
-  const { nome, descricao, percentual } = corpo;
+  try {
+    const caller = requireCaller(req);
+    requireTipo(caller, 'ADMIN');
 
-  const planoAtualizado = await atualizarPlano(planoId, { nome, descricao, percentual });
+    const corpo = await lerCorpo(req);
+    const { nome, descricao, percentual } = corpo;
 
-  if (!planoAtualizado) {
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ erro: 'Plano não encontrado ou sem campos para atualizar.' }));
-    return;
+    const planoAtualizado = await atualizarPlano(planoId, { nome, descricao, percentual });
+
+    if (!planoAtualizado) {
+      responder(res, 404, { erro: 'Plano não encontrado ou sem campos para atualizar.' });
+      return;
+    }
+
+    responder(res, 200, planoAtualizado);
+  } catch (err) {
+    const { status, mensagem } = mapearErro(err);
+    responder(res, status, { erro: mensagem });
   }
-
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(planoAtualizado));
 }
 
 // ──────────────────────────────────────────────
@@ -84,14 +113,20 @@ export async function atualizarSeguro(req: IncomingMessage, res: ServerResponse,
 // Planos obrigatórios (Básico) não podem ser desativados.
 // ──────────────────────────────────────────────
 export async function desativarSeguro(req: IncomingMessage, res: ServerResponse, planoId: string) {
-  const resultado = await desativarPlano(planoId);
+  try {
+    const caller = requireCaller(req);
+    requireTipo(caller, 'ADMIN');
 
-  if (!resultado.sucesso) {
-    res.writeHead(409, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ erro: resultado.motivo }));
-    return;
+    const resultado = await desativarPlano(planoId);
+
+    if (!resultado.sucesso) {
+      responder(res, 409, { erro: resultado.motivo });
+      return;
+    }
+
+    responder(res, 200, { mensagem: 'Plano desativada com sucesso.' });
+  } catch (err) {
+    const { status, mensagem } = mapearErro(err);
+    responder(res, status, { erro: mensagem });
   }
-
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ mensagem: 'Plano desativado com sucesso.' }));
 }

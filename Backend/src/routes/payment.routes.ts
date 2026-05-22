@@ -1,11 +1,12 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { query } from '../db/index.js';
 import {
-  buscarVeiculoDisponivel,
+  buscarVeiculoDisponivelPorFilial,
   calcularValorTotal,
   criarReservaPendente,
   confirmarReserva,
 } from '../services/reserva.service.js';
+import { notifyPaymentConfirmed } from '../services/whatsapp.service.js';
 
 // ──────────────────────────────────────────────
 // POST /pagamento/iniciar
@@ -23,6 +24,7 @@ export async function iniciarPagamento(req: IncomingMessage, res: ServerResponse
     data_fim,
     cliente_id,
     plano_seguro_id,  // opcional: se omitido usa o plano básico da locadora
+    metodo_pagamento, // opcional: se 'DINHEIRO', pula InfinitePay
   } = corpo;
 
   if (!modelo_id || !filial_retirada_id || !data_inicio || !data_fim || !cliente_id) {
@@ -35,7 +37,7 @@ export async function iniciarPagamento(req: IncomingMessage, res: ServerResponse
   const fim = new Date(data_fim);
 
   // Busca unidade física disponível (Garantia A)
-  const veiculoId = await buscarVeiculoDisponivel(modelo_id, inicio, fim);
+  const veiculoId = await buscarVeiculoDisponivelPorFilial(modelo_id, filial_retirada_id, inicio, fim);
 
   if (!veiculoId) {
     res.writeHead(409, { 'Content-Type': 'application/json' });
@@ -69,6 +71,8 @@ export async function iniciarPagamento(req: IncomingMessage, res: ServerResponse
     emailCliente: dadosCliente.rows[0].email,
     descricaoModelo: `${dadosModelo.rows[0].marca} ${dadosModelo.rows[0].nome}`,
     planoSeguroId: plano_seguro_id,
+    metodoPagamento: metodo_pagamento,
+    origem: 'APP',
   });
 
   res.writeHead(201, { 'Content-Type': 'application/json' });
@@ -98,11 +102,23 @@ export async function receberWebhook(req: IncomingMessage, res: ServerResponse) 
     return;
   }
 
-  await confirmarReserva({ order_nsu, transaction_nsu, invoice_slug, capture_method, receipt_url });
+  const resultado = await confirmarReserva({ order_nsu, transaction_nsu, invoice_slug, capture_method, receipt_url });
+
+  if (resultado !== 'not_found') {
+    void notifyPaymentConfirmed(order_nsu).catch((err) => {
+      console.error('[Pagamento] Falha ao notificar WhatsApp:', err);
+    });
+  }
 
   // InfinitePay exige resposta rápida (< 1 segundo)
-  res.writeHead(200);
-  res.end();
+  if (resultado === 'not_found') {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, message: 'Pedido não encontrado' }));
+    return;
+  }
+
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ success: true, message: null }));
 }
 
 // ──────────────────────────────────────────────
@@ -119,6 +135,15 @@ export async function statusPagamento(req: IncomingMessage, res: ServerResponse,
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ erro: 'Reserva não encontrada.' }));
     return;
+  }
+
+  // Se o status já estiver confirmado e a notificação do WhatsApp ainda não tiver acontecido
+  // (por exemplo: webhook perdido), tenta notificar no caminho de polling também.
+  const status = String(resultado.rows[0]?.status || '');
+  if (status === 'RESERVADA') {
+    void notifyPaymentConfirmed(reservaId).catch((err) => {
+      console.error('[Pagamento] Falha ao notificar WhatsApp (polling):', err);
+    });
   }
 
   res.writeHead(200, { 'Content-Type': 'application/json' });

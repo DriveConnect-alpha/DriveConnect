@@ -1,16 +1,20 @@
 -- Extensões úteis
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ──────────────────────────────────────────────
 -- USUÁRIO (autenticação central)
 -- tipo GERENTE: pode ser global (filial_id NULL em gerente)
 --               ou vinculado a uma filial (filial_id preenchido)
 -- ──────────────────────────────────────────────
-CREATE TABLE usuario (
+CREATE TABLE IF NOT EXISTS usuario (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
     senha TEXT NOT NULL,
     tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('CLIENTE', 'GERENTE', 'ADMIN')),
+    reset_token VARCHAR(255),
+    reset_token_expira_em TIMESTAMP,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deletado_em TIMESTAMP
 );
@@ -18,13 +22,14 @@ CREATE TABLE usuario (
 -- ──────────────────────────────────────────────
 -- CLIENTE
 -- ──────────────────────────────────────────────
-CREATE TABLE cliente (
+CREATE TABLE IF NOT EXISTS cliente (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     usuario_id UUID UNIQUE REFERENCES usuario(id),
     nome_completo VARCHAR(255) NOT NULL,
     cpf VARCHAR(14) UNIQUE NOT NULL,
     rg VARCHAR(20),
     cnh VARCHAR(20),
+    telefone VARCHAR(20),
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deletado_em TIMESTAMP
 );
@@ -33,7 +38,7 @@ CREATE TABLE cliente (
 -- FILIAL
 -- Unidade física da empresa. Não há mais vínculo com franquia.
 -- ──────────────────────────────────────────────
-CREATE TABLE filial (
+CREATE TABLE IF NOT EXISTS filial (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     nome VARCHAR(255),
     cep VARCHAR(10),
@@ -52,7 +57,7 @@ CREATE TABLE filial (
 -- GERENTE
 -- Substitui o perfil de "franquia". filial_id NULL = acesso global.
 -- ──────────────────────────────────────────────
-CREATE TABLE gerente (
+CREATE TABLE IF NOT EXISTS gerente (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     usuario_id UUID UNIQUE REFERENCES usuario(id),
     nome_completo VARCHAR(255) NOT NULL,
@@ -66,7 +71,7 @@ CREATE TABLE gerente (
 -- O plano Básico tem obrigatorio = TRUE e é sempre incluído na reserva.
 -- Constraint garante no máximo 1 plano obrigatório ativo globalmente.
 -- ──────────────────────────────────────────────
-CREATE TABLE plano_seguro (
+CREATE TABLE IF NOT EXISTS plano_seguro (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
     nome VARCHAR(100) NOT NULL,       -- ex: 'Básico', 'Standard', 'Premium'
@@ -82,14 +87,14 @@ CREATE TABLE plano_seguro (
 
 -- Garante 1 único plano obrigatório ativo globalmente
 CREATE EXTENSION IF NOT EXISTS btree_gist;
-CREATE UNIQUE INDEX unique_plano_obrigatorio_global
+CREATE UNIQUE INDEX IF NOT EXISTS unique_plano_obrigatorio_global
     ON plano_seguro ((TRUE))
     WHERE (obrigatorio = TRUE AND deletado_em IS NULL AND ativo = TRUE);
 
 -- ──────────────────────────────────────────────
 -- TIPO DE CARRO (categoria)
 -- ──────────────────────────────────────────────
-CREATE TABLE tipo_carro (
+CREATE TABLE IF NOT EXISTS tipo_carro (
     id SERIAL PRIMARY KEY,
     nome VARCHAR(50) NOT NULL,
     preco_base_diaria DECIMAL(10,2) NOT NULL
@@ -98,7 +103,7 @@ CREATE TABLE tipo_carro (
 -- ──────────────────────────────────────────────
 -- MODELO
 -- ──────────────────────────────────────────────
-CREATE TABLE modelo (
+CREATE TABLE IF NOT EXISTS modelo (
     id SERIAL PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
     marca VARCHAR(100),
@@ -108,7 +113,7 @@ CREATE TABLE modelo (
 -- ──────────────────────────────────────────────
 -- VEÍCULO (unidade física)
 -- ──────────────────────────────────────────────
-CREATE TABLE veiculo (
+CREATE TABLE IF NOT EXISTS veiculo (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     modelo_id INT REFERENCES modelo(id),
     filial_id UUID REFERENCES filial(id),
@@ -116,14 +121,30 @@ CREATE TABLE veiculo (
     ano INT NOT NULL,
     cor VARCHAR(50),
     status VARCHAR(20) NOT NULL CHECK (status IN ('DISPONIVEL', 'ALUGADO', 'MANUTENCAO')),
+    imagem_url TEXT,
+    preco_diaria DECIMAL(10,2) DEFAULT 0.00,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deletado_em TIMESTAMP
 );
 
 -- ──────────────────────────────────────────────
+-- ITENS / ACESSÓRIOS DO VEÍCULO
+-- ─────────────────────────────────────────faça com que o bot de whatsapp consiga cadastrar clientes, bastando pedir cpf e email─────
+CREATE TABLE IF NOT EXISTS item (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(100) UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS veiculo_item (
+    veiculo_id UUID REFERENCES veiculo(id) ON DELETE CASCADE,
+    item_id INT REFERENCES item(id) ON DELETE CASCADE,
+    PRIMARY KEY (veiculo_id, item_id)
+);
+
+-- ──────────────────────────────────────────────
 -- RESERVA / ALUGUEL
 -- ──────────────────────────────────────────────
-CREATE TABLE reserva (
+CREATE TABLE IF NOT EXISTS reserva (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     cliente_id UUID REFERENCES cliente(id),
     veiculo_id UUID REFERENCES veiculo(id),
@@ -134,6 +155,7 @@ CREATE TABLE reserva (
     data_retirada_real TIMESTAMP,
     data_devolucao_real TIMESTAMP,
     valor_total DECIMAL(10,2),
+    valor_adicional DECIMAL(10,2) DEFAULT 0.00,
     -- PENDENTE_PAGAMENTO: aguardando pagamento (bloqueio temporário do veículo)
     -- EXPIRADA: pagamento não concluído no tempo limite, veículo liberado
     status VARCHAR(25) NOT NULL CHECK (status IN ('PENDENTE_PAGAMENTO', 'RESERVADA', 'ATIVA', 'FINALIZADA', 'CANCELADA', 'EXPIRADA')),
@@ -159,7 +181,7 @@ CREATE TABLE reserva (
 -- ──────────────────────────────────────────────
 -- TABELA DE PREÇO DINÂMICO
 -- ──────────────────────────────────────────────
-CREATE TABLE tabela_preco (
+CREATE TABLE IF NOT EXISTS tabela_preco (
     id SERIAL PRIMARY KEY,
     tipo_carro_id INT REFERENCES tipo_carro(id),
     filial_id UUID REFERENCES filial(id),
@@ -171,7 +193,7 @@ CREATE TABLE tabela_preco (
 -- ──────────────────────────────────────────────
 -- CONTROLE FINANCEIRO (global; filial_id para rastreio por unidade)
 -- ──────────────────────────────────────────────
-CREATE TABLE transacao (
+CREATE TABLE IF NOT EXISTS transacao (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     filial_id UUID REFERENCES filial(id),  -- NULL = transação corporativa
     tipo VARCHAR(20) CHECK (tipo IN ('ENTRADA', 'SAIDA')),
@@ -184,8 +206,98 @@ CREATE TABLE transacao (
 -- ──────────────────────────────────────────────
 -- ÍNDICES (performance)
 -- ──────────────────────────────────────────────
-CREATE INDEX idx_veiculo_filial ON veiculo(filial_id);
-CREATE INDEX idx_reserva_veiculo ON reserva(veiculo_id);
-CREATE INDEX idx_reserva_cliente ON reserva(cliente_id);
-CREATE INDEX idx_reserva_periodo ON reserva(data_inicio, data_fim);
-CREATE INDEX idx_gerente_filial ON gerente(filial_id);
+CREATE INDEX IF NOT EXISTS idx_veiculo_filial ON veiculo(filial_id);
+CREATE INDEX IF NOT EXISTS idx_reserva_veiculo ON reserva(veiculo_id);
+CREATE INDEX IF NOT EXISTS idx_reserva_cliente ON reserva(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_reserva_periodo ON reserva(data_inicio, data_fim);
+CREATE TABLE IF NOT EXISTS veiculo_imagem (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    veiculo_id UUID NOT NULL REFERENCES veiculo(id) ON DELETE CASCADE,
+    filename VARCHAR(255) NOT NULL,
+    is_principal BOOLEAN DEFAULT FALSE,
+    ordem INT DEFAULT 0,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_veiculo_imagem_veiculo ON veiculo_imagem(veiculo_id);
+
+CREATE INDEX IF NOT EXISTS idx_gerente_filial ON gerente(filial_id);
+
+-- ──────────────────────────────────────────────
+-- WHATSAPP (conversas e mensagens)
+-- ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS whatsapp_conversation (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    phone VARCHAR(32) UNIQUE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+    last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS whatsapp_message (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conversation_id UUID REFERENCES whatsapp_conversation(id) ON DELETE CASCADE,
+    direction VARCHAR(3) NOT NULL CHECK (direction IN ('IN', 'OUT')),
+    wa_message_id VARCHAR(128),
+    text TEXT,
+    raw_payload JSONB,
+    status VARCHAR(20) NOT NULL DEFAULT 'received',
+    error TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_whatsapp_message_conversation ON whatsapp_message(conversation_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_message_wa_id ON whatsapp_message(wa_message_id);
+
+CREATE TABLE IF NOT EXISTS whatsapp_reserva (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    reserva_id UUID UNIQUE REFERENCES reserva(id) ON DELETE CASCADE,
+    phone VARCHAR(32) NOT NULL,
+    conversation_id UUID REFERENCES whatsapp_conversation(id) ON DELETE SET NULL,
+    notified_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_whatsapp_reserva_phone ON whatsapp_reserva(phone);
+
+-- ──────────────────────────────────────────────
+-- FCM (Tokens de Notificação)
+-- ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS fcm_token (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    usuario_id UUID NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+    token TEXT UNIQUE NOT NULL,
+    plataforma VARCHAR(20),
+    device_id VARCHAR(100),
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_fcm_token_usuario ON fcm_token(usuario_id);
+
+-- ──────────────────────────────────────────────
+-- RAG / PGVector (LangChain)
+-- ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS langchain_pg_collection (
+    uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    cmetadata JSONB
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_langchain_pg_collection_name ON langchain_pg_collection(name);
+
+CREATE TABLE IF NOT EXISTS langchain_pg_embedding (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    collection_id UUID REFERENCES langchain_pg_collection(uuid) ON DELETE CASCADE,
+    embedding vector(1536),
+    document TEXT,
+    metadata JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_collection ON langchain_pg_embedding(collection_id);
+CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_vector ON langchain_pg_embedding USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+-- ──────────────────────────────────────────────
+-- AJUSTES EM TABELAS EXISTENTES (Idempotência de colunas)
+-- ──────────────────────────────────────────────
+ALTER TABLE veiculo ADD COLUMN IF NOT EXISTS preco_diaria DECIMAL(10,2) DEFAULT 0.00;

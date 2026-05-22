@@ -41,5 +41,14 @@ app.*.map.json
 
 # Android Studio will place build artifacts here
 /android/app/debug
-/android/app/profile
 /android/app/release
+
+# Env Variables
+.env
+.env*
+!.env.example
+
+# Firebase
+/android/app/google-services.json
+/android/app/src/*/google-services.json
+/ios/Runner/GoogleService-Info.plist

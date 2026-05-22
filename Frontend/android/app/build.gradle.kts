@@ -5,6 +5,16 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Firebase (Google Services)
+// Permite buildar mesmo sem `google-services.json` (ex: ambiente dev/CI sem segredo),
+// mas o Firebase/FCM só vai funcionar quando o arquivo estiver presente.
+val googleServicesJson = file("google-services.json")
+if (googleServicesJson.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.warn("google-services.json ausente em android/app. Firebase/FCM ficará desabilitado neste build.")
+}
+
 android {
     namespace = "com.nyx_g3.driveconnect.frontend"
     compileSdk = flutter.compileSdkVersion

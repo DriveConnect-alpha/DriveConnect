@@ -88,7 +88,7 @@ class DriveConnectApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool useMock = _useMockServices(); // Toggle centralizado
 
-    // Configure session expiry handler (JWT 401 → logout)
+     // Configure session expiry handler (JWT 401 → logout)
     onSessionExpired = () {
       final ctx = AppRouter.rootNavigatorKey.currentContext;
       if (ctx != null) {
